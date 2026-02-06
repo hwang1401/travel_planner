@@ -416,6 +416,285 @@ const CATEGORY_COLORS = {
   "교통": { bg: "#FFFDE8", color: "#8A7E22", border: "#F0EAAC" },
 };
 
+const SHOPPING_GUIDE = {
+  spots: [
+    {
+      name: "쿠마몬 스퀘어",
+      sub: "くまモンスクエア",
+      loc: "쓰루야 백화점 내",
+      mapQuery: "くまモンスクエア 熊本",
+      details: ["입장료 무료", "360도 스테이지, 포토스팟, AR 게임", "BAZAAR 코너 — 100종류 이상 굿즈, 스퀘어 한정 레어 아이템"],
+      schedule: "공연 11:30 / 14:00 (매일) + 16:30 (주말)",
+      tip: "Day2 시모토리 동선에서 쓰루야 백화점과 함께 방문",
+    },
+    {
+      name: "쿠마몬 빌리지",
+      sub: "くまモンビレッジ",
+      loc: "사쿠라마치 쇼핑몰 2층",
+      mapQuery: "くまモンビレッジ サクラマチ熊本",
+      details: ["쿠마몬 굿즈 전문매장 (스퀘어보다 종류 다양)", "5,000엔 이상 면세 가능", "5층 옥상 자이언트 쿠마몬 + 일본식 정원", "같은 건물: 지브리숍, 가차숍, 버스터미널"],
+      tip: "Day3 저녁 야츠다 가기 전 시모토리 가는 길에 잠깐 들르기",
+    },
+    {
+      name: "원피스 루피 동상",
+      sub: "ルフィ像",
+      loc: "구마모토현청 프롬나드",
+      mapQuery: "ルフィ像 熊本県庁",
+      details: ["오다 에이이치로 출신지 → 2016년 대지진 부흥 프로젝트", "시내 접근 가능: 루피(현청), 쵸파(동식물원)", "동상 옆 QR코드 → 캐릭터 대사 재생"],
+      tip: "Day2 스이젠지 공원 가는 길에 현청 앞에서 인증샷",
+    },
+    {
+      name: "가미토리 쿠마몬 조형물",
+      sub: "上通りアーケード",
+      loc: "가미토리 상점가 중심부",
+      mapQuery: "上通りアーケード 熊本",
+      details: ["시모토리와 연결", "구마모토시 현대미술관·전통공예관 인접"],
+      tip: "시모토리보다 한적해서 여유롭게 인증샷",
+    },
+  ],
+  food: [
+    { name: "쿠리센리 (栗千里)", desc: "구마모토산 밤 구운 몽블랑. 전국 향토 간식 랭킹 1위", price: "5개입 729엔 / 8개입 1,166엔", where: "쓰루야 백화점, JR구마모토역, 공항", mapQuery: "鶴屋百貨店 熊本" },
+    { name: "이키나리당고", desc: "고구마+팥 향토 만두. '간단하게'라는 뜻", price: "1개 100엔", where: "다이후쿠도(가미토리), 기념품점", mapQuery: "大福堂 上通り 熊本" },
+    { name: "카라시렌콘", desc: "400년 역사. 연근에 겨자 채워 튀긴 명물", price: "선물박스 있음", where: "모리 카라시렌콘, 쓰루야 백화점", mapQuery: "森からし蓮根 熊本" },
+    { name: "후가롤 (ふがロール)", desc: "바삭한 과자. 유통기한 10~11개월", price: "843엔~", where: "에즈 본점, 쓰루야 백화점, 공항", mapQuery: "Hez 本店 熊本" },
+    { name: "리큐어 마론", desc: "1962년 창업 노포 롱셀러. 리큐어+밤 버터크림", price: "-", where: "미도리노긴시 직영점, 쓰루야 백화점", mapQuery: "みどりの銀糸 熊本" },
+    { name: "쿠마몬 과자 (각종)", desc: "콜라보 과자, 한정판 식품류. 도쿄바나나 쿠마몬 에디션 등", price: "수백엔~", where: "역, 공항, 편의점, 기념품점", mapQuery: "JR熊本駅 肥後よかモン市場" },
+    { name: "구마모토 라멘 (인스턴트)", desc: "마늘기름+돈코츠 국물 포장라멘", price: "수백엔~", where: "돈키호테, 기념품점, 공항", mapQuery: "ドンキホーテ 下通り 熊本" },
+  ],
+  goods: [
+    { name: "쿠마몬 굿즈", desc: "머그컵, 에코백, 수건, 볼펜, 스트랩, 노트 등", where: "쿠마몬 빌리지(사쿠라마치), 쿠마몬 스퀘어(쓰루야)", mapQuery: "くまモンビレッジ サクラマチ熊本" },
+    { name: "쿠마몬 스퀘어 한정", desc: "실사 쿠마몬 상품, 시즌 한정판 (여기서만 구매)", where: "쿠마몬 스퀘어 BAZAAR only", mapQuery: "くまモンスクエア 熊本" },
+    { name: "히고코마 (肥後こま)", desc: "에도시대 전통 팽이. 12종 모양, 행운 부적", where: "구마모토 전통공예관, 기념품점", mapQuery: "熊本県伝統工芸館" },
+    { name: "히고 상감 (肥後象嵌)", desc: "400년 전통 금속공예. 펜던트, 넥타이핀 등", where: "쓰루야 백화점, 전통공예관", mapQuery: "熊本県伝統工芸館" },
+  ],
+  shops: [
+    {
+      name: "시모토리 아케이드",
+      sub: "下通り",
+      desc: "구마모토 최대 쇼핑 아케이드 (510m, 폭 15m)",
+      mapQuery: "下通りアーケード 熊本",
+      items: ["돈키호테 시모토리점 — 의약품, 화장품, 위스키, 과자 (면세)", "드럭스토어 — 코스모스, 마츠모토키요시 등", "각종 잡화점, 카페, 음식점"],
+      tip: "Day2, Day3 저녁 동선에서 자연스럽게 방문",
+    },
+    {
+      name: "쓰루야 백화점",
+      sub: "鶴屋百貨店",
+      desc: "구마모토현 유일 백화점. 본관/별관/윙관 3개동",
+      mapQuery: "鶴屋百貨店 熊本",
+      items: ["쿠마몬 스퀘어 (무료, 공연+굿즈+카페)", "지하 식품관 — 과자 기념품 집중 구매", "본관 1층 — 손수건, 양말, 우산 등", "별관 2층 — 명품 브랜드 (면세 가능)"],
+      tip: "시모토리에서 도보 연결",
+    },
+    {
+      name: "사쿠라마치 쇼핑몰",
+      sub: "SAKURA MACHI Kumamoto",
+      desc: "쇼핑몰 + 호텔 + 버스터미널 복합시설",
+      mapQuery: "SAKURA MACHI Kumamoto",
+      items: ["쿠마몬 빌리지 (2층) — 쿠마몬 굿즈 최다", "지브리숍, 가차숍", "5층 옥상 — 자이언트 쿠마몬 + 정원", "버스터미널 옆 기념품숍"],
+      tip: "시모토리에서 도보 5분",
+    },
+    {
+      name: "JR 구마모토역",
+      sub: "히고요카몬 시장",
+      desc: "역 안 기념품 구역",
+      mapQuery: "JR熊本駅 肥後よかモン市場",
+      items: ["쿠리센리 등 대표 과자 대부분 구비", "출발/도착 시 빠르게 기념품 사기 좋음"],
+      tip: "Day2 도착, Day4 출발 시 활용",
+    },
+  ],
+};
+
+function MapButton({ query }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, "_blank");
+      }}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: "4px",
+        padding: "4px 10px", border: "1px solid #D4E8D0", borderRadius: "8px",
+        background: "#F0F8EE", color: "#2D7A3A", fontSize: "10px", fontWeight: 600,
+        cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0,
+      }}
+    >
+      📍 지도
+    </button>
+  );
+}
+
+function ShoppingGuideDialog({ onClose }) {
+  const [tab, setTab] = useState(0);
+  const tabs = [
+    { key: "spots", label: "📸 구경거리" },
+    { key: "food", label: "🍘 먹거리" },
+    { key: "goods", label: "🧸 굿즈" },
+    { key: "shops", label: "🛍️ 쇼핑스팟" },
+  ];
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "16px",
+        animation: "fadeIn 0.2s ease",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%", maxWidth: "420px", maxHeight: "85vh",
+          background: "#fff", borderRadius: "18px",
+          overflow: "hidden", animation: "slideUp 0.25s ease",
+          display: "flex", flexDirection: "column",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: "16px 16px 0 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1a1a1a" }}>
+            🐻 구마모토 쇼핑 가이드
+          </h3>
+          <button onClick={onClose} style={{
+            border: "none", background: "#F2F1ED", borderRadius: "50%",
+            width: "28px", height: "28px", cursor: "pointer",
+            fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "inherit",
+          }}>✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{
+          display: "flex", gap: "4px", padding: "14px 20px 0",
+          overflowX: "auto",
+        }}>
+          {tabs.map((t, i) => (
+            <button key={i} onClick={() => setTab(i)} style={{
+              flex: "none", padding: "7px 12px", border: "none", borderRadius: "10px",
+              background: tab === i ? "#1a1a1a" : "#F2F1ED",
+              color: tab === i ? "#fff" : "#777",
+              fontSize: "11px", fontWeight: tab === i ? 700 : 500,
+              cursor: "pointer", fontFamily: "inherit",
+              transition: "all 0.15s", whiteSpace: "nowrap",
+            }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px 20px" }}>
+
+          {/* 구경거리 탭 */}
+          {tab === 0 && SHOPPING_GUIDE.spots.map((s, i) => (
+            <div key={i} style={{
+              marginBottom: "12px", padding: "14px",
+              background: "#FAFAF8", borderRadius: "12px",
+              border: "1px solid #EEECE6",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: "14px", fontWeight: 800, color: "#111" }}>{s.name}</p>
+                  <p style={{ margin: 0, fontSize: "10px", color: "#aaa" }}>{s.sub}</p>
+                </div>
+                <MapButton query={s.mapQuery} />
+              </div>
+              <p style={{ margin: "0 0 8px", fontSize: "11px", color: "#888" }}>📍 {s.loc}</p>
+              {s.schedule && (
+                <p style={{ margin: "0 0 8px", fontSize: "11px", color: "#C75D20", fontWeight: 600 }}>🕐 {s.schedule}</p>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "8px" }}>
+                {s.details.map((d, j) => (
+                  <div key={j} style={{ display: "flex", gap: "6px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#ccc", fontSize: "8px", marginTop: "5px" }}>●</span>
+                    <span style={{ fontSize: "11px", color: "#555", lineHeight: 1.5 }}>{d}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{
+                padding: "6px 10px", background: "#FFF9E8", borderRadius: "8px",
+                border: "1px solid #F0E8C8",
+              }}>
+                <span style={{ fontSize: "10px", color: "#8A7322", lineHeight: 1.5 }}>💡 {s.tip}</span>
+              </div>
+            </div>
+          ))}
+
+          {/* 먹거리 탭 */}
+          {tab === 1 && SHOPPING_GUIDE.food.map((f, i) => (
+            <div key={i} style={{
+              marginBottom: "10px", padding: "14px",
+              background: "#FAFAF8", borderRadius: "12px",
+              border: "1px solid #EEECE6",
+            }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
+                <p style={{ margin: 0, fontSize: "13px", fontWeight: 800, color: "#111" }}>{f.name}</p>
+                <MapButton query={f.mapQuery} />
+              </div>
+              <p style={{ margin: "0 0 6px", fontSize: "11px", color: "#555", lineHeight: 1.5 }}>{f.desc}</p>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", fontSize: "10px", color: "#888" }}>
+                {f.price !== "-" && <span>💰 {f.price}</span>}
+                <span>🏬 {f.where}</span>
+              </div>
+            </div>
+          ))}
+
+          {/* 굿즈 탭 */}
+          {tab === 2 && SHOPPING_GUIDE.goods.map((g, i) => (
+            <div key={i} style={{
+              marginBottom: "10px", padding: "14px",
+              background: "#FAFAF8", borderRadius: "12px",
+              border: "1px solid #EEECE6",
+            }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
+                <p style={{ margin: 0, fontSize: "13px", fontWeight: 800, color: "#111" }}>{g.name}</p>
+                <MapButton query={g.mapQuery} />
+              </div>
+              <p style={{ margin: "0 0 6px", fontSize: "11px", color: "#555", lineHeight: 1.5 }}>{g.desc}</p>
+              <p style={{ margin: 0, fontSize: "10px", color: "#888" }}>🏬 {g.where}</p>
+            </div>
+          ))}
+
+          {/* 쇼핑스팟 탭 */}
+          {tab === 3 && SHOPPING_GUIDE.shops.map((s, i) => (
+            <div key={i} style={{
+              marginBottom: "12px", padding: "14px",
+              background: "#FAFAF8", borderRadius: "12px",
+              border: "1px solid #EEECE6",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: "14px", fontWeight: 800, color: "#111" }}>{s.name}</p>
+                  <p style={{ margin: 0, fontSize: "10px", color: "#aaa" }}>{s.sub}</p>
+                </div>
+                <MapButton query={s.mapQuery} />
+              </div>
+              <p style={{ margin: "4px 0 10px", fontSize: "11px", color: "#888" }}>{s.desc}</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "8px" }}>
+                {s.items.map((item, j) => (
+                  <div key={j} style={{ display: "flex", gap: "6px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#ccc", fontSize: "8px", marginTop: "5px" }}>●</span>
+                    <span style={{ fontSize: "11px", color: "#555", lineHeight: 1.5 }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{
+                padding: "6px 10px", background: "#FFF9E8", borderRadius: "8px",
+                border: "1px solid #F0E8C8",
+              }}>
+                <span style={{ fontSize: "10px", color: "#8A7322", lineHeight: 1.5 }}>💡 {s.tip}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DocumentDialog({ onClose }) {
   const [tab, setTab] = useState(0);
   const [viewImage, setViewImage] = useState(null);
@@ -857,6 +1136,7 @@ export default function TravelPlanner() {
   const [selectedDay, setSelectedDay] = useState(0);
   const [activeDetail, setActiveDetail] = useState(null);
   const [showDocs, setShowDocs] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const current = DAYS[selectedDay];
 
   return (
@@ -885,6 +1165,19 @@ export default function TravelPlanner() {
             2026.02.19 — 02.24 · 5박 6일
           </p>
         </div>
+        <button
+          onClick={() => setShowGuide(true)}
+          style={{
+            width: "36px", height: "36px", borderRadius: "10px",
+            border: "1px solid #E8E6E1", background: "#FAFAF8",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", fontSize: "16px", flexShrink: 0,
+            transition: "background 0.15s",
+          }}
+          title="쇼핑 가이드"
+        >
+          🐻
+        </button>
         <button
           onClick={() => setShowDocs(true)}
           style={{
@@ -1066,6 +1359,9 @@ export default function TravelPlanner() {
 
       {/* Document Dialog */}
       {showDocs && <DocumentDialog onClose={() => setShowDocs(false)} />}
+
+      {/* Shopping Guide Dialog */}
+      {showGuide && <ShoppingGuideDialog onClose={() => setShowGuide(false)} />}
     </div>
   );
 }
