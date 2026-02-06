@@ -1036,7 +1036,7 @@ function ImageViewer({ src, alt, onClose }) {
   );
 }
 
-function DetailDialog({ detail, onClose, dayColor }) {
+function DetailDialog({ detail, onClose, onEdit, dayColor }) {
   if (!detail) return null;
   const [viewImage, setViewImage] = useState(null);
   const cat = CATEGORY_COLORS[detail.category] || { bg: "#f5f5f5", color: "#555", border: "#ddd" };
@@ -1088,12 +1088,22 @@ function DetailDialog({ detail, onClose, dayColor }) {
               {detail.category}
             </span>
           </div>
-          <button onClick={onClose} style={{
-            flexShrink: 0, border: "none", background: "#F2F1ED", borderRadius: "50%",
-            width: "28px", height: "28px", cursor: "pointer",
-            fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: "inherit",
-          }}>✕</button>
+          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+            {onEdit && (
+              <button onClick={onEdit} style={{
+                border: "none", background: "#EEF6FF", borderRadius: "50%",
+                width: "28px", height: "28px", cursor: "pointer",
+                fontSize: "12px", color: "#2B6CB0", display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: "inherit",
+              }}>✏️</button>
+            )}
+            <button onClick={onClose} style={{
+              border: "none", background: "#F2F1ED", borderRadius: "50%",
+              width: "28px", height: "28px", cursor: "pointer",
+              fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+              fontFamily: "inherit",
+            }}>✕</button>
+          </div>
         </div>
 
         {/* Image - top, outside scroll area for full bleed */}
@@ -1694,7 +1704,7 @@ export default function TravelPlanner() {
                   if (item._custom) {
                     setEditTarget({ item, sectionIdx: si, itemIdx: ii, dayIdx: selectedDay });
                   } else if (hasDetail) {
-                    setActiveDetail(item.detail);
+                    setActiveDetail({ ...item.detail, _item: item, _si: si, _ii: ii, _di: selectedDay });
                   }
                 };
                 return (
@@ -1785,6 +1795,11 @@ export default function TravelPlanner() {
       <DetailDialog
         detail={activeDetail}
         onClose={() => setActiveDetail(null)}
+        onEdit={activeDetail?._item ? () => {
+          const d = activeDetail;
+          setActiveDetail(null);
+          setEditTarget({ item: d._item, sectionIdx: d._si, itemIdx: d._ii, dayIdx: d._di });
+        } : null}
         dayColor={current.color}
       />
 
