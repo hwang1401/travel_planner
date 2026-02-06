@@ -420,7 +420,7 @@ function DocumentDialog({ onClose }) {
   const [tab, setTab] = useState(0);
   const tabs = [
     { label: "✈️ 항공권", image: "/images/ticket_departure.jpg", caption: "KE8795 인천→후쿠오카 / KE788 후쿠오카→인천" },
-    { label: "🚄 JR패스", image: "/images/jr_pass.png", caption: "JR 북큐슈 5일권 · 예약번호: FGY393247 (성인 2매)" },
+    { label: "🚄 JR패스", image: "/images/jrpass.jpg", caption: "JR 북큐슈 5일권 · 예약번호: FGY393247 (성인 2매)" },
   ];
   const current = tabs[tab];
 
