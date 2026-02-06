@@ -931,7 +931,8 @@ function DetailDialog({ detail, onClose, dayColor }) {
             {detail.address && (
               <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                 <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>📍</span>
-                <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{detail.address}</span>
+                <span style={{ flex: 1, fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{detail.address}</span>
+                <MapButton query={detail.address} />
               </div>
             )}
             {detail.hours && (
@@ -1262,6 +1263,11 @@ export default function TravelPlanner() {
                         </p>
                       )}
                     </div>
+                    {item.detail && item.detail.address && (
+                      <div style={{ flexShrink: 0, alignSelf: "center" }}>
+                        <MapButton query={item.detail.address} />
+                      </div>
+                    )}
                   </div>
                 );
               })}
