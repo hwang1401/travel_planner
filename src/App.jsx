@@ -398,6 +398,198 @@ const DAYS = [
   },
 ];
 
+const DAY_INFO = {
+  1: {
+    meals: {
+      dinner: [
+        { name: "캐널시티 라멘스타디움", time: "18:25", price: "~1,000엔", mapQuery: "キャナルシティ博多 ラーメンスタジアム", note: "전국 유명 라멘 8개 점포 푸드코트" },
+        { name: "쿠라스시 나카스점", time: "20:20", price: "1인 1,500~2,500엔", mapQuery: "くら寿司 中洲店 福岡", note: "회전초밥, 터치패널 주문" },
+      ],
+    },
+    stay: { name: "하카타 에어비앤비", address: "福岡市博多区住吉 2-13-13", mapQuery: "福岡市博多区住吉 2-13-13", checkin: "18:15", checkout: "Day2 10:00", note: "캐널시티 도보 3분 / 하카타역 도보 15분" },
+  },
+  2: {
+    meals: {
+      lunch: [
+        { name: "코란테이 (紅蘭亭)", time: "12:10", price: "~1,200엔", mapQuery: "紅蘭亭 下通本店 熊本", note: "타이피엔 — 구마모토 향토 중화 당면 스프" },
+      ],
+      dinner: [
+        { name: "스가노야 긴자도리점", time: "18:00", price: "코스 5,000~8,000엔", mapQuery: "菅乃屋 銀座通り店 熊本", note: "바사시(말고기) 코스 · ⚠️ 전일 예약 필수!" },
+      ],
+    },
+    stay: { name: "구마모토 호텔", address: "구마모토역 근처", mapQuery: "熊本駅 ホテル", checkin: "16:35", checkout: "Day3 아침", note: "구마모토역에서 도보 이동" },
+  },
+  3: {
+    meals: {
+      lunch: [
+        { name: "이마킨 식당 — 아카규동", time: "12:00", price: "1,780엔", mapQuery: "いまきん食堂 阿蘇", note: "100년 노포, 아카우시 덮밥 · 줄서는 곳" },
+      ],
+      dinner: [
+        { name: "야츠다 — 숯불 야키토리", time: "19:00", price: "1인 ~3,000엔", mapQuery: "炭火焼やつ田 熊本 下通", note: "당일 도축 조비키도리 + 구마모토 안주" },
+      ],
+    },
+    stay: { name: "구마모토 호텔", address: "구마모토역 근처", mapQuery: "熊本駅 ホテル", checkin: "17:15 (귀환)", checkout: "Day4 오전", note: "Day2와 동일 숙소" },
+  },
+  4: {
+    meals: {
+      dinner: [
+        { name: "료칸 카이세키 요리", time: "저녁", price: "숙박 포함", mapQuery: "由布院 旅館", note: "료칸 내 일본 전통 코스 요리" },
+      ],
+    },
+    stay: { name: "유후인 료칸", address: "유후인 온천 지역", mapQuery: "由布院温泉 旅館", checkin: "점심경", checkout: "Day5 오전", note: "료칸 후보: 센도·바이엔·겟토안 / 온천 포함" },
+  },
+  5: {
+    meals: {
+      dinner: [
+        { name: "나카스 포장마차 야타이", time: "저녁", price: "1인 2,000~3,000엔", mapQuery: "中洲屋台 福岡", note: "강변 포장마차 — 라멘, 교자, 야키토리" },
+      ],
+    },
+    stay: { name: "하카타 숙소", address: "하카타역 인근", mapQuery: "博多駅 ホテル", checkin: "오후", checkout: "Day6 오전", note: "캐널시티·텐진 접근 용이한 곳" },
+  },
+  6: {
+    meals: {},
+    stay: { name: "귀국", address: "후쿠오카 공항", mapQuery: "福岡空港 国際線", checkin: "-", checkout: "10:30 출발", note: "KE788 후쿠오카 10:30 → 인천 12:00" },
+  },
+};
+
+function DayInfoDialog({ dayNum, tab, onClose, color }) {
+  const [activeTab, setActiveTab] = useState(tab);
+  const info = DAY_INFO[dayNum];
+  if (!info) return null;
+
+  const meals = info.meals || {};
+  const mealSections = [];
+  if (meals.breakfast) mealSections.push({ label: "조식", items: meals.breakfast });
+  if (meals.lunch) mealSections.push({ label: "점심", items: meals.lunch });
+  if (meals.dinner) mealSections.push({ label: "석식", items: meals.dinner });
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+        padding: "16px",
+        animation: "fadeIn 0.2s ease",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%", maxWidth: "420px", maxHeight: "75vh",
+          background: "#fff", borderRadius: "20px 20px 16px 16px",
+          overflow: "hidden", animation: "slideUp 0.25s ease",
+          display: "flex", flexDirection: "column",
+        }}
+      >
+        {/* Header with tabs */}
+        <div style={{
+          display: "flex", borderBottom: "1px solid #EEECE6", flexShrink: 0,
+        }}>
+          {["meals", "stay"].map((t) => (
+            <button key={t} onClick={() => setActiveTab(t)} style={{
+              flex: 1, padding: "14px 0", border: "none", background: "none",
+              borderBottom: activeTab === t ? `2.5px solid ${color}` : "2.5px solid transparent",
+              color: activeTab === t ? color : "#aaa",
+              fontSize: "13px", fontWeight: activeTab === t ? 700 : 400,
+              cursor: "pointer", fontFamily: "inherit",
+              transition: "all 0.15s",
+            }}>
+              {t === "meals" ? "🍽 식사" : "🏨 숙소"}
+            </button>
+          ))}
+          <button onClick={onClose} style={{
+            position: "absolute", right: "24px", marginTop: "8px",
+            border: "none", background: "#F2F1ED", borderRadius: "50%",
+            width: "28px", height: "28px", cursor: "pointer",
+            fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "inherit",
+          }}>✕</button>
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px" }}>
+
+          {/* 식사 탭 */}
+          {activeTab === "meals" && (
+            <>
+              {mealSections.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "30px 0", color: "#bbb", fontSize: "13px" }}>
+                  이 날은 식사 정보가 없습니다
+                </div>
+              ) : (
+                mealSections.map((section, si) => (
+                  <div key={si} style={{ marginBottom: "16px" }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px",
+                    }}>
+                      <span style={{
+                        padding: "3px 10px", borderRadius: "20px",
+                        fontSize: "11px", fontWeight: 700,
+                        background: `${color}15`, color: color,
+                      }}>
+                        {section.label}
+                      </span>
+                      <div style={{ flex: 1, height: "1px", background: "#EEECE6" }} />
+                    </div>
+                    {section.items.map((meal, mi) => (
+                      <div key={mi} style={{
+                        padding: "12px 14px", background: "#FAFAF8",
+                        borderRadius: "12px", border: "1px solid #EEECE6",
+                        marginBottom: "8px",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: "13px", fontWeight: 800, color: "#111" }}>{meal.name}</p>
+                            <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#666", lineHeight: 1.5 }}>{meal.note}</p>
+                          </div>
+                          <MapButton query={meal.mapQuery} />
+                        </div>
+                        <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "10px", color: "#888" }}>
+                          <span>🕐 {meal.time}</span>
+                          <span>💰 {meal.price}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+            </>
+          )}
+
+          {/* 숙소 탭 */}
+          {activeTab === "stay" && info.stay && (
+            <div style={{
+              padding: "16px", background: "#FAFAF8",
+              borderRadius: "12px", border: "1px solid #EEECE6",
+            }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "10px" }}>
+                <p style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#111" }}>{info.stay.name}</p>
+                <MapButton query={info.stay.mapQuery} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: "13px", flexShrink: 0 }}>📍</span>
+                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{info.stay.address}</span>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: "13px", flexShrink: 0 }}>🔑</span>
+                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>체크인 {info.stay.checkin} / 체크아웃 {info.stay.checkout}</span>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: "13px", flexShrink: 0 }}>💡</span>
+                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{info.stay.note}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TYPE_CONFIG = {
   food: { emoji: "🍽", bg: "#FFF3EC", border: "#FDDCC8", text: "#C75D20" },
   spot: { emoji: "📍", bg: "#EEF6FF", border: "#C8DFF5", text: "#2B6CB0" },
@@ -1070,6 +1262,7 @@ export default function TravelPlanner() {
   const [activeDetail, setActiveDetail] = useState(null);
   const [showDocs, setShowDocs] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [dayInfoTab, setDayInfoTab] = useState(null);
   const current = DAYS[selectedDay];
 
   return (
@@ -1177,14 +1370,24 @@ export default function TravelPlanner() {
               {current.date} · {current.stay}
             </p>
           </div>
-          <span style={{
-            padding: "4px 10px", borderRadius: "20px",
-            fontSize: "10px", fontWeight: 700,
-            background: current.booked ? `${current.color}15` : "#f5f0e8",
-            color: current.booked ? current.color : "#b5a276",
-          }}>
-            {current.booked ? "✓ 예약완료" : "미예약"}
-          </span>
+          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+            <button onClick={() => setDayInfoTab("meals")} style={{
+              padding: "6px 10px", borderRadius: "10px",
+              border: "1px solid #FDDCC8", background: "#FFF3EC",
+              fontSize: "12px", cursor: "pointer", fontFamily: "inherit",
+              display: "flex", alignItems: "center", gap: "3px",
+            }}>
+              🍽<span style={{ fontSize: "10px", fontWeight: 600, color: "#C75D20" }}>식사</span>
+            </button>
+            <button onClick={() => setDayInfoTab("stay")} style={{
+              padding: "6px 10px", borderRadius: "10px",
+              border: "1px solid #C6F0D5", background: "#F0FAF4",
+              fontSize: "12px", cursor: "pointer", fontFamily: "inherit",
+              display: "flex", alignItems: "center", gap: "3px",
+            }}>
+              🏨<span style={{ fontSize: "10px", fontWeight: 600, color: "#2A7D4F" }}>숙소</span>
+            </button>
+          </div>
         </div>
 
         {/* Sections */}
@@ -1300,6 +1503,9 @@ export default function TravelPlanner() {
 
       {/* Shopping Guide Dialog */}
       {showGuide && <ShoppingGuideDialog onClose={() => setShowGuide(false)} />}
+
+      {/* Day Info Dialog (식사/숙소) */}
+      {dayInfoTab && <DayInfoDialog dayNum={current.day} tab={dayInfoTab} onClose={() => setDayInfoTab(null)} color={current.color} />}
     </div>
   );
 }
