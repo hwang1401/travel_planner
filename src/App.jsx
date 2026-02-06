@@ -492,12 +492,16 @@ function DocumentDialog({ onClose }) {
             <div style={{
               borderRadius: "12px", overflow: "hidden",
               border: "1px solid #EEECE6",
+              background: "#F9F9F7",
+              aspectRatio: "595 / 842",
+              width: "100%",
             }}>
               <img
                 src={current.image}
                 alt={current.label}
                 style={{
-                  width: "100%", display: "block", objectFit: "contain",
+                  width: "100%", height: "100%", display: "block",
+                  objectFit: "contain",
                 }}
               />
             </div>
