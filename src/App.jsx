@@ -614,13 +614,35 @@ function DetailDialog({ detail, onClose, dayColor }) {
           display: "flex", flexDirection: "column",
         }}
       >
-        {/* Handle bar */}
+        {/* Header */}
         <div style={{
-          display: "flex", justifyContent: "center", padding: "10px 0 4px",
+          padding: "14px 16px 12px 20px", flexShrink: 0,
+          borderBottom: "1px solid #EEECE6",
+          display: "flex", alignItems: "center", gap: "10px",
         }}>
-          <div style={{
-            width: "36px", height: "4px", borderRadius: "2px", background: "#ddd",
-          }} />
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+            <h3 style={{
+              margin: 0, fontSize: "16px", fontWeight: 800,
+              color: "#111", letterSpacing: "-0.3px",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>
+              {detail.name}
+            </h3>
+            <span style={{
+              flexShrink: 0, padding: "2px 9px", borderRadius: "20px",
+              fontSize: "10px", fontWeight: 700,
+              background: cat.bg, color: cat.color, border: `1px solid ${cat.border}`,
+              whiteSpace: "nowrap",
+            }}>
+              {detail.category}
+            </span>
+          </div>
+          <button onClick={onClose} style={{
+            flexShrink: 0, border: "none", background: "#F2F1ED", borderRadius: "50%",
+            width: "28px", height: "28px", cursor: "pointer",
+            fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "inherit",
+          }}>✕</button>
         </div>
 
         {/* Image - top, outside scroll area for full bleed */}
@@ -638,24 +660,7 @@ function DetailDialog({ detail, onClose, dayColor }) {
         )}
 
         {/* Content */}
-        <div style={{ overflowY: "auto", padding: "8px 20px 20px" }}>
-          {/* Category badge + Name */}
-          <div style={{ marginBottom: "14px" }}>
-            <span style={{
-              display: "inline-block", padding: "3px 10px", borderRadius: "20px",
-              fontSize: "10px", fontWeight: 700,
-              background: cat.bg, color: cat.color, border: `1px solid ${cat.border}`,
-              marginBottom: "8px",
-            }}>
-              {detail.category}
-            </span>
-            <h3 style={{
-              margin: 0, fontSize: "18px", fontWeight: 800,
-              color: "#111", letterSpacing: "-0.3px", lineHeight: 1.3,
-            }}>
-              {detail.name}
-            </h3>
-          </div>
+        <div style={{ overflowY: "auto", padding: "14px 20px 20px" }}>
 
           {/* Info rows */}
           <div style={{
@@ -794,20 +799,6 @@ function DetailDialog({ detail, onClose, dayColor }) {
           )}
         </div>
 
-        {/* Close button */}
-        <div style={{ padding: "0 20px 16px" }}>
-          <button
-            onClick={onClose}
-            style={{
-              width: "100%", padding: "12px", border: "none",
-              borderRadius: "12px", background: "#F2F1ED",
-              fontSize: "13px", fontWeight: 600, color: "#555",
-              cursor: "pointer", fontFamily: "inherit",
-            }}
-          >
-            닫기
-          </button>
-        </div>
       </div>
     </div>
   );
