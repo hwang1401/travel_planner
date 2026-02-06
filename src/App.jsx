@@ -619,6 +619,20 @@ function DetailDialog({ detail, onClose, dayColor }) {
           }} />
         </div>
 
+        {/* Image - top, outside scroll area for full bleed */}
+        {detail.image && (
+          <div style={{ flexShrink: 0, overflow: "hidden" }}>
+            <img
+              src={detail.image}
+              alt={detail.name}
+              style={{
+                width: "100%", display: "block",
+                maxHeight: "200px", objectFit: "cover",
+              }}
+            />
+          </div>
+        )}
+
         {/* Content */}
         <div style={{ overflowY: "auto", padding: "8px 20px 20px" }}>
           {/* Category badge + Name */}
@@ -745,20 +759,6 @@ function DetailDialog({ detail, onClose, dayColor }) {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Image */}
-          {detail.image && (
-            <div style={{ marginBottom: "14px", borderRadius: "12px", overflow: "hidden", border: "1px solid #EEECE6" }}>
-              <img
-                src={detail.image}
-                alt={detail.name}
-                style={{
-                  width: "100%", display: "block",
-                  maxHeight: "220px", objectFit: "cover",
-                }}
-              />
             </div>
           )}
 
