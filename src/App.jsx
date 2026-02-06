@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-const DAYS = [
+const BASE_DAYS = [
   {
     day: 1, date: "2/19 (목)", label: "인천 → 하카타",
     color: "#D94F3B", icon: "✈️", stay: "하카타 1박", booked: true,
@@ -1262,13 +1262,267 @@ function DetailDialog({ detail, onClose, dayColor }) {
   );
 }
 
+function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color }) {
+  const isNew = !item;
+  const [time, setTime] = useState(item?.time || "");
+  const [desc, setDesc] = useState(item?.desc || "");
+  const [type, setType] = useState(item?.type || "spot");
+  const [sub, setSub] = useState(item?.sub || "");
+  const [address, setAddress] = useState(item?.detail?.address || "");
+  const [detailName, setDetailName] = useState(item?.detail?.name || "");
+  const [detailTip, setDetailTip] = useState(item?.detail?.tip || "");
+  const [detailPrice, setDetailPrice] = useState(item?.detail?.price || "");
+  const [detailHours, setDetailHours] = useState(item?.detail?.hours || "");
+  const [detailImage, setDetailImage] = useState(item?.detail?.image || "");
+
+  const typeOptions = [
+    { value: "food", label: "🍽 식사" },
+    { value: "spot", label: "📍 관광" },
+    { value: "shop", label: "🛍 쇼핑" },
+    { value: "move", label: "→ 이동" },
+    { value: "stay", label: "🏨 숙소" },
+    { value: "info", label: "💡 정보" },
+  ];
+
+  const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "교통" };
+
+  const handleSave = () => {
+    if (!time.trim() || !desc.trim()) return;
+    const newItem = {
+      time: time.trim(),
+      desc: desc.trim(),
+      type,
+      ...(sub.trim() ? { sub: sub.trim() } : {}),
+      detail: {
+        name: detailName.trim() || desc.trim(),
+        category: catMap[type] || "관광",
+        ...(address.trim() ? { address: address.trim() } : {}),
+        ...(detailTip.trim() ? { tip: detailTip.trim() } : {}),
+        ...(detailPrice.trim() ? { price: detailPrice.trim() } : {}),
+        ...(detailHours.trim() ? { hours: detailHours.trim() } : {}),
+        ...(detailImage.trim() ? { image: detailImage.trim() } : {}),
+      },
+      _custom: true,
+    };
+    onSave(newItem, dayIdx, sectionIdx, itemIdx);
+  };
+
+  const fieldStyle = {
+    width: "100%", padding: "10px 12px", border: "1px solid #E0DFDC",
+    borderRadius: "10px", fontSize: "13px", fontFamily: "inherit",
+    background: "#FAFAF8", outline: "none", boxSizing: "border-box",
+  };
+  const labelStyle = { margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#888" };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+        padding: "16px",
+        animation: "fadeIn 0.2s ease",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%", maxWidth: "420px", maxHeight: "85vh",
+          background: "#fff", borderRadius: "20px 20px 16px 16px",
+          overflow: "hidden", animation: "slideUp 0.25s ease",
+          display: "flex", flexDirection: "column",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: "16px 16px 12px 20px", flexShrink: 0,
+          borderBottom: "1px solid #EEECE6",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1a1a1a" }}>
+            {isNew ? "➕ 일정 추가" : "✏️ 일정 수정"}
+          </h3>
+          <button onClick={onClose} style={{
+            border: "none", background: "#F2F1ED", borderRadius: "50%",
+            width: "28px", height: "28px", cursor: "pointer",
+            fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "inherit",
+          }}>✕</button>
+        </div>
+
+        {/* Form */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          {/* Time + Type row */}
+          <div style={{ display: "flex", gap: "10px" }}>
+            <div style={{ flex: 1 }}>
+              <p style={labelStyle}>시간 *</p>
+              <input value={time} onChange={(e) => setTime(e.target.value)} placeholder="예: 12:00" style={fieldStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={labelStyle}>유형</p>
+              <select value={type} onChange={(e) => setType(e.target.value)} style={{ ...fieldStyle, cursor: "pointer" }}>
+                {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Desc */}
+          <div>
+            <p style={labelStyle}>일정명 *</p>
+            <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="예: 캐널시티 라멘스타디움" style={fieldStyle} />
+          </div>
+
+          {/* Sub */}
+          <div>
+            <p style={labelStyle}>부가 정보</p>
+            <input value={sub} onChange={(e) => setSub(e.target.value)} placeholder="예: 도보 5분 · 1,000엔" style={fieldStyle} />
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderTop: "1px solid #EEECE6", paddingTop: "10px" }}>
+            <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "#555" }}>상세 정보 (다이얼로그)</p>
+          </div>
+
+          {/* Detail name */}
+          <div>
+            <p style={labelStyle}>장소명 (상세)</p>
+            <input value={detailName} onChange={(e) => setDetailName(e.target.value)} placeholder="비워두면 일정명 사용" style={fieldStyle} />
+          </div>
+
+          {/* Address */}
+          <div>
+            <p style={labelStyle}>주소</p>
+            <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="예: 福岡市博多区住吉1-2" style={fieldStyle} />
+          </div>
+
+          {/* Hours + Price */}
+          <div style={{ display: "flex", gap: "10px" }}>
+            <div style={{ flex: 1 }}>
+              <p style={labelStyle}>영업시간</p>
+              <input value={detailHours} onChange={(e) => setDetailHours(e.target.value)} placeholder="11:00~23:00" style={fieldStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={labelStyle}>가격</p>
+              <input value={detailPrice} onChange={(e) => setDetailPrice(e.target.value)} placeholder="~1,000엔" style={fieldStyle} />
+            </div>
+          </div>
+
+          {/* Tip */}
+          <div>
+            <p style={labelStyle}>팁 / 메모</p>
+            <textarea value={detailTip} onChange={(e) => setDetailTip(e.target.value)} placeholder="참고사항을 적어주세요" rows={2}
+              style={{ ...fieldStyle, resize: "vertical" }} />
+          </div>
+
+          {/* Image URL */}
+          <div>
+            <p style={labelStyle}>이미지 경로</p>
+            <input value={detailImage} onChange={(e) => setDetailImage(e.target.value)} placeholder="/images/filename.jpg" style={fieldStyle} />
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ padding: "0 20px 16px", display: "flex", gap: "8px", flexShrink: 0 }}>
+          {!isNew && onDelete && (
+            <button onClick={() => onDelete(dayIdx, sectionIdx, itemIdx)} style={{
+              padding: "12px", border: "none", borderRadius: "12px",
+              background: "#FFF0F0", color: "#D94F3B", fontSize: "13px", fontWeight: 600,
+              cursor: "pointer", fontFamily: "inherit",
+            }}>
+              삭제
+            </button>
+          )}
+          <button onClick={handleSave} style={{
+            flex: 1, padding: "12px", border: "none", borderRadius: "12px",
+            background: color || "#1a1a1a", color: "#fff", fontSize: "13px", fontWeight: 700,
+            cursor: "pointer", fontFamily: "inherit",
+            opacity: (time.trim() && desc.trim()) ? 1 : 0.4,
+          }}>
+            {isNew ? "추가" : "저장"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function loadCustomData() {
+  try {
+    const saved = localStorage.getItem("travel_custom_data");
+    return saved ? JSON.parse(saved) : {};
+  } catch { return {}; }
+}
+
+function mergeData(base, custom) {
+  return base.map((day, di) => {
+    const dayCustom = custom[di];
+    if (!dayCustom) return day;
+    const newSections = day.sections.map((sec, si) => {
+      const secCustom = dayCustom.sections?.[si];
+      if (!secCustom) return sec;
+      return { ...sec, items: secCustom.items || sec.items };
+    });
+    if (dayCustom.extraItems) {
+      const extraSection = { title: "추가 일정", items: dayCustom.extraItems };
+      newSections.push(extraSection);
+    }
+    return { ...day, sections: newSections };
+  });
+}
+
 export default function TravelPlanner() {
+  const [customData, setCustomData] = useState(() => loadCustomData());
   const [selectedDay, setSelectedDay] = useState(0);
   const [activeDetail, setActiveDetail] = useState(null);
   const [showDocs, setShowDocs] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [dayInfoTab, setDayInfoTab] = useState(null);
+  const [editTarget, setEditTarget] = useState(null); // { item, sectionIdx, itemIdx, dayIdx } or { dayIdx } for new
+
+  useEffect(() => {
+    localStorage.setItem("travel_custom_data", JSON.stringify(customData));
+  }, [customData]);
+
+  const DAYS = mergeData(BASE_DAYS, customData);
   const current = DAYS[selectedDay];
+
+  const handleSaveItem = useCallback((newItem, dayIdx, sectionIdx, itemIdx) => {
+    setCustomData((prev) => {
+      const next = { ...prev };
+      if (sectionIdx === -1) {
+        // New item → add to extraItems
+        if (!next[dayIdx]) next[dayIdx] = {};
+        if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
+        next[dayIdx].extraItems.push(newItem);
+      } else {
+        // Edit existing
+        if (!next[dayIdx]) next[dayIdx] = {};
+        if (!next[dayIdx].sections) next[dayIdx].sections = {};
+        if (!next[dayIdx].sections[sectionIdx]) {
+          next[dayIdx].sections[sectionIdx] = { items: [...BASE_DAYS[dayIdx].sections[sectionIdx].items] };
+        }
+        if (itemIdx !== undefined && itemIdx !== null) {
+          next[dayIdx].sections[sectionIdx].items[itemIdx] = newItem;
+        }
+      }
+      return { ...next };
+    });
+    setEditTarget(null);
+  }, []);
+
+  const handleDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx) => {
+    setCustomData((prev) => {
+      const next = { ...prev };
+      if (sectionIdx === -1 && next[dayIdx]?.extraItems) {
+        next[dayIdx].extraItems.splice(itemIdx, 1);
+      } else if (next[dayIdx]?.sections?.[sectionIdx]?.items) {
+        next[dayIdx].sections[sectionIdx].items.splice(itemIdx, 1);
+      }
+      return { ...next };
+    });
+    setEditTarget(null);
+  }, []);
 
   return (
     <div style={{
@@ -1328,26 +1582,41 @@ export default function TravelPlanner() {
       <div style={{
         display: "flex", gap: 0, padding: "0 12px",
         background: "#fff", borderBottom: "1px solid #E8E6E1",
-        overflowX: "auto", flexShrink: 0,
+        flexShrink: 0, alignItems: "center",
       }}>
-        {DAYS.map((day, i) => {
-          const active = selectedDay === i;
-          return (
-            <button key={i} onClick={() => setSelectedDay(i)} style={{
-              flex: "none", padding: "10px 14px", border: "none",
-              background: "none", cursor: "pointer",
-              borderBottom: active ? `2.5px solid ${day.color}` : "2.5px solid transparent",
-              color: active ? day.color : "#aaa",
-              fontWeight: active ? 700 : 400,
-              fontSize: "12px", fontFamily: "inherit",
-              transition: "all 0.15s", whiteSpace: "nowrap",
-              opacity: active ? 1 : 0.7,
-            }}>
-              <span style={{ fontSize: "14px", marginRight: "3px" }}>{day.icon}</span>
-              D{day.day}
-            </button>
-          );
-        })}
+        <div style={{ display: "flex", flex: 1, overflowX: "auto" }}>
+          {DAYS.map((day, i) => {
+            const active = selectedDay === i;
+            return (
+              <button key={i} onClick={() => setSelectedDay(i)} style={{
+                flex: "none", padding: "10px 14px", border: "none",
+                background: "none", cursor: "pointer",
+                borderBottom: active ? `2.5px solid ${day.color}` : "2.5px solid transparent",
+                color: active ? day.color : "#aaa",
+                fontWeight: active ? 700 : 400,
+                fontSize: "12px", fontFamily: "inherit",
+                transition: "all 0.15s", whiteSpace: "nowrap",
+                opacity: active ? 1 : 0.7,
+              }}>
+                <span style={{ fontSize: "14px", marginRight: "3px" }}>{day.icon}</span>
+                D{day.day}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => setEditTarget({ dayIdx: selectedDay, sectionIdx: -1, itemIdx: null, item: null })}
+          style={{
+            width: "30px", height: "30px", borderRadius: "8px",
+            border: "1px solid #E8E6E1", background: "#FAFAF8",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", fontSize: "16px", flexShrink: 0,
+            color: current.color, fontWeight: 700, marginRight: "4px",
+          }}
+          title="일정 추가"
+        >
+          +
+        </button>
       </div>
 
       {/* Main content */}
@@ -1421,10 +1690,17 @@ export default function TravelPlanner() {
                 const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
                 const isLast = ii === section.items.length - 1;
                 const hasDetail = !!item.detail;
+                const handleClick = () => {
+                  if (item._custom) {
+                    setEditTarget({ item, sectionIdx: si, itemIdx: ii, dayIdx: selectedDay });
+                  } else if (hasDetail) {
+                    setActiveDetail(item.detail);
+                  }
+                };
                 return (
                   <div
                     key={ii}
-                    onClick={hasDetail ? () => setActiveDetail(item.detail) : undefined}
+                    onClick={handleClick}
                     style={{
                       display: "flex", alignItems: "flex-start", gap: "10px",
                       padding: "10px 14px",
@@ -1436,10 +1712,11 @@ export default function TravelPlanner() {
                     onMouseEnter={(e) => { if (hasDetail) e.currentTarget.style.background = "#FAFAF8"; }}
                     onMouseLeave={(e) => { if (hasDetail) e.currentTarget.style.background = "transparent"; }}
                   >
-                    <div style={{ width: "44px", flexShrink: 0, textAlign: "right", paddingTop: "2px" }}>
+                    <div style={{ width: "48px", flexShrink: 0, textAlign: "right" }}>
                       <span style={{
-                        fontSize: "12px", fontWeight: 700, color: "#555",
+                        fontSize: "11px", fontWeight: 700, color: "#555",
                         fontVariantNumeric: "tabular-nums",
+                        lineHeight: "22px", whiteSpace: "nowrap",
                       }}>
                         {item.time}
                       </span>
@@ -1448,14 +1725,14 @@ export default function TravelPlanner() {
                       width: "22px", height: "22px", borderRadius: "6px",
                       background: cfg.bg, border: `1px solid ${cfg.border}`,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "11px", flexShrink: 0, marginTop: "1px",
+                      fontSize: "11px", flexShrink: 0,
                     }}>
                       {cfg.emoji}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", minHeight: "22px" }}>
                         <p style={{
-                          margin: 0, fontSize: "13px", fontWeight: 500, color: "#222", lineHeight: 1.45,
+                          margin: 0, fontSize: "13px", fontWeight: 500, color: "#222", lineHeight: "22px",
                         }}>
                           {item.desc}
                         </p>
@@ -1475,6 +1752,14 @@ export default function TravelPlanner() {
                       <div style={{ flexShrink: 0, alignSelf: "center" }}>
                         <MapButton query={item.detail.address} />
                       </div>
+                    )}
+                    {item._custom && (
+                      <div style={{
+                        flexShrink: 0, alignSelf: "center", width: "18px", height: "18px",
+                        borderRadius: "4px", background: "#F2F1ED",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "9px", color: "#aaa",
+                      }}>✏️</div>
                     )}
                   </div>
                 );
@@ -1511,6 +1796,20 @@ export default function TravelPlanner() {
 
       {/* Day Info Dialog (식사/숙소) */}
       {dayInfoTab && <DayInfoDialog dayNum={current.day} tab={dayInfoTab} onClose={() => setDayInfoTab(null)} color={current.color} />}
+
+      {/* Edit/Add Item Dialog */}
+      {editTarget && (
+        <EditItemDialog
+          item={editTarget.item}
+          sectionIdx={editTarget.sectionIdx}
+          itemIdx={editTarget.itemIdx}
+          dayIdx={editTarget.dayIdx}
+          onSave={handleSaveItem}
+          onDelete={editTarget.item?._custom ? handleDeleteItem : null}
+          onClose={() => setEditTarget(null)}
+          color={current.color}
+        />
+      )}
     </div>
   );
 }
