@@ -1,4 +1,838 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+/* ── Location Coordinates DB ── */
+const LOCATION_COORDS = {
+  // 후쿠오카
+  "인천공항": [37.4602, 126.4407],
+  "후쿠오카공항": [33.5854, 130.4510],
+  "하카타역": [33.5898, 130.4207],
+  "하카타 숙소": [33.5873, 130.4148],
+  "캐널시티": [33.5894, 130.4112],
+  "나카스": [33.5928, 130.4075],
+  "돈키호테 나카스": [33.5932, 130.4068],
+  "쿠라스시 나카스": [33.5932, 130.4068],
+  "텐진": [33.5903, 130.3988],
+  // 구마모토
+  "구마모토역": [32.7898, 130.6886],
+  "시모토리": [32.8014, 130.7100],
+  "코란테이": [32.8018, 130.7105],
+  "구마모토성": [32.8060, 130.7058],
+  "조사이엔": [32.8040, 130.7045],
+  "스이젠지": [32.7950, 130.7270],
+  "스가노야": [32.8010, 130.7115],
+  "야츠다": [32.8015, 130.7098],
+  // 아소
+  "아소역": [32.9480, 131.0840],
+  "이마킨 식당": [32.9695, 131.0515],
+  "쿠사센리": [32.8850, 131.0650],
+  "아소산": [32.8840, 131.0840],
+  "아소 신사": [32.9510, 131.1157],
+  "몬젠마치": [32.9508, 131.1152],
+  // 유후인
+  "유후인역": [33.2665, 131.3690],
+  "유노쓰보거리": [33.2672, 131.3740],
+  "긴린코": [33.2660, 131.3798],
+  "플로럴빌리지": [33.2678, 131.3730],
+  // 쿠루메
+  "쿠루메역": [33.3167, 130.5083],
+};
+
+function getItemCoords(item, dayIdx) {
+  const desc = item.desc || "";
+  const addr = item.detail?.address || "";
+  const name = item.detail?.name || "";
+  const all = desc + " " + addr + " " + name;
+
+  for (const [key, coords] of Object.entries(LOCATION_COORDS)) {
+    if (all.includes(key)) return { coords, label: key };
+  }
+  // Fuzzy match
+  if (all.includes("공항") && all.includes("후쿠오카")) return { coords: LOCATION_COORDS["후쿠오카공항"], label: "후쿠오카공항" };
+  if (all.includes("공항") && all.includes("인천")) return { coords: LOCATION_COORDS["인천공항"], label: "인천공항" };
+  if (all.includes("하카타") && all.includes("역")) return { coords: LOCATION_COORDS["하카타역"], label: "하카타역" };
+  if (all.includes("구마모토") && all.includes("역")) return { coords: LOCATION_COORDS["구마모토역"], label: "구마모토역" };
+  if (all.includes("유후인") && all.includes("역")) return { coords: LOCATION_COORDS["유후인역"], label: "유후인역" };
+  if (all.includes("쿠루메")) return { coords: LOCATION_COORDS["쿠루메역"], label: "쿠루메역" };
+  if (all.includes("시모토리") || all.includes("下通")) return { coords: LOCATION_COORDS["시모토리"], label: "시모토리" };
+  if (all.includes("캐널시티") || all.includes("キャナル")) return { coords: LOCATION_COORDS["캐널시티"], label: "캐널시티" };
+  if (all.includes("나카스") || all.includes("中洲")) return { coords: LOCATION_COORDS["나카스"], label: "나카스" };
+  if (all.includes("아소산") || all.includes("쿠사센리") || all.includes("나카다케")) return { coords: LOCATION_COORDS["쿠사센리"], label: "쿠사센리" };
+  if (all.includes("아소") && all.includes("역")) return { coords: LOCATION_COORDS["아소역"], label: "아소역" };
+  if (all.includes("스이젠지") || all.includes("水前寺")) return { coords: LOCATION_COORDS["스이젠지"], label: "스이젠지" };
+  if (all.includes("긴린코") || all.includes("金鱗湖")) return { coords: LOCATION_COORDS["긴린코"], label: "긴린코" };
+  if (all.includes("유후인")) return { coords: LOCATION_COORDS["유후인역"], label: "유후인" };
+  if (all.includes("텐진") || all.includes("天神")) return { coords: LOCATION_COORDS["텐진"], label: "텐진" };
+  // stay type fallback — match by day's accommodation
+  if (item.type === "stay") {
+    if (all.includes("숙소") || all.includes("체크인") || all.includes("체크아웃") || all.includes("복귀") || all.includes("휴식") || all.includes("호텔") || all.includes("마무리") || all.includes("짐")) {
+      // Try text-based match first
+      if (all.includes("유후인") || all.includes("료칸")) return { coords: LOCATION_COORDS["유후인역"], label: "유후인 숙소" };
+      if (all.includes("구마모토")) return { coords: LOCATION_COORDS["구마모토역"], label: "구마모토 숙소" };
+      if (all.includes("하카타") || all.includes("스미요시") || all.includes("住吉")) return { coords: LOCATION_COORDS["하카타 숙소"], label: "하카타 숙소" };
+      // Fallback by day index
+      const dayStayMap = { 0: "하카타 숙소", 1: "구마모토역", 2: "구마모토역", 3: "유후인역", 4: "하카타 숙소" };
+      const stayKey = dayStayMap[dayIdx];
+      if (stayKey && LOCATION_COORDS[stayKey]) return { coords: LOCATION_COORDS[stayKey], label: stayKey === "구마모토역" ? "구마모토 숙소" : stayKey === "유후인역" ? "유후인 숙소" : stayKey };
+    }
+  }
+  return null;
+}
+
+function createDayIcon(color, label) {
+  const text = String(label);
+  const isMulti = text.includes("·");
+  const w = isMulti ? 40 : 28;
+  return L.divIcon({
+    className: "",
+    html: `<div style="
+      min-width:${w}px;height:28px;border-radius:14px;padding:0 ${isMulti ? 6 : 0}px;
+      background:${color};color:#fff;font-size:${isMulti ? 10 : 11}px;font-weight:800;
+      display:flex;align-items:center;justify-content:center;
+      border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);
+      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+      white-space:nowrap;
+    ">${text}</div>`,
+    iconSize: [w, 28],
+    iconAnchor: [w / 2, 14],
+    popupAnchor: [0, -16],
+  });
+}
+
+function FitBounds({ positions }) {
+  const map = useMap();
+  useEffect(() => {
+    if (positions.length > 0) {
+      const bounds = L.latLngBounds(positions);
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+    }
+  }, [positions, map]);
+  return null;
+}
+
+/* ── Confirm Dialog ── */
+function ConfirmDialog({ title, message, confirmLabel, confirmColor, onConfirm, onCancel }) {
+  return (
+    <div onClick={onCancel} style={{
+      position: "fixed", inset: 0, zIndex: 3000,
+      background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "24px", animation: "fadeIn 0.15s ease",
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: "100%", maxWidth: "320px", background: "#fff",
+        borderRadius: "18px", overflow: "hidden",
+        animation: "slideUp 0.2s ease",
+        boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
+      }}>
+        <div style={{ padding: "24px 24px 16px", textAlign: "center" }}>
+          <h3 style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: 800, color: "#1a1a1a" }}>{title}</h3>
+          <p style={{ margin: 0, fontSize: "13px", color: "#666", lineHeight: 1.5 }}>{message}</p>
+        </div>
+        <div style={{ display: "flex", borderTop: "1px solid #EEECE6" }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: "14px", border: "none", background: "none",
+            fontSize: "14px", fontWeight: 500, color: "#888",
+            cursor: "pointer", fontFamily: "inherit",
+            borderRight: "1px solid #EEECE6",
+          }}>취소</button>
+          <button onClick={onConfirm} style={{
+            flex: 1, padding: "14px", border: "none", background: "none",
+            fontSize: "14px", fontWeight: 700, color: confirmColor || "#D94F3B",
+            cursor: "pointer", fontFamily: "inherit",
+          }}>{confirmLabel || "확인"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Add Day Dialog ── */
+function AddDayDialog({ onAdd, onCancel }) {
+  const [label, setLabel] = useState("");
+  const [icon, setIcon] = useState("📌");
+  const icons = ["📌", "✈️", "🚄", "♨️", "🛍️", "🏖", "⛰", "🎌", "🍽", "🏯"];
+
+  return (
+    <div onClick={onCancel} style={{
+      position: "fixed", inset: 0, zIndex: 3000,
+      background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "24px", animation: "fadeIn 0.15s ease",
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: "100%", maxWidth: "340px", background: "#fff",
+        borderRadius: "18px", overflow: "hidden",
+        animation: "slideUp 0.2s ease",
+        boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
+      }}>
+        <div style={{ padding: "20px 24px 16px" }}>
+          <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 800, color: "#1a1a1a" }}>📅 날짜 추가</h3>
+          <div style={{ marginBottom: "14px" }}>
+            <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#888" }}>아이콘</p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {icons.map((ic) => (
+                <button key={ic} onClick={() => setIcon(ic)} style={{
+                  width: "36px", height: "36px", borderRadius: "10px",
+                  border: icon === ic ? "2px solid #1a1a1a" : "1px solid #E8E6E1",
+                  background: icon === ic ? "#F5F5F0" : "#FAFAF8",
+                  fontSize: "18px", cursor: "pointer", display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                  transition: "all 0.1s",
+                }}>{ic}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#888" }}>날짜 이름 *</p>
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && label.trim()) onAdd(label.trim(), icon); }}
+              placeholder="예: 후쿠오카 자유시간"
+              autoFocus
+              style={{
+                width: "100%", padding: "10px 12px",
+                border: "1px solid #E0DFDC", borderRadius: "10px",
+                fontSize: "13px", fontFamily: "inherit",
+                background: "#FAFAF8", outline: "none", boxSizing: "border-box",
+              }}
+            />
+          </div>
+        </div>
+        <div style={{ display: "flex", borderTop: "1px solid #EEECE6" }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: "14px", border: "none", background: "none",
+            fontSize: "14px", fontWeight: 500, color: "#888",
+            cursor: "pointer", fontFamily: "inherit",
+            borderRight: "1px solid #EEECE6",
+          }}>취소</button>
+          <button
+            onClick={() => { if (label.trim()) onAdd(label.trim(), icon); }}
+            style={{
+              flex: 1, padding: "14px", border: "none", background: "none",
+              fontSize: "14px", fontWeight: 700,
+              color: label.trim() ? "#1a1a1a" : "#ccc",
+              cursor: label.trim() ? "pointer" : "default",
+              fontFamily: "inherit",
+            }}
+          >추가</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FlyToPoint({ coords, zoom }) {
+  const map = useMap();
+  useEffect(() => {
+    if (coords) map.flyTo(coords, zoom || 14, { duration: 0.8 });
+  }, [coords, zoom, map]);
+  return null;
+}
+
+function FullMapDialog({ days, onClose }) {
+  const [selectedDay, setSelectedDay] = useState(0);
+  const [flyTarget, setFlyTarget] = useState(null);
+  const [selectedPin, setSelectedPin] = useState(null);
+  const [cardExpanded, setCardExpanded] = useState(true);
+  const markerRefs = useRef({});
+
+  const day = days[selectedDay];
+
+  // Collect pins for selected day (allow revisits as new pins)
+  const dayPins = [];
+  if (day) {
+    let orderNum = 1;
+    let lastCoordKey = null;
+    day.sections.forEach((sec) => {
+      sec.items.forEach((item) => {
+        const loc = getItemCoords(item, selectedDay);
+        if (loc) {
+          const coordKey = loc.coords[0] + "," + loc.coords[1];
+          // Skip only consecutive duplicates (same place back-to-back)
+          if (coordKey !== lastCoordKey) {
+            dayPins.push({
+              coords: loc.coords,
+              label: loc.label,
+              desc: item.desc,
+              time: item.time,
+              color: day.color,
+              dayNum: day.day,
+              order: orderNum++,
+            });
+          }
+          lastCoordKey = coordKey;
+        }
+      });
+    });
+  }
+
+  // Merge overlapping pins for map rendering (combine order labels like "4·7")
+  const mapPins = [];
+  dayPins.forEach((pin) => {
+    const existing = mapPins.find((p) => p.coords[0] === pin.coords[0] && p.coords[1] === pin.coords[1]);
+    if (existing) {
+      existing.orders.push(pin.order);
+      existing.mapLabel = existing.orders.join("·");
+      existing.descs.push({ time: pin.time, desc: pin.desc });
+    } else {
+      mapPins.push({
+        ...pin,
+        orders: [pin.order],
+        mapLabel: String(pin.order),
+        descs: [{ time: pin.time, desc: pin.desc }],
+      });
+    }
+  });
+
+  const positions = dayPins.map((p) => p.coords);
+
+  // Build timeline items for the card — match pins in order
+  const timelineItems = [];
+  const shownPinOrders = new Set();
+  let pinCursor = 0; // tracks which pin we're matching next
+  if (day) {
+    let lastCoordKey = null;
+    day.sections.forEach((sec) => {
+      sec.items.forEach((item) => {
+        const loc = getItemCoords(item, selectedDay);
+        let pinOrder = null;
+        let coords = null;
+        let hasPin = false;
+
+        if (loc) {
+          const coordKey = loc.coords[0] + "," + loc.coords[1];
+          coords = loc.coords;
+          // Advance pin cursor for non-consecutive-duplicate items (mirrors pin collection logic)
+          if (coordKey !== lastCoordKey && pinCursor < dayPins.length) {
+            pinOrder = dayPins[pinCursor].order;
+            pinCursor++;
+            hasPin = true;
+          } else if (coordKey === lastCoordKey) {
+            // Consecutive duplicate — point to same pin as previous
+            hasPin = true;
+            pinOrder = pinCursor > 0 ? dayPins[pinCursor - 1].order : null;
+          }
+          lastCoordKey = coordKey;
+        }
+
+        const isFirstShow = pinOrder && !shownPinOrders.has(pinOrder);
+        if (isFirstShow) shownPinOrders.add(pinOrder);
+        timelineItems.push({
+          time: item.time,
+          desc: item.desc,
+          type: item.type,
+          hasPin,
+          coords,
+          pinOrder,
+          showNumber: isFirstShow,
+        });
+      });
+    });
+  }
+
+  const handlePinClick = (pin) => {
+    setSelectedPin(pin);
+    setFlyTarget({ coords: pin.coords, ts: Date.now() });
+  };
+
+  const handleTimelineClick = (item) => {
+    if (!item.hasPin) return;
+    // Find the mapPin that contains this item's pinOrder
+    const mp = mapPins.find((p) => p.orders.includes(item.pinOrder));
+    if (mp) {
+      setFlyTarget({ coords: mp.coords, ts: Date.now() });
+      setSelectedPin(mp);
+      // Open the popup on the matching marker after a short delay for flyTo
+      const coordKey = mp.coords[0] + "," + mp.coords[1];
+      setTimeout(() => {
+        const marker = markerRefs.current[coordKey];
+        if (marker) marker.openPopup();
+      }, 400);
+    }
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 2000,
+      background: "#000", display: "flex", flexDirection: "column",
+      animation: "fadeIn 0.2s ease",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "10px 16px", background: "#fff",
+        borderBottom: "1px solid #E8E6E1",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexShrink: 0,
+      }}>
+        <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#1a1a1a" }}>🗺 여행 지도</h3>
+        <button onClick={onClose} style={{
+          border: "none", background: "#F2F1ED", borderRadius: "50%",
+          width: "28px", height: "28px", cursor: "pointer",
+          fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>✕</button>
+      </div>
+
+      {/* Day tabs */}
+      <div style={{
+        display: "flex", background: "#fff", flexShrink: 0,
+        borderBottom: "1px solid #E8E6E1", overflowX: "auto",
+      }}>
+        {days.map((d, i) => {
+          const active = selectedDay === i;
+          return (
+            <button key={i} onClick={() => { setSelectedDay(i); setSelectedPin(null); setFlyTarget(null); }} style={{
+              flex: "none", padding: "8px 14px", border: "none",
+              background: "none", cursor: "pointer",
+              borderBottom: active ? `2.5px solid ${d.color}` : "2.5px solid transparent",
+              color: active ? d.color : "#bbb",
+              fontWeight: active ? 700 : 400,
+              fontSize: "11px", fontFamily: "inherit",
+              transition: "all 0.15s", whiteSpace: "nowrap",
+            }}>
+              {d.icon} D{d.day}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Map */}
+      <div style={{ flex: 1, position: "relative" }}>
+        <MapContainer
+          center={[33.0, 131.0]}
+          zoom={10}
+          style={{ width: "100%", height: "100%" }}
+          zoomControl={false}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          {positions.length > 0 && !flyTarget && <FitBounds positions={positions} />}
+          {flyTarget && <FlyToPoint coords={flyTarget.coords} zoom={14} key={flyTarget.ts} />}
+          {dayPins.length > 1 && (
+            <Polyline positions={dayPins.map((p) => p.coords)} color={day.color} weight={3} opacity={0.5} dashArray="8,6" />
+          )}
+          {mapPins.map((pin, pi) => {
+            const coordKey = pin.coords[0] + "," + pin.coords[1];
+            return (
+            <Marker
+              key={pi}
+              ref={(ref) => { if (ref) markerRefs.current[coordKey] = ref; }}
+              position={pin.coords}
+              icon={createDayIcon(
+                selectedPin && pin.orders.includes(selectedPin.order) ? "#1a1a1a" : pin.color,
+                pin.mapLabel
+              )}
+              eventHandlers={{ click: () => handlePinClick(pin) }}
+            >
+              <Popup>
+                <div style={{ fontSize: "12px", fontFamily: "-apple-system,BlinkMacSystemFont,sans-serif", minWidth: "120px" }}>
+                  <strong style={{ fontSize: "13px" }}>{pin.label}</strong>
+                  {pin.descs.map((d, di) => (
+                    <div key={di} style={{ color: "#555", marginTop: "3px" }}>
+                      <span style={{ color: "#888" }}>{d.time}</span> {d.desc}
+                    </div>
+                  ))}
+                </div>
+              </Popup>
+            </Marker>
+            );
+          })}
+        </MapContainer>
+
+        {/* Selected pin info card */}
+        {selectedPin && (
+          <div style={{
+            position: "absolute", top: "12px", left: "12px", right: "12px", zIndex: 1000,
+            background: "#fff", borderRadius: "12px", padding: "12px 14px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            display: "flex", alignItems: "center", gap: "10px",
+            animation: "fadeIn 0.15s ease",
+          }}>
+            <div style={{
+              minWidth: "28px", height: "28px", borderRadius: "14px", padding: selectedPin.mapLabel?.includes("·") ? "0 6px" : 0,
+              background: day.color, color: "#fff", fontSize: selectedPin.mapLabel?.includes("·") ? "10px" : "12px", fontWeight: 800,
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>{selectedPin.mapLabel || selectedPin.order}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: "#1a1a1a" }}>{selectedPin.label}</p>
+              {selectedPin.descs ? selectedPin.descs.map((d, di) => (
+                <p key={di} style={{ margin: "2px 0 0", fontSize: "11px", color: "#888" }}>{d.time} · {d.desc}</p>
+              )) : (
+                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#888" }}>{selectedPin.time} · {selectedPin.desc}</p>
+              )}
+            </div>
+            <button onClick={() => setSelectedPin(null)} style={{
+              border: "none", background: "#F2F1ED", borderRadius: "50%",
+              width: "22px", height: "22px", fontSize: "10px", color: "#999",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>✕</button>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom itinerary card */}
+      <div style={{
+        background: "#fff", borderTop: "1px solid #E8E6E1", flexShrink: 0,
+        maxHeight: cardExpanded ? "35vh" : "44px", transition: "max-height 0.25s ease",
+        overflow: "hidden", display: "flex", flexDirection: "column",
+      }}>
+        {/* Card header */}
+        <button onClick={() => setCardExpanded(!cardExpanded)} style={{
+          width: "100%", padding: "12px 16px", border: "none", background: "none",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          cursor: "pointer", fontFamily: "inherit", flexShrink: 0,
+        }}>
+          <span style={{ fontSize: "12px", fontWeight: 700, color: day?.color || "#333" }}>
+            {day?.icon} Day {day?.day} — {day?.label}
+          </span>
+          <span style={{ fontSize: "11px", color: "#bbb" }}>
+            {dayPins.length}곳 · {cardExpanded ? "▾" : "▴"}
+          </span>
+        </button>
+
+        {/* Timeline list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 12px" }}>
+          {timelineItems.map((item, i) => (
+            <div
+              key={i}
+              onClick={() => handleTimelineClick(item)}
+              style={{
+                display: "flex", alignItems: "center", gap: "8px",
+                padding: "7px 8px", borderRadius: "8px",
+                cursor: item.hasPin ? "pointer" : "default",
+                background: selectedPin && selectedPin.orders && selectedPin.orders.includes(item.pinOrder) ? `${day.color}12` : "transparent",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => { if (item.hasPin) e.currentTarget.style.background = "#F5F5F2"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = selectedPin && selectedPin.orders && selectedPin.orders.includes(item.pinOrder) ? `${day.color}12` : "transparent"; }}
+            >
+              {/* Pin number (first occurrence only) or dot */}
+              {item.showNumber ? (
+                <div style={{
+                  width: "20px", height: "20px", borderRadius: "50%",
+                  background: day.color, color: "#fff", fontSize: "9px", fontWeight: 800,
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>{item.pinOrder}</div>
+              ) : (
+                <div style={{
+                  width: "20px", height: "20px", display: "flex",
+                  alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>
+                  <div style={{
+                    width: item.hasPin ? "6px" : "4px",
+                    height: item.hasPin ? "6px" : "4px",
+                    borderRadius: "50%",
+                    background: item.hasPin ? day.color + "60" : "#ddd",
+                  }} />
+                </div>
+              )}
+              <span style={{
+                fontSize: "10px", fontWeight: 600, color: "#999",
+                width: "36px", flexShrink: 0, textAlign: "right",
+                fontVariantNumeric: "tabular-nums",
+              }}>{item.time}</span>
+              <span style={{
+                fontSize: "11px", color: item.hasPin ? "#333" : "#aaa",
+                fontWeight: item.hasPin ? 500 : 400,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
+              }}>{item.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Timetable Database ── */
+const TIMETABLE_DB = [
+  {
+    id: "hakata_kumamoto",
+    label: "하카타 → 구마모토 (신칸센)",
+    icon: "🚅",
+    station: "하카타역",
+    direction: "구마모토 방면",
+    trains: [
+      { time: "08:23", name: "さくら541", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "08:38", name: "つばめ315", dest: "熊本", note: "각역정차, 약 50분" },
+      { time: "09:20", name: "みずほ601", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "09:28", name: "さくら543", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "09:47", name: "つばめ317", dest: "熊本", note: "각역정차, 약 50분" },
+      { time: "10:20", name: "みずほ605", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "10:38", name: "さくら545", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "10:47", name: "つばめ319", dest: "熊本", note: "각역정차, 약 50분" },
+      { time: "11:28", name: "さくら547", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "11:36", name: "つばめ321", dest: "熊本", note: "각역정차, 약 50분" },
+      { time: "12:20", name: "みずほ607", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "12:28", name: "さくら549", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "13:28", name: "さくら551", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "14:28", name: "さくら553", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+      { time: "15:28", name: "さくら555", dest: "鹿児島中央", note: "구마모토 정차, 33분" },
+    ],
+    highlights: [
+      "みずほ·さくら = 빠름(33분) / つばめ = 느림(50분)",
+      "⚠️ みずほ는 지정석만 가능 (자유석 없음, 지정석 횟수 차감)",
+    ],
+  },
+  {
+    id: "kumamoto_hakata",
+    label: "구마모토 → 하카타 (신칸센)",
+    icon: "🚅",
+    station: "구마모토역",
+    direction: "하카타 방면",
+    trains: [
+      { time: "08:42", name: "さくら540", dest: "博多", note: "33분" },
+      { time: "09:42", name: "さくら542", dest: "博多", note: "33분" },
+      { time: "10:42", name: "さくら544", dest: "博多", note: "33분" },
+      { time: "11:42", name: "さくら546", dest: "博多", note: "33분" },
+      { time: "12:42", name: "さくら548", dest: "博多", note: "33분" },
+      { time: "13:42", name: "さくら550", dest: "博多", note: "33분" },
+      { time: "14:42", name: "さくら552", dest: "博多", note: "33분" },
+      { time: "15:42", name: "さくら554", dest: "博多", note: "33분" },
+      { time: "16:42", name: "さくら556", dest: "博多", note: "33분" },
+      { time: "17:42", name: "さくら558", dest: "博多", note: "33분" },
+      { time: "18:42", name: "さくら560", dest: "博多", note: "33분" },
+    ],
+    highlights: [
+      "さくら 자유석 탑승 가능 (JR 북큐슈 5일권)",
+    ],
+  },
+  {
+    id: "kumamoto_aso",
+    label: "구마모토 → 아소 (JR 호히본선)",
+    icon: "🚂",
+    station: "구마모토역",
+    direction: "아소 방면 (호히본선)",
+    trains: [
+      { time: "07:38", name: "보통열차", dest: "미야지 경유 아소", note: "약 1시간 40분" },
+      { time: "09:09", name: "특급 あそぼーい!", dest: "아소·별부", note: "약 1시간 15분" },
+      { time: "10:30", name: "보통열차", dest: "미야지 경유 아소", note: "약 1시간 40분" },
+      { time: "12:19", name: "보통열차", dest: "미야지 경유 아소", note: "약 1시간 40분" },
+      { time: "14:10", name: "보통열차", dest: "미야지 경유 아소", note: "약 1시간 40분" },
+    ],
+    highlights: [
+      "특급 あそぼーい!(아소보이): 토·일·공휴일 운행 관광열차",
+      "보통열차는 히고오즈(肥後大津)에서 환승 필요할 수 있음",
+      "⚠️ 열차 편수가 적으니 시간 반드시 확인!",
+    ],
+  },
+  {
+    id: "aso_kumamoto",
+    label: "아소 → 구마모토 (JR 호히본선)",
+    icon: "🚂",
+    station: "아소역",
+    direction: "구마모토 방면 (호히본선)",
+    trains: [
+      { time: "12:28", name: "보통열차", dest: "구마모토", note: "약 1시간 40분" },
+      { time: "14:28", name: "보통열차", dest: "구마모토", note: "약 1시간 40분" },
+      { time: "15:46", name: "특급 あそぼーい!", dest: "구마모토", note: "약 1시간 15분 → 17:01착" },
+      { time: "16:28", name: "보통열차", dest: "구마모토", note: "약 1시간 40분 → 18:08착" },
+      { time: "17:39", name: "보통열차", dest: "구마모토", note: "약 1시간 40분" },
+    ],
+    highlights: [
+      "あそぼーい! 15:46발이 가장 빠름 (17:01 도착)",
+      "놓칠 경우 16:28 보통열차 (18:08 도착)",
+      "⚠️ 열차 편수 적음 — 시간 조절 필요!",
+    ],
+  },
+  {
+    id: "hakata_yufuin",
+    label: "하카타 → 유후인 (JR 특급)",
+    icon: "🚂",
+    station: "하카타역",
+    direction: "유후인 방면",
+    trains: [
+      { time: "07:24", name: "특급 ゆふいんの森1호", dest: "유후인·별부", note: "약 2시간 15분" },
+      { time: "09:24", name: "특급 ゆふいんの森3호", dest: "유후인·별부", note: "약 2시간 15분" },
+      { time: "10:24", name: "특급 ゆふ3호", dest: "유후인·별부", note: "약 2시간 20분" },
+      { time: "12:26", name: "특급 ゆふいんの森5호", dest: "유후인·별부", note: "약 2시간 15분" },
+      { time: "15:28", name: "특급 ゆふ5호", dest: "유후인·별부", note: "약 2시간 20분" },
+    ],
+    highlights: [
+      "ゆふいんの森: 전석 지정석 관광열차 (지정석 횟수 차감)",
+      "ゆふ: 자유석 있음 (JR 북큐슈 5일권 자유석 탑승 가능)",
+      "⚠️ ゆふいんの森는 인기 많아 미리 예약 추천!",
+    ],
+  },
+  {
+    id: "yufuin_hakata",
+    label: "유후인 → 하카타 (JR 특급)",
+    icon: "🚂",
+    station: "유후인역",
+    direction: "하카타 방면",
+    trains: [
+      { time: "11:18", name: "특급 ゆふいんの森2호", dest: "博多", note: "약 2시간 15분" },
+      { time: "13:55", name: "특급 ゆふ4호", dest: "博多", note: "약 2시간 20분" },
+      { time: "15:38", name: "특급 ゆふいんの森4호", dest: "博多", note: "약 2시간 15분" },
+      { time: "16:45", name: "특급 ゆふいんの森6호", dest: "博多", note: "약 2시간 15분" },
+      { time: "17:06", name: "특급 ゆふ6호", dest: "博多", note: "약 2시간 20분" },
+    ],
+    highlights: [
+      "ゆふいんの森: 전석 지정석 관광열차",
+      "ゆふ: 자유석 있음 (JR 북큐슈 5일권)",
+    ],
+  },
+  {
+    id: "kumamoto_tram",
+    label: "구마모토 노면전차",
+    icon: "🚋",
+    station: "구마모토역 전정",
+    direction: "시모토리·스이젠지 방면",
+    trains: [
+      { time: "매 6~8분", name: "A계통", dest: "다시마에도리 → 건군신사", note: "170엔 균일요금" },
+      { time: "매 6~8분", name: "B계통", dest: "가미구마모토 → 스이젠지", note: "170엔 균일요금" },
+    ],
+    highlights: [
+      "A계통: 구마모토역 → 가라시마초 → 시모토리 → 건군신사",
+      "B계통: 가미구마모토 → 시모토리 → 스이젠지 공원",
+      "배차 간격 짧아 시간 구애 없이 탑승 가능",
+      "1일권: 500엔 (3회 이상 탑승 시 이득)",
+      "💡 하나바타초역 = 구마모토성 최근접역",
+    ],
+  },
+  {
+    id: "fukuoka_airport_bus",
+    label: "후쿠오카공항 → 하카타역 (버스/지하철)",
+    icon: "🚌",
+    station: "후쿠오카공항 국제선 터미널",
+    direction: "하카타역 방면",
+    trains: [
+      { time: "매 15~20분", name: "직행버스 (니시테츠)", dest: "하카타역 치쿠시구치", note: "약 20분 · 310엔" },
+      { time: "매 5~8분", name: "셔틀+지하철", dest: "국내선 환승 → 하카타역", note: "약 25~35분 · 260엔" },
+    ],
+    highlights: [
+      "직행버스: 국제선→하카타역 치쿠시구치 (환승 불필요)",
+      "지하철: 무료셔틀로 국내선 이동 → 공항선 2정거장 (5분)",
+      "짐 많으면 직행버스 추천 / 시간 정확성은 지하철 우세",
+      "⚠️ 직행버스는 도로 상황에 따라 지연 가능",
+    ],
+  },
+  {
+    id: "hakata_fukuoka_airport",
+    label: "하카타역 → 후쿠오카공항 (버스/지하철)",
+    icon: "🚌",
+    station: "하카타역",
+    direction: "후쿠오카공항 국제선 방면",
+    trains: [
+      { time: "매 15~20분", name: "직행버스 (니시테츠)", dest: "공항 국제선 터미널", note: "약 20분 · 310엔" },
+      { time: "매 5~8분", name: "지하철+셔틀", dest: "공항역 → 국제선 환승", note: "약 25~35분 · 260엔" },
+    ],
+    highlights: [
+      "직행버스: 하카타역 치쿠시구치 → 국제선 직행",
+      "지하철: 하카타역 → 공항역(5분) → 무료셔틀로 국제선(10분)",
+      "출국 2시간 전 공항 도착 권장",
+      "⚠️ 국제선은 국내선과 별도 터미널 — 환승 시간 여유 두기",
+    ],
+  },
+  {
+    id: "aso_bus_up",
+    label: "아소역 → 쿠사센리·아소산 (산교버스)",
+    icon: "🚌",
+    station: "아소역앞",
+    direction: "쿠사센리·아소산상 터미널 방면",
+    trains: [
+      { time: "09:40", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔" },
+      { time: "10:25", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔" },
+      { time: "11:50", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔" },
+      { time: "12:50", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔" },
+      { time: "13:30", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔" },
+      { time: "14:10", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔" },
+      { time: "14:35", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔" },
+    ],
+    highlights: [
+      "산교(産交)버스 운행 — JR패스 미적용",
+      "쿠사센리 초원 + 나카다케 화구 전망",
+      "⚠️ 편수 적음 — 반드시 시간 확인 후 이동",
+      "⚠️ 혼잡 시 탑승 불가할 수 있으니 여유있게",
+      "동절기(2월) 시간표 변동 가능 — 현지 확인 필수",
+    ],
+  },
+  {
+    id: "aso_bus_down",
+    label: "아소산·쿠사센리 → 아소역 (산교버스)",
+    icon: "🚌",
+    station: "쿠사센리·아소산상 터미널",
+    direction: "아소역앞 방면",
+    trains: [
+      { time: "10:15", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔" },
+      { time: "11:00", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔" },
+      { time: "12:20", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔" },
+      { time: "13:20", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔" },
+      { time: "14:00", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔" },
+      { time: "14:40", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔" },
+      { time: "15:05", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔" },
+    ],
+    highlights: [
+      "산교(産交)버스 운행 — JR패스 미적용",
+      "⚠️ 마지막 버스 놓치지 않도록 주의!",
+      "동절기(2월) 시간표 변동 가능 — 현지 확인 필수",
+    ],
+  },
+  {
+    id: "kumamoto_kurume",
+    label: "구마모토 → 쿠루메 (신칸센)",
+    icon: "🚅",
+    station: "구마모토역",
+    direction: "쿠루메(하카타) 방면",
+    trains: [
+      { time: "08:00", name: "さくら540", dest: "博多", note: "쿠루메 20분 · 하카타 33분" },
+      { time: "08:42", name: "つばめ310", dest: "博多", note: "쿠루메 약 30분" },
+      { time: "09:42", name: "さくら542", dest: "博多", note: "쿠루메 20분" },
+      { time: "10:42", name: "さくら544", dest: "博多", note: "쿠루메 20분" },
+      { time: "11:42", name: "さくら546", dest: "博多", note: "쿠루메 20분" },
+      { time: "12:42", name: "さくら548", dest: "博多", note: "쿠루메 20분" },
+    ],
+    highlights: [
+      "JR 북큐슈 5일권 자유석 탑승 가능",
+      "쿠루메역에서 JR큐다이본선 환승 → 유후인",
+      "さくら가 빠름 (쿠루메까지 약 20분)",
+    ],
+  },
+  {
+    id: "kurume_yufuin",
+    label: "쿠루메 → 유후인 (JR 큐다이본선)",
+    icon: "🚂",
+    station: "쿠루메역",
+    direction: "유후인·오이타 방면",
+    trains: [
+      { time: "07:43", name: "보통열차", dest: "히타", note: "히타 환승, 약 2시간 30분" },
+      { time: "08:45", name: "특급 ゆふいんの森1호", dest: "유후인·별부", note: "약 1시간 40분 · 전석지정석" },
+      { time: "10:45", name: "특급 ゆふいんの森3호", dest: "유후인·별부", note: "약 1시간 40분 · 전석지정석" },
+      { time: "11:45", name: "특급 ゆふ3호", dest: "유후인·별부", note: "약 1시간 45분 · 자유석 있음" },
+      { time: "13:45", name: "특급 ゆふいんの森5호", dest: "유후인·별부", note: "약 1시간 40분 · 전석지정석" },
+      { time: "16:45", name: "특급 ゆふ5호", dest: "유후인·별부", note: "약 1시간 45분 · 자유석 있음" },
+    ],
+    highlights: [
+      "ゆふいんの森: 전석 지정석 관광열차 (지정석 횟수 차감)",
+      "ゆふ: 자유석 있음 (JR 북큐슈 5일권 자유석 탑승 가능)",
+      "보통열차는 히타(日田)에서 환승 필요",
+      "⚠️ ゆふいんの森는 인기 많아 미리 예약 추천!",
+    ],
+  },
+];
+
+function findBestTrain(trains, targetTime) {
+  if (!targetTime || !trains.length) return 0;
+  const [h, m] = targetTime.split(":").map(Number);
+  if (isNaN(h)) return 0;
+  const target = h * 60 + m;
+  let bestIdx = 0;
+  let bestDiff = Infinity;
+  trains.forEach((t, i) => {
+    const [th, tm] = t.time.split(":").map(Number);
+    if (isNaN(th)) return;
+    const diff = (th * 60 + tm) - target;
+    // prefer trains at or after target time, then closest before
+    const score = diff >= 0 ? diff : 1440 + diff;
+    if (score < bestDiff) { bestDiff = score; bestIdx = i; }
+  });
+  return bestIdx;
+}
 
 const BASE_DAYS = [
   {
@@ -17,9 +851,36 @@ const BASE_DAYS = [
               image: "/images/ticket_departure.jpg",
             }
           },
-          { time: "17:10", desc: "후쿠오카공항 도착", type: "move" },
+          { time: "17:10", desc: "후쿠오카공항 도착", type: "move",
+            detail: {
+              name: "후쿠오카공항 국제선 터미널",
+              category: "교통",
+              tip: "입국심사 + 수하물 수령까지 약 25~30분 소요",
+              highlights: ["입국카드 기내에서 미리 작성", "세관 신고서 필요 (면세품 있을 경우)"],
+            }
+          },
           { time: "17:35", desc: "입국심사 + 수하물 수령", type: "info" },
-          { time: "17:40", desc: "공항 직행버스 탑승 → 하카타역", type: "move", sub: "약 20분" },
+          { time: "17:40", desc: "공항 직행버스 탑승 → 하카타역", type: "move", sub: "약 20분 · 310엔",
+            detail: {
+              name: "공항 → 하카타역 (직행버스)",
+              category: "교통",
+              tip: "국제선 터미널 1번 승차장에서 탑승",
+              timetable: {
+                _routeId: "fukuoka_airport_bus",
+                station: "후쿠오카공항 국제선 터미널",
+                direction: "하카타역 방면",
+                trains: [
+                  { time: "매 15~20분", name: "직행버스 (니시테츠)", dest: "하카타역 치쿠시구치", note: "약 20분 · 310엔", picked: true },
+                  { time: "매 5~8분", name: "셔틀+지하철", dest: "국내선 환승 → 하카타역", note: "약 25~35분 · 260엔", picked: false },
+                ],
+              },
+              highlights: [
+                "직행버스: 국제선→하카타역 치쿠시구치 (환승 불필요)",
+                "지하철: 무료셔틀로 국내선 이동 → 공항선 2정거장 (5분)",
+                "짐 많으면 직행버스 추천 / 시간 정확성은 지하철 우세",
+              ],
+            }
+          },
           { time: "18:05", desc: "하카타역 도착 → 숙소 이동", type: "move", sub: "도보 10분" },
           { time: "18:15", desc: "숙소 체크인 & 짐 맡기기", type: "stay",
             detail: {
@@ -119,6 +980,7 @@ const BASE_DAYS = [
               image: "/images/sakura547.jpg",
               tip: "JR 북큐슈 5일권으로 자유석 탑승 가능 · 지정석도 6회까지 OK",
               timetable: {
+                _routeId: "hakata_kumamoto",
                 station: "하카타역",
                 direction: "구마모토 방면",
                 trains: [
@@ -135,9 +997,37 @@ const BASE_DAYS = [
               ],
             }
           },
-          { time: "11:33", desc: "구마모토역 도착", type: "move" },
+          { time: "11:33", desc: "구마모토역 도착", type: "move",
+            detail: {
+              name: "구마모토역 도착",
+              category: "교통",
+              tip: "신칸센 출구 → 재래선·노면전차 안내판 따라 이동",
+              highlights: ["코인로커: 역내 2층 (400~700엔)", "노면전차: 역 정면 광장에서 탑승"],
+            }
+          },
           { time: "11:40", desc: "역 코인로커에 짐 보관", type: "info", sub: "400~700엔" },
-          { time: "11:50", desc: "노면전차 → 시모토리 방면", type: "move", sub: "15분 · 170엔" },
+          { time: "11:50", desc: "노면전차 → 시모토리 방면", type: "move", sub: "15분 · 170엔",
+            detail: {
+              name: "노면전차 (구마모토역→시모토리)",
+              category: "교통",
+              tip: "구마모토역 전정에서 A계통 탑승 · 시모토리 하차",
+              timetable: {
+                _routeId: "kumamoto_tram",
+                station: "구마모토역 전정",
+                direction: "시모토리·스이젠지 방면",
+                trains: [
+                  { time: "매 6~8분", name: "A계통", dest: "다시마에도리 → 건군신사", note: "170엔 균일요금", picked: true },
+                  { time: "매 6~8분", name: "B계통", dest: "가미구마모토 → 스이젠지", note: "170엔 균일요금", picked: false },
+                ],
+              },
+              highlights: [
+                "A계통 탑승 → '시모토리(辛島町)' 하차 (약 15분)",
+                "배차 6~8분 간격이라 대기 시간 짧음",
+                "1일권 500엔 (3회 이상 타면 이득)",
+                "💡 하나바타초역 = 구마모토성 최근접",
+              ],
+            }
+          },
         ],
       },
       {
@@ -175,7 +1065,26 @@ const BASE_DAYS = [
               highlights: ["카라시렌콘 간식 꼭 먹어보기", "구마모토 기념품 원스톱 쇼핑", "관광안내소도 있어서 지도·정보 수집 가능"],
             }
           },
-          { time: "15:00", desc: "노면전차 → 스이젠지", type: "move", sub: "20분 · 170엔" },
+          { time: "15:00", desc: "노면전차 → 스이젠지", type: "move", sub: "20분 · 170엔",
+            detail: {
+              name: "노면전차 (시모토리→스이젠지)",
+              category: "교통",
+              tip: "B계통 탑승 · 스이젠지코엔마에(水前寺公園) 하차",
+              timetable: {
+                _routeId: "kumamoto_tram",
+                station: "시모토리(辛島町)",
+                direction: "스이젠지 방면",
+                trains: [
+                  { time: "매 6~8분", name: "B계통", dest: "스이젠지 공원", note: "170엔 균일요금 · 약 20분", picked: true },
+                ],
+              },
+              highlights: [
+                "B계통 탑승 → '스이젠지코엔마에' 하차",
+                "배차 6~8분 간격",
+                "하차 후 도보 3분 → 스이젠지 조주엔 입구",
+              ],
+            }
+          },
           { time: "15:25", desc: "스이젠지 조주엔", type: "spot", sub: "400엔 · 후지산 축소판 정원",
             detail: {
               name: "스이젠지 조주엔 (水前寺成趣園)",
@@ -187,7 +1096,26 @@ const BASE_DAYS = [
               highlights: ["후지산 모양 언덕이 포토스팟", "연못 한바퀴 산책 약 30~40분", "구마모토성과 함께 2대 관광지"],
             }
           },
-          { time: "16:05", desc: "노면전차 → 구마모토역 복귀", type: "move", sub: "20분" },
+          { time: "16:05", desc: "노면전차 → 구마모토역 복귀", type: "move", sub: "20분 · 170엔",
+            detail: {
+              name: "노면전차 (스이젠지→구마모토역)",
+              category: "교통",
+              tip: "B계통 역방향 탑승 → 구마모토역 전정 하차",
+              timetable: {
+                _routeId: "kumamoto_tram",
+                station: "스이젠지코엔마에",
+                direction: "구마모토역 방면",
+                trains: [
+                  { time: "매 6~8분", name: "B계통 (역방향)", dest: "구마모토역 전정", note: "170엔 균일요금 · 약 20분", picked: true },
+                ],
+              },
+              highlights: [
+                "스이젠지코엔마에 → 구마모토역 전정",
+                "배차 6~8분 간격",
+                "역 도착 후 코인로커 짐 회수",
+              ],
+            }
+          },
         ],
       },
       {
@@ -236,6 +1164,7 @@ const BASE_DAYS = [
               image: "/images/asoboi.jpeg",
               tip: "JR 북큐슈 5일권 커버 · 특급 이용 시 지정석 횟수 차감",
               timetable: {
+                _routeId: "kumamoto_aso",
                 station: "구마모토역",
                 direction: "아소 방면 (호히본선)",
                 trains: [
@@ -251,7 +1180,14 @@ const BASE_DAYS = [
               ],
             }
           },
-          { time: "11:45", desc: "아소역 도착", type: "move" },
+          { time: "11:45", desc: "아소역 도착", type: "move",
+            detail: {
+              name: "아소역 도착",
+              category: "교통",
+              tip: "아소역 앞 버스 정류장에서 아소산행 버스 탑승",
+              highlights: ["역 앞 관광안내소에서 지도·정보 수집 가능", "코인로커 있음 (400엔~)"],
+            }
+          },
         ],
       },
       {
@@ -273,7 +1209,33 @@ const BASE_DAYS = [
       {
         title: "오후 · 아소산 관광",
         items: [
-          { time: "13:00", desc: "아소역 앞 버스 탑승 → 아소산", type: "move", sub: "약 35분 · ~600엔" },
+          { time: "13:00", desc: "아소역 앞 버스 탑승 → 아소산", type: "move", sub: "약 26분 · ~600엔",
+            detail: {
+              name: "아소역 → 쿠사센리 (산교버스)",
+              category: "교통",
+              tip: "아소역앞 버스 정류장에서 아소 등산선 탑승",
+              timetable: {
+                _routeId: "aso_bus_up",
+                station: "아소역앞",
+                direction: "쿠사센리·아소산상 터미널 방면",
+                trains: [
+                  { time: "09:40", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔", picked: false },
+                  { time: "10:25", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔", picked: false },
+                  { time: "11:50", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔", picked: false },
+                  { time: "12:50", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔", picked: true },
+                  { time: "13:30", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔", picked: false },
+                  { time: "14:10", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔", picked: false },
+                  { time: "14:35", name: "아소 등산선", dest: "쿠사센리·아소산상", note: "약 26분 · ~600엔", picked: false },
+                ],
+              },
+              highlights: [
+                "산교(産交)버스 운행 — JR패스 미적용",
+                "⚠️ 편수 적음 — 반드시 시간 확인",
+                "⚠️ 혼잡 시 탑승 불가 가능 — 여유있게",
+                "동절기(2월) 시간표 변동 가능 — 현지 확인 필수",
+              ],
+            }
+          },
           { time: "13:30", desc: "쿠사센리 초원 + 나카다케 화구 전망", type: "spot", sub: "약 1시간",
             detail: {
               name: "쿠사센리 · 나카다케 화구",
@@ -283,7 +1245,32 @@ const BASE_DAYS = [
               highlights: ["쿠사센리 초원 산책 + 나카다케 활화산 전망", "⚠️ 화구 제한 시 Plan B: 승마체험 + 아소 화산박물관", "🌡 2월 아소산은 0~5°C → 방한 준비 필수!", "화구 상황 확인: aso.ne.jp/~volcano/"],
             }
           },
-          { time: "14:30", desc: "버스로 하산", type: "move" },
+          { time: "14:30", desc: "버스로 하산 → 아소역", type: "move", sub: "약 26분 · ~600엔",
+            detail: {
+              name: "쿠사센리 → 아소역 (산교버스)",
+              category: "교통",
+              tip: "쿠사센리 버스 정류장에서 하행 버스 탑승",
+              timetable: {
+                _routeId: "aso_bus_down",
+                station: "쿠사센리·아소산상 터미널",
+                direction: "아소역앞 방면",
+                trains: [
+                  { time: "10:15", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔", picked: false },
+                  { time: "11:00", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔", picked: false },
+                  { time: "12:20", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔", picked: false },
+                  { time: "13:20", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔", picked: false },
+                  { time: "14:00", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔", picked: true },
+                  { time: "14:40", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔", picked: false },
+                  { time: "15:05", name: "아소 등산선", dest: "아소역앞", note: "약 26분 · ~600엔", picked: false },
+                ],
+              },
+              highlights: [
+                "산교(産交)버스 운행 — JR패스 미적용",
+                "⚠️ 마지막 버스 놓치지 않도록 시간 체크!",
+                "하산 후 아소 신사 방면으로 이동",
+              ],
+            }
+          },
         ],
       },
       {
@@ -314,6 +1301,7 @@ const BASE_DAYS = [
               image: "/images/asoboi.jpeg",
               tip: "JR 북큐슈 5일권 커버 · 놓치면 다음 열차까지 대기 길어짐",
               timetable: {
+                _routeId: "aso_kumamoto",
                 station: "아소역",
                 direction: "구마모토 방면 (호히본선)",
                 trains: [
@@ -336,7 +1324,25 @@ const BASE_DAYS = [
         title: "저녁",
         items: [
           { time: "17:15", desc: "구마모토역 도착 → 숙소 휴식", type: "stay" },
-          { time: "18:30", desc: "시모토리로 출발", type: "move" },
+          { time: "18:30", desc: "시모토리로 출발 (노면전차)", type: "move", sub: "15분 · 170엔",
+            detail: {
+              name: "노면전차 (구마모토역→시모토리)",
+              category: "교통",
+              tip: "구마모토역 전정에서 A계통 탑승",
+              timetable: {
+                _routeId: "kumamoto_tram",
+                station: "구마모토역 전정",
+                direction: "시모토리 방면",
+                trains: [
+                  { time: "매 6~8분", name: "A계통", dest: "시모토리", note: "170엔 · 약 15분", picked: true },
+                ],
+              },
+              highlights: [
+                "A계통 → 시모토리 하차",
+                "배차 6~8분 간격",
+              ],
+            }
+          },
           { time: "19:00", desc: "야츠다 — 숯불 야키토리", type: "food", sub: "1인 ~3,000엔",
             detail: {
               name: "야츠다 (炭火焼 やつ田)",
@@ -359,32 +1365,183 @@ const BASE_DAYS = [
     color: "#3E8E5B", icon: "♨️", stay: "유후인 1박", booked: false,
     sections: [
       {
-        title: "종일",
+        title: "이동",
         items: [
-          { time: "오전", desc: "구마모토 출발", type: "move" },
-          { time: "~점심", desc: "유후인 도착 & 체크인", type: "stay" },
-          { time: "오후", desc: "유후인 유노쓰보 거리 산책", type: "shop" },
-          { time: "저녁", desc: "료칸 온천 & 카이세키 요리", type: "food" },
+          { time: "09:00", desc: "구마모토 호텔 체크아웃", type: "stay" },
+          { time: "09:42", desc: "신칸센 탑승 (구마모토→쿠루메)", type: "move", sub: "약 20분 · JR패스",
+            detail: {
+              name: "구마모토 → 쿠루메 (신칸센)",
+              category: "교통",
+              tip: "JR 북큐슈 5일권 자유석 탑승 · 쿠루메역에서 큐다이본선 환승",
+              timetable: {
+                _routeId: "kumamoto_kurume",
+                station: "구마모토역",
+                direction: "쿠루메(하카타) 방면",
+                trains: [
+                  { time: "08:00", name: "さくら540", dest: "博多", note: "쿠루메 20분 · 하카타 33분", picked: false },
+                  { time: "08:42", name: "つばめ310", dest: "博多", note: "쿠루메 약 30분", picked: false },
+                  { time: "09:42", name: "さくら542", dest: "博多", note: "쿠루메 20분", picked: true },
+                  { time: "10:42", name: "さくら544", dest: "博多", note: "쿠루메 20분", picked: false },
+                  { time: "11:42", name: "さくら546", dest: "博多", note: "쿠루메 20분", picked: false },
+                ],
+              },
+              highlights: [
+                "JR 북큐슈 5일권 자유석 탑승 가능",
+                "쿠루메역에서 JR큐다이본선 환승 → 유후인",
+                "さくら가 빠름 (쿠루메까지 약 20분)",
+              ],
+            }
+          },
+          { time: "10:02", desc: "쿠루메역 도착 → 큐다이본선 환승", type: "move" },
+          { time: "10:45", desc: "특급 유후인노모리 탑승", type: "move", sub: "약 1시간 40분 · JR패스(지정석)",
+            detail: {
+              name: "쿠루메 → 유후인 (JR 큐다이본선)",
+              category: "교통",
+              tip: "JR 북큐슈 5일권 커버 · 유후인노모리는 전석 지정석 (지정석 횟수 차감)",
+              timetable: {
+                _routeId: "kurume_yufuin",
+                station: "쿠루메역",
+                direction: "유후인·오이타 방면",
+                trains: [
+                  { time: "08:45", name: "특급 ゆふいんの森1호", dest: "유후인·별부", note: "약 1시간 40분 · 전석지정석", picked: false },
+                  { time: "10:45", name: "특급 ゆふいんの森3호", dest: "유후인·별부", note: "약 1시간 40분 · 전석지정석", picked: true },
+                  { time: "11:45", name: "특급 ゆふ3호", dest: "유후인·별부", note: "약 1시간 45분 · 자유석 있음", picked: false },
+                  { time: "13:45", name: "특급 ゆふいんの森5호", dest: "유후인·별부", note: "약 1시간 40분 · 전석지정석", picked: false },
+                  { time: "16:45", name: "특급 ゆふ5호", dest: "유후인·별부", note: "약 1시간 45분 · 자유석 있음", picked: false },
+                ],
+              },
+              highlights: [
+                "ゆふいんの森: 전석 지정석 관광열차 (지정석 횟수 차감)",
+                "ゆふ: 자유석 있음 (JR 북큐슈 5일권 자유석 탑승 가능)",
+                "⚠️ ゆふいんの森는 인기 많아 미리 예약 추천!",
+                "차창 밖 큐슈 산간 풍경이 절경",
+              ],
+            }
+          },
+          { time: "12:25", desc: "유후인역 도착", type: "move",
+            detail: {
+              name: "유후인역",
+              category: "교통",
+              tip: "역 2층에 족탕 있음 (무료) · 유후다케 조망 포인트",
+              highlights: ["역 앞에서 유후다케 전경 사진 촬영", "관광안내소에서 지도 수령", "메인거리(유노쓰보가도)까지 도보 5분"],
+            }
+          },
+        ],
+      },
+      {
+        title: "오후 · 저녁",
+        items: [
+          { time: "12:30", desc: "유후인 료칸 체크인 & 짐 맡기기", type: "stay" },
+          { time: "13:00", desc: "유후인 유노쓰보 거리 산책", type: "shop",
+            detail: {
+              name: "유노쓰보가도 (湯の坪街道)",
+              category: "쇼핑",
+              address: "유후인역 → 긴린코 방면 메인거리",
+              tip: "역에서 긴린코까지 약 800m, 왕복 1~2시간 여유있게",
+              highlights: ["B-speak 롤케이크 (오전 매진 주의)", "금상 고로케 먹어보기", "플로럴 빌리지 (동화마을)", "밀히(Milch) 푸딩"],
+            }
+          },
+          { time: "15:00", desc: "긴린코 호수 산책", type: "spot",
+            detail: {
+              name: "긴린코 (金鱗湖)",
+              category: "관광",
+              address: "유후인 메인거리 끝",
+              tip: "겨울 아침에 물안개 피어오르는 포토스팟",
+              highlights: ["메인거리 끝에 위치 (도보 15분)", "호수 주변 카페·갤러리 산책", "겨울 아침 물안개 포토 추천"],
+            }
+          },
+          { time: "16:00", desc: "료칸 복귀 & 온천", type: "stay" },
+          { time: "저녁", desc: "료칸 카이세키 요리", type: "food" },
         ],
       },
     ],
-    notes: "구마모토 → 유후인 (JR 쿠루메 환승, 5일권 커버) / 료칸 후보: 센도·바이엔·겟토안",
+    notes: "구마모토→쿠루메(신칸센 20분)→유후인(특급 1시간 40분) / JR 5일권 커버 / 료칸 후보: 센도·바이엔·겟토안",
   },
   {
     day: 5, date: "2/23 (월)", label: "유후인 → 하카타",
     color: "#3A7DB5", icon: "🛍️", stay: "하카타 1박", booked: false,
     sections: [
       {
-        title: "종일",
+        title: "오전",
         items: [
-          { time: "오전", desc: "킨린코 호수 산책", type: "spot" },
-          { time: "~점심", desc: "유후인 출발 → 하카타", type: "move" },
-          { time: "오후", desc: "캐널시티 / 텐진 쇼핑", type: "shop" },
-          { time: "저녁", desc: "나카스 포장마차 야타이 체험", type: "food" },
+          { time: "09:00", desc: "킨린코 호수 아침 산책", type: "spot",
+            detail: {
+              name: "긴린코 아침 산책",
+              category: "관광",
+              address: "유후인 메인거리 끝",
+              tip: "겨울 아침 물안개가 피어오르는 환상적인 풍경",
+              highlights: ["아침 일찍 가면 물안개 볼 확률 높음", "료칸 조식 후 산책 추천"],
+            }
+          },
+          { time: "10:00", desc: "료칸 체크아웃 & 유후인역 이동", type: "stay" },
+        ],
+      },
+      {
+        title: "이동",
+        items: [
+          { time: "11:18", desc: "특급 유후인노모리 탑승 → 하카타", type: "move", sub: "약 2시간 15분 · JR패스(지정석)",
+            detail: {
+              name: "유후인 → 하카타 (JR 특급)",
+              category: "교통",
+              tip: "JR 북큐슈 5일권 커버 · 유후인노모리는 전석 지정석",
+              timetable: {
+                _routeId: "yufuin_hakata",
+                station: "유후인역",
+                direction: "하카타 방면",
+                trains: [
+                  { time: "11:18", name: "특급 ゆふいんの森2호", dest: "博多", note: "약 2시간 15분", picked: true },
+                  { time: "13:55", name: "특급 ゆふ4호", dest: "博多", note: "약 2시간 20분", picked: false },
+                  { time: "15:38", name: "특급 ゆふいんの森4호", dest: "博多", note: "약 2시간 15분", picked: false },
+                  { time: "16:45", name: "특급 ゆふいんの森6호", dest: "博多", note: "약 2시간 15분", picked: false },
+                  { time: "17:06", name: "특급 ゆふ6호", dest: "博多", note: "약 2시간 20분", picked: false },
+                ],
+              },
+              highlights: [
+                "ゆふいんの森: 전석 지정석 관광열차",
+                "ゆふ: 자유석 있음 (JR 북큐슈 5일권)",
+                "⚠️ ゆふいんの森는 인기 많아 미리 예약!",
+                "차창 밖 큐슈 산간 풍경 감상",
+              ],
+            }
+          },
+          { time: "13:33", desc: "하카타역 도착", type: "move",
+            detail: {
+              name: "하카타역 도착",
+              category: "교통",
+              tip: "하카타역에서 숙소 체크인 후 쇼핑 시작",
+              highlights: ["캐널시티까지 도보 10분", "텐진까지 지하철 5분"],
+            }
+          },
+        ],
+      },
+      {
+        title: "오후 · 저녁",
+        items: [
+          { time: "14:00", desc: "숙소 체크인 & 짐 맡기기", type: "stay" },
+          { time: "14:30", desc: "캐널시티 / 텐진 쇼핑", type: "shop",
+            detail: {
+              name: "텐진·캐널시티 쇼핑",
+              category: "쇼핑",
+              tip: "텐진 지하상가 + 캐널시티 + 하카타역 주변",
+              highlights: ["텐진 지하상가: 150개+ 매장, 비올 때 최적", "캐널시티: 분수 쇼 + 쇼핑", "면세 쇼핑은 여권 지참 필수"],
+            }
+          },
+          { time: "19:00", desc: "나카스 포장마차 야타이 체험", type: "food",
+            detail: {
+              name: "나카스 야타이 (포장마차)",
+              category: "식사",
+              address: "福岡市博多区中洲 나카가와 강변",
+              hours: "저녁 6시경~",
+              price: "1인 2,000~3,000엔",
+              tip: "강변 포장마차 줄에서 분위기 좋은 곳 골라 앉기",
+              highlights: ["라멘, 교자, 오뎅, 야키토리 등 다양", "한 곳당 8~10석 소규모", "후쿠오카 여행의 하이라이트!"],
+            }
+          },
+          { time: "21:00", desc: "숙소 복귀", type: "stay" },
         ],
       },
     ],
-    notes: "유후인→하카타 별도 티켓 구매 (~4,800엔) / 유후인노모리 특급 추천",
+    notes: "유후인→하카타 JR 특급 약 2시간 15분 (5일권 커버) / 오후: 텐진·캐널시티 쇼핑",
   },
   {
     day: 6, date: "2/24 (화)", label: "하카타 → 인천",
@@ -393,13 +1550,57 @@ const BASE_DAYS = [
       {
         title: "오전",
         items: [
-          { time: "오전", desc: "면세점 쇼핑 / 공항 이동", type: "shop" },
-          { time: "10:30", desc: "후쿠오카공항 출발 (KE788)", type: "move" },
-          { time: "12:00", desc: "인천공항 도착", type: "move" },
+          { time: "07:30", desc: "숙소 체크아웃", type: "stay" },
+          { time: "08:00", desc: "하카타역 → 후쿠오카공항", type: "move", sub: "직행버스 20분 · 310엔",
+            detail: {
+              name: "하카타역 → 후쿠오카공항 국제선",
+              category: "교통",
+              tip: "출국 2시간 전 공항 도착 권장 — 8시 출발이면 여유",
+              timetable: {
+                _routeId: "hakata_fukuoka_airport",
+                station: "하카타역",
+                direction: "후쿠오카공항 국제선 방면",
+                trains: [
+                  { time: "매 15~20분", name: "직행버스 (니시테츠)", dest: "공항 국제선 터미널", note: "약 20분 · 310엔", picked: true },
+                  { time: "매 5~8분", name: "지하철+셔틀", dest: "공항역 → 국제선 환승", note: "약 25~35분 · 260엔", picked: false },
+                ],
+              },
+              highlights: [
+                "직행버스: 하카타역 치쿠시구치 → 국제선 직행",
+                "지하철: 하카타역 → 공항역(5분) → 무료셔틀로 국제선(10분)",
+                "⚠️ 국제선은 국내선과 별도 터미널!",
+                "출국 2시간 전 공항 도착 권장",
+              ],
+            }
+          },
+          { time: "08:30", desc: "후쿠오카공항 도착 → 면세 쇼핑", type: "shop",
+            detail: {
+              name: "후쿠오카공항 면세 쇼핑",
+              category: "쇼핑",
+              tip: "출국 수속 후 면세 구역에서 쇼핑",
+              highlights: ["면세점에서 위스키·화장품·과자류 구매", "못 산 기념품 마지막 찬스"],
+            }
+          },
+          { time: "10:30", desc: "후쿠오카공항 출발 (KE788)", type: "move",
+            detail: {
+              name: "후쿠오카 → 인천 (KE788)",
+              category: "교통",
+              tip: "대한항공 KE788 · 후쿠오카 10:30 → 인천 12:00",
+              highlights: ["대한항공 KE788", "비행시간 약 1시간 30분", "수하물 1pc (23kg)"],
+            }
+          },
+          { time: "12:00", desc: "인천공항 도착", type: "move",
+            detail: {
+              name: "인천공항 도착",
+              category: "교통",
+              tip: "입국심사 + 수하물 수령 후 귀가",
+              highlights: ["수하물 수령 → 세관 → 출구"],
+            }
+          },
         ],
       },
     ],
-    notes: "대한항공 KE788 · 수하물 1pc",
+    notes: "대한항공 KE788 · 수하물 1pc · 출국 2시간 전 공항 도착 권장",
   },
 ];
 
@@ -1036,7 +2237,7 @@ function ImageViewer({ src, alt, onClose }) {
   );
 }
 
-function DetailDialog({ detail, onClose, onEdit, dayColor }) {
+function DetailDialog({ detail, onClose, dayColor }) {
   if (!detail) return null;
   const [viewImage, setViewImage] = useState(null);
   const cat = CATEGORY_COLORS[detail.category] || { bg: "#f5f5f5", color: "#555", border: "#ddd" };
@@ -1089,14 +2290,6 @@ function DetailDialog({ detail, onClose, onEdit, dayColor }) {
             </span>
           </div>
           <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-            {onEdit && (
-              <button onClick={onEdit} style={{
-                border: "none", background: "#EEF6FF", borderRadius: "50%",
-                width: "28px", height: "28px", cursor: "pointer",
-                fontSize: "12px", color: "#2B6CB0", display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: "inherit",
-              }}>✏️</button>
-            )}
             <button onClick={onClose} style={{
               border: "none", background: "#F2F1ED", borderRadius: "50%",
               width: "28px", height: "28px", cursor: "pointer",
@@ -1272,8 +2465,9 @@ function DetailDialog({ detail, onClose, onEdit, dayColor }) {
   );
 }
 
-function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color }) {
+function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color, days }) {
   const isNew = !item;
+  const [selectedDayIdx, setSelectedDayIdx] = useState(dayIdx);
   const [time, setTime] = useState(item?.time || "");
   const [desc, setDesc] = useState(item?.desc || "");
   const [type, setType] = useState(item?.type || "spot");
@@ -1284,6 +2478,11 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
   const [detailPrice, setDetailPrice] = useState(item?.detail?.price || "");
   const [detailHours, setDetailHours] = useState(item?.detail?.hours || "");
   const [detailImage, setDetailImage] = useState(item?.detail?.image || "");
+
+  // Timetable state
+  const currentRouteId = item?.detail?.timetable?._routeId || "";
+  const [selectedRoute, setSelectedRoute] = useState(currentRouteId);
+  const [loadedTimetable, setLoadedTimetable] = useState(item?.detail?.timetable || null);
 
   const typeOptions = [
     { value: "food", label: "🍽 식사" },
@@ -1296,14 +2495,43 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
 
   const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "교통" };
 
+  const handleLoadTimetable = (routeId) => {
+    if (!routeId) { setLoadedTimetable(null); return; }
+    const route = TIMETABLE_DB.find((r) => r.id === routeId);
+    if (!route) return;
+    const bestIdx = findBestTrain(route.trains, time);
+    const trains = route.trains.map((t, i) => ({ ...t, picked: i === bestIdx }));
+    setLoadedTimetable({
+      _routeId: routeId,
+      station: route.station,
+      direction: route.direction,
+      trains,
+    });
+    setSelectedRoute(routeId);
+  };
+
   const handleSave = () => {
     if (!time.trim() || !desc.trim()) return;
+    const hasDetailContent = detailName.trim() || address.trim() || detailTip.trim() || detailImage.trim() || detailPrice.trim() || detailHours.trim();
+
     const newItem = {
       time: time.trim(),
       desc: desc.trim(),
       type,
       ...(sub.trim() ? { sub: sub.trim() } : {}),
-      detail: {
+      _custom: true,
+    };
+
+    // Build timetable + highlights from loaded route
+    let timetable = loadedTimetable;
+    let highlights = item?.detail?.highlights || null;
+    if (loadedTimetable?._routeId) {
+      const route = TIMETABLE_DB.find((r) => r.id === loadedTimetable._routeId);
+      if (route) highlights = route.highlights;
+    }
+
+    if (hasDetailContent || timetable) {
+      newItem.detail = {
         name: detailName.trim() || desc.trim(),
         category: catMap[type] || "관광",
         ...(address.trim() ? { address: address.trim() } : {}),
@@ -1311,10 +2539,12 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
         ...(detailPrice.trim() ? { price: detailPrice.trim() } : {}),
         ...(detailHours.trim() ? { hours: detailHours.trim() } : {}),
         ...(detailImage.trim() ? { image: detailImage.trim() } : {}),
-      },
-      _custom: true,
-    };
-    onSave(newItem, dayIdx, sectionIdx, itemIdx);
+        ...(timetable ? { timetable } : {}),
+        ...(highlights ? { highlights } : {}),
+      };
+    }
+
+    onSave(newItem, selectedDayIdx, sectionIdx, itemIdx);
   };
 
   const fieldStyle = {
@@ -1363,6 +2593,18 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
 
         {/* Form */}
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          {/* Day selector (only for new items) */}
+          {isNew && days && (
+            <div>
+              <p style={labelStyle}>추가할 날짜</p>
+              <select value={selectedDayIdx} onChange={(e) => setSelectedDayIdx(Number(e.target.value))} style={{ ...fieldStyle, cursor: "pointer" }}>
+                {days.map((d, i) => (
+                  <option key={i} value={i}>{d.icon} Day {d.day} — {d.date} {d.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Time + Type row */}
           <div style={{ display: "flex", gap: "10px" }}>
             <div style={{ flex: 1 }}>
@@ -1430,6 +2672,71 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
             <p style={labelStyle}>이미지 경로</p>
             <input value={detailImage} onChange={(e) => setDetailImage(e.target.value)} placeholder="/images/filename.jpg" style={fieldStyle} />
           </div>
+
+          {/* Timetable loader - only for move type */}
+          {type === "move" && (
+            <>
+              <div style={{ borderTop: "1px solid #EEECE6", paddingTop: "10px" }}>
+                <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "#555" }}>🚆 시간표 불러오기</p>
+              </div>
+              <div>
+                <p style={labelStyle}>노선 선택</p>
+                <select
+                  value={selectedRoute}
+                  onChange={(e) => setSelectedRoute(e.target.value)}
+                  style={{ ...fieldStyle, cursor: "pointer" }}
+                >
+                  <option value="">시간표 없음</option>
+                  {TIMETABLE_DB.map((r) => (
+                    <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={() => handleLoadTimetable(selectedRoute)}
+                disabled={!selectedRoute}
+                style={{
+                  padding: "10px", border: "none", borderRadius: "10px",
+                  background: selectedRoute ? "#EEF6FF" : "#F2F1ED",
+                  color: selectedRoute ? "#2B6CB0" : "#bbb",
+                  fontSize: "12px", fontWeight: 700, cursor: selectedRoute ? "pointer" : "default",
+                  fontFamily: "inherit", transition: "all 0.15s",
+                }}
+              >
+                🔄 {loadedTimetable ? "시간표 다시 불러오기" : "시간표 불러오기"}
+                {time.trim() ? ` (${time.trim()} 기준)` : ""}
+              </button>
+
+              {/* Preview loaded timetable */}
+              {loadedTimetable && loadedTimetable.trains && (
+                <div style={{
+                  background: "#FAFAF8", borderRadius: "10px", border: "1px solid #E8E6E1",
+                  padding: "10px 12px", fontSize: "11px",
+                }}>
+                  <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#555" }}>
+                    {loadedTimetable.station} → {loadedTimetable.direction}
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {loadedTimetable.trains.map((t, i) => (
+                      <div key={i} style={{
+                        display: "flex", alignItems: "center", gap: "8px",
+                        padding: "4px 6px", borderRadius: "6px",
+                        background: t.picked ? "#FFF9DB" : "transparent",
+                        fontWeight: t.picked ? 700 : 400,
+                      }}>
+                        <span style={{ width: "38px", flexShrink: 0, color: t.picked ? "#B8860B" : "#777" }}>{t.time}</span>
+                        <span style={{ flex: 1, color: t.picked ? "#333" : "#666" }}>{t.name}</span>
+                        {t.picked && <span style={{
+                          fontSize: "9px", background: "#FFE066", color: "#7C6A0A",
+                          padding: "1px 5px", borderRadius: "4px", fontWeight: 700,
+                        }}>탑승 예정</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Actions */}
@@ -1464,11 +2771,16 @@ function loadCustomData() {
   } catch { return {}; }
 }
 
+const DAY_COLORS = ["#D94F3B", "#D97B2B", "#B8912A", "#3E8E5B", "#3A7DB5", "#7161A5", "#C75D78", "#5B8C6E", "#8B6E4F", "#4A6FA5"];
+
 function mergeData(base, custom) {
-  return base.map((day, di) => {
+  const merged = base.map((day, di) => {
     const dayCustom = custom[di];
-    if (!dayCustom) return day;
-    const newSections = day.sections.map((sec, si) => {
+    const overrides = custom._dayOverrides?.[di];
+    let d = day;
+    if (overrides) d = { ...d, ...overrides };
+    if (!dayCustom) return d;
+    const newSections = d.sections.map((sec, si) => {
       const secCustom = dayCustom.sections?.[si];
       if (!secCustom) return sec;
       return { ...sec, items: secCustom.items || sec.items };
@@ -1477,8 +2789,13 @@ function mergeData(base, custom) {
       const extraSection = { title: "추가 일정", items: dayCustom.extraItems };
       newSections.push(extraSection);
     }
-    return { ...day, sections: newSections };
+    return { ...d, sections: newSections };
   });
+  // Append custom-added days
+  if (custom._extraDays) {
+    custom._extraDays.forEach((d) => merged.push(d));
+  }
+  return merged;
 }
 
 export default function TravelPlanner() {
@@ -1488,7 +2805,12 @@ export default function TravelPlanner() {
   const [showDocs, setShowDocs] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [dayInfoTab, setDayInfoTab] = useState(null);
-  const [editTarget, setEditTarget] = useState(null); // { item, sectionIdx, itemIdx, dayIdx } or { dayIdx } for new
+  const [editTarget, setEditTarget] = useState(null);
+  const [showMap, setShowMap] = useState(false);
+  const [editingDayIdx, setEditingDayIdx] = useState(null);
+  const [editDayLabel, setEditDayLabel] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState(null); // { title, message, onConfirm }
+  const [showAddDay, setShowAddDay] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("travel_custom_data", JSON.stringify(customData));
@@ -1496,6 +2818,77 @@ export default function TravelPlanner() {
 
   const DAYS = mergeData(BASE_DAYS, customData);
   const current = DAYS[selectedDay];
+
+  const handleAddDay = useCallback((label, icon) => {
+    setCustomData((prev) => {
+      const next = { ...prev };
+      const existingExtra = next._extraDays || [];
+      const totalDays = BASE_DAYS.length + existingExtra.length;
+      const newDay = {
+        day: totalDays + 1,
+        date: `Day ${totalDays + 1}`,
+        label: label,
+        color: DAY_COLORS[totalDays % DAY_COLORS.length],
+        icon: icon || "📌",
+        stay: "",
+        booked: false,
+        sections: [{ title: "종일", items: [] }],
+        notes: "",
+        _custom: true,
+      };
+      next._extraDays = [...existingExtra, newDay];
+      return { ...next };
+    });
+    setShowAddDay(false);
+    setTimeout(() => {
+      setSelectedDay(BASE_DAYS.length + (customData._extraDays?.length || 0));
+    }, 50);
+  }, [customData]);
+
+  const handleEditDayLabel = useCallback((dayIdx, newLabel) => {
+    setCustomData((prev) => {
+      const next = { ...prev };
+      if (dayIdx < BASE_DAYS.length) {
+        // Base day — store override
+        if (!next._dayOverrides) next._dayOverrides = {};
+        next._dayOverrides[dayIdx] = { ...(next._dayOverrides[dayIdx] || {}), label: newLabel };
+      } else {
+        // Extra day
+        const extraIdx = dayIdx - BASE_DAYS.length;
+        if (next._extraDays && next._extraDays[extraIdx]) {
+          next._extraDays = [...next._extraDays];
+          next._extraDays[extraIdx] = { ...next._extraDays[extraIdx], label: newLabel };
+        }
+      }
+      return { ...next };
+    });
+    setEditingDayIdx(null);
+  }, []);
+
+  const handleDeleteDay = useCallback((dayIdx) => {
+    if (dayIdx < BASE_DAYS.length) return;
+    setConfirmDialog({
+      title: "날짜 삭제",
+      message: "이 날짜와 포함된 모든 일정이 삭제됩니다.\n정말 삭제하시겠습니까?",
+      confirmLabel: "삭제",
+      confirmColor: "#D94F3B",
+      onConfirm: () => {
+        setCustomData((prev) => {
+          const next = { ...prev };
+          const extraIdx = dayIdx - BASE_DAYS.length;
+          if (next._extraDays) {
+            next._extraDays = next._extraDays.filter((_, i) => i !== extraIdx);
+            next._extraDays = next._extraDays.map((d, i) => ({
+              ...d, day: BASE_DAYS.length + i + 1,
+            }));
+          }
+          return { ...next };
+        });
+        setSelectedDay((prev) => Math.max(0, prev - 1));
+        setConfirmDialog(null);
+      },
+    });
+  }, []);
 
   const handleSaveItem = useCallback((newItem, dayIdx, sectionIdx, itemIdx) => {
     setCustomData((prev) => {
@@ -1522,16 +2915,30 @@ export default function TravelPlanner() {
   }, []);
 
   const handleDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx) => {
-    setCustomData((prev) => {
-      const next = { ...prev };
-      if (sectionIdx === -1 && next[dayIdx]?.extraItems) {
-        next[dayIdx].extraItems.splice(itemIdx, 1);
-      } else if (next[dayIdx]?.sections?.[sectionIdx]?.items) {
-        next[dayIdx].sections[sectionIdx].items.splice(itemIdx, 1);
-      }
-      return { ...next };
+    setConfirmDialog({
+      title: "일정 삭제",
+      message: "이 일정을 삭제하시겠습니까?",
+      confirmLabel: "삭제",
+      confirmColor: "#D94F3B",
+      onConfirm: () => {
+        setCustomData((prev) => {
+          const next = { ...prev };
+          if (sectionIdx === -1 && next[dayIdx]?.extraItems) {
+            next[dayIdx].extraItems.splice(itemIdx, 1);
+          } else {
+            if (!next[dayIdx]) next[dayIdx] = {};
+            if (!next[dayIdx].sections) next[dayIdx].sections = {};
+            if (!next[dayIdx].sections[sectionIdx]) {
+              next[dayIdx].sections[sectionIdx] = { items: [...BASE_DAYS[dayIdx].sections[sectionIdx].items] };
+            }
+            next[dayIdx].sections[sectionIdx].items.splice(itemIdx, 1);
+          }
+          return { ...next };
+        });
+        setEditTarget(null);
+        setConfirmDialog(null);
+      },
     });
-    setEditTarget(null);
   }, []);
 
   return (
@@ -1594,7 +3001,7 @@ export default function TravelPlanner() {
         background: "#fff", borderBottom: "1px solid #E8E6E1",
         flexShrink: 0, alignItems: "center",
       }}>
-        <div style={{ display: "flex", flex: 1, overflowX: "auto" }}>
+        <div style={{ display: "flex", flex: 1, overflowX: "auto", alignItems: "center" }}>
           {DAYS.map((day, i) => {
             const active = selectedDay === i;
             return (
@@ -1613,20 +3020,41 @@ export default function TravelPlanner() {
               </button>
             );
           })}
-        </div>
-        <button
-          onClick={() => setEditTarget({ dayIdx: selectedDay, sectionIdx: -1, itemIdx: null, item: null })}
-          style={{
-            width: "30px", height: "30px", borderRadius: "8px",
-            border: "1px solid #E8E6E1", background: "#FAFAF8",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", fontSize: "16px", flexShrink: 0,
-            color: current.color, fontWeight: 700, marginRight: "4px",
+          {/* Add Day button */}
+          <button onClick={() => setShowAddDay(true)} style={{
+            flex: "none", padding: "6px 8px", border: "none",
+            background: "none", cursor: "pointer",
+            borderBottom: "2.5px solid transparent",
+            color: "#ccc", fontSize: "16px", fontWeight: 700,
+            fontFamily: "inherit", transition: "color 0.15s",
+            marginLeft: "2px",
           }}
-          title="일정 추가"
-        >
-          +
-        </button>
+            onMouseEnter={(e) => e.currentTarget.style.color = "#888"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#ccc"}
+            title="날짜 추가"
+          >
+            +
+          </button>
+        </div>
+
+        {/* Gap + Schedule add button */}
+        <div style={{ flexShrink: 0, marginLeft: "12px", paddingRight: "4px" }}>
+          <button
+            onClick={() => setEditTarget({ dayIdx: selectedDay, sectionIdx: -1, itemIdx: null, item: null })}
+            style={{
+              padding: "6px 12px", borderRadius: "8px",
+              border: "1px solid #E8E6E1", background: "#FAFAF8",
+              display: "flex", alignItems: "center", gap: "4px",
+              cursor: "pointer", fontSize: "11px", fontWeight: 600,
+              color: current.color, fontFamily: "inherit",
+              whiteSpace: "nowrap", transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = current.color + "15"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "#FAFAF8"; }}
+          >
+            일정 추가 +
+          </button>
+        </div>
       </div>
 
       {/* Main content */}
@@ -1646,10 +3074,56 @@ export default function TravelPlanner() {
           }}>
             {current.icon}
           </div>
-          <div style={{ flex: 1 }}>
-            <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.3px" }}>
-              {current.label}
-            </h2>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {editingDayIdx === selectedDay ? (
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <input
+                  value={editDayLabel}
+                  onChange={(e) => setEditDayLabel(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleEditDayLabel(selectedDay, editDayLabel); if (e.key === "Escape") setEditingDayIdx(null); }}
+                  autoFocus
+                  style={{
+                    flex: 1, padding: "4px 8px", border: `1.5px solid ${current.color}`,
+                    borderRadius: "8px", fontSize: "14px", fontWeight: 700,
+                    fontFamily: "inherit", outline: "none", background: "#FAFAF8",
+                  }}
+                />
+                <button onClick={() => handleEditDayLabel(selectedDay, editDayLabel)} style={{
+                  border: "none", background: current.color, color: "#fff", borderRadius: "6px",
+                  padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                }}>저장</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <h2
+                  onClick={() => { setEditingDayIdx(selectedDay); setEditDayLabel(current.label); }}
+                  style={{
+                    margin: 0, fontSize: "16px", fontWeight: 800, color: "#1a1a1a",
+                    letterSpacing: "-0.3px", cursor: "pointer",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}
+                  title="클릭하여 이름 변경"
+                >
+                  {current.label}
+                </h2>
+                <button
+                  onClick={() => { setEditingDayIdx(selectedDay); setEditDayLabel(current.label); }}
+                  style={{
+                    border: "none", background: "none", cursor: "pointer",
+                    fontSize: "10px", color: "#ccc", padding: "2px", flexShrink: 0,
+                  }}
+                >✏️</button>
+                {selectedDay >= BASE_DAYS.length && (
+                  <button
+                    onClick={() => handleDeleteDay(selectedDay)}
+                    style={{
+                      border: "none", background: "none", cursor: "pointer",
+                      fontSize: "10px", color: "#dbb", padding: "2px", flexShrink: 0,
+                    }}
+                  >🗑</button>
+                )}
+              </div>
+            )}
             <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#999" }}>
               {current.date} · {current.stay}
             </p>
@@ -1699,28 +3173,26 @@ export default function TravelPlanner() {
               {section.items.map((item, ii) => {
                 const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
                 const isLast = ii === section.items.length - 1;
-                const hasDetail = !!item.detail;
+                const hasDetail = !!item.detail && !!(item.detail.image || item.detail.tip || item.detail.address || item.detail.timetable);
                 const handleClick = () => {
-                  if (item._custom) {
-                    setEditTarget({ item, sectionIdx: si, itemIdx: ii, dayIdx: selectedDay });
-                  } else if (hasDetail) {
+                  if (hasDetail) {
                     setActiveDetail({ ...item.detail, _item: item, _si: si, _ii: ii, _di: selectedDay });
                   }
                 };
                 return (
                   <div
                     key={ii}
-                    onClick={handleClick}
+                    onClick={hasDetail ? handleClick : undefined}
                     style={{
                       display: "flex", alignItems: "flex-start", gap: "10px",
-                      padding: "10px 14px",
+                      padding: "10px 10px 10px 14px",
                       borderBottom: isLast ? "none" : "1px solid #F2F1ED",
                       background: "transparent",
                       cursor: hasDetail ? "pointer" : "default",
                       transition: "background 0.15s",
                     }}
                     onMouseEnter={(e) => { if (hasDetail) e.currentTarget.style.background = "#FAFAF8"; }}
-                    onMouseLeave={(e) => { if (hasDetail) e.currentTarget.style.background = "transparent"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                   >
                     <div style={{ width: "48px", flexShrink: 0, textAlign: "right" }}>
                       <span style={{
@@ -1763,14 +3235,21 @@ export default function TravelPlanner() {
                         <MapButton query={item.detail.address} />
                       </div>
                     )}
-                    {item._custom && (
-                      <div style={{
-                        flexShrink: 0, alignSelf: "center", width: "18px", height: "18px",
-                        borderRadius: "4px", background: "#F2F1ED",
+                    {/* Edit / Delete */}
+                    <div style={{ display: "flex", gap: "4px", flexShrink: 0, alignSelf: "center" }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button onClick={() => setEditTarget({ item, sectionIdx: si, itemIdx: ii, dayIdx: selectedDay })} style={{
+                        width: "24px", height: "24px", border: "none", borderRadius: "6px",
+                        background: "#F2F1ED", cursor: "pointer", fontSize: "10px",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: "9px", color: "#aaa",
-                      }}>✏️</div>
-                    )}
+                      }}>✏️</button>
+                      <button onClick={() => handleDeleteItem(selectedDay, si, ii)} style={{
+                        width: "24px", height: "24px", border: "none", borderRadius: "6px",
+                        background: "#FFF0F0", cursor: "pointer", fontSize: "10px",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>🗑</button>
+                    </div>
                   </div>
                 );
               })}
@@ -1795,11 +3274,6 @@ export default function TravelPlanner() {
       <DetailDialog
         detail={activeDetail}
         onClose={() => setActiveDetail(null)}
-        onEdit={activeDetail?._item ? () => {
-          const d = activeDetail;
-          setActiveDetail(null);
-          setEditTarget({ item: d._item, sectionIdx: d._si, itemIdx: d._ii, dayIdx: d._di });
-        } : null}
         dayColor={current.color}
       />
 
@@ -1823,6 +3297,49 @@ export default function TravelPlanner() {
           onDelete={editTarget.item?._custom ? handleDeleteItem : null}
           onClose={() => setEditTarget(null)}
           color={current.color}
+          days={DAYS}
+        />
+      )}
+
+      {/* Floating Map Button */}
+      <button
+        onClick={() => setShowMap(true)}
+        style={{
+          position: "fixed", bottom: "24px", right: "24px", zIndex: 900,
+          width: "52px", height: "52px", borderRadius: "50%",
+          border: "none", background: "#1a1a1a", color: "#fff",
+          fontSize: "22px", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+          transition: "transform 0.15s, box-shadow 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.35)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.25)"; }}
+        title="여행 지도"
+      >
+        🗺
+      </button>
+
+      {/* Full Map Dialog */}
+      {showMap && <FullMapDialog days={DAYS} onClose={() => setShowMap(false)} />}
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          confirmColor={confirmDialog.confirmColor}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {/* Add Day Dialog */}
+      {showAddDay && (
+        <AddDayDialog
+          onAdd={handleAddDay}
+          onCancel={() => setShowAddDay(false)}
         />
       )}
     </div>
