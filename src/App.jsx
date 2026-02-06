@@ -418,6 +418,7 @@ const CATEGORY_COLORS = {
 
 function DocumentDialog({ onClose }) {
   const [tab, setTab] = useState(0);
+  const [viewImage, setViewImage] = useState(null);
   const tabs = [
     { label: "✈️ 항공권", image: "/images/ticket_departure.jpg", caption: "KE8795 인천→후쿠오카 / KE788 후쿠오카→인천" },
     { label: "🚄 JR패스", image: "/images/jrpass.jpg", caption: "JR 북큐슈 5일권 · 예약번호: FGY393247 (성인 2매)" },
@@ -489,13 +490,17 @@ function DocumentDialog({ onClose }) {
 
           {/* Image or placeholder */}
           {current.image ? (
-            <div style={{
-              borderRadius: "12px", overflow: "hidden",
-              border: "1px solid #EEECE6",
-              background: "#F9F9F7",
-              aspectRatio: "595 / 842",
-              width: "100%",
-            }}>
+            <div
+              onClick={() => setViewImage(current.image)}
+              style={{
+                borderRadius: "12px", overflow: "hidden",
+                border: "1px solid #EEECE6",
+                background: "#F9F9F7",
+                aspectRatio: "595 / 842",
+                width: "100%",
+                cursor: "zoom-in",
+              }}
+            >
               <img
                 src={current.image}
                 alt={current.label}
@@ -582,12 +587,50 @@ function DocumentDialog({ onClose }) {
           )}
         </div>
       </div>
+
+      {/* Image Viewer */}
+      <ImageViewer src={viewImage} alt={current.label} onClose={() => setViewImage(null)} />
+    </div>
+  );
+}
+
+function ImageViewer({ src, alt, onClose }) {
+  if (!src) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 2000,
+        background: "rgba(0,0,0,0.9)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        animation: "fadeIn 0.15s ease",
+        cursor: "zoom-out",
+      }}
+    >
+      <button onClick={onClose} style={{
+        position: "absolute", top: "16px", right: "16px", zIndex: 2001,
+        border: "none", background: "rgba(255,255,255,0.15)", borderRadius: "50%",
+        width: "36px", height: "36px", cursor: "pointer",
+        fontSize: "18px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "inherit", backdropFilter: "blur(4px)",
+      }}>✕</button>
+      <img
+        src={src}
+        alt={alt || ""}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: "95vw", maxHeight: "90vh",
+          objectFit: "contain", borderRadius: "4px",
+          cursor: "default",
+        }}
+      />
     </div>
   );
 }
 
 function DetailDialog({ detail, onClose, dayColor }) {
   if (!detail) return null;
+  const [viewImage, setViewImage] = useState(null);
   const cat = CATEGORY_COLORS[detail.category] || { bg: "#f5f5f5", color: "#555", border: "#ddd" };
 
   return (
@@ -647,7 +690,10 @@ function DetailDialog({ detail, onClose, dayColor }) {
 
         {/* Image - top, outside scroll area for full bleed */}
         {detail.image && (
-          <div style={{ flexShrink: 0, overflow: "hidden" }}>
+          <div
+            onClick={() => setViewImage(detail.image)}
+            style={{ flexShrink: 0, overflow: "hidden", cursor: "zoom-in" }}
+          >
             <img
               src={detail.image}
               alt={detail.name}
@@ -658,6 +704,9 @@ function DetailDialog({ detail, onClose, dayColor }) {
             />
           </div>
         )}
+
+        {/* Image Viewer */}
+        <ImageViewer src={viewImage} alt={detail.name} onClose={() => setViewImage(null)} />
 
         {/* Content */}
         <div style={{ overflowY: "auto", padding: "14px 20px 20px" }}>
