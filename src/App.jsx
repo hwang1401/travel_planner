@@ -101,6 +101,7 @@ const DAYS = [
             detail: {
               name: "JR 북큐슈 5일권",
               category: "교통",
+              image: "/images/jrpass_voucher.jpg",
               price: "17,000엔 / 인 (Klook 예매완료)",
               tip: "하카타역 JR 미도리노마도구치(みどりの窓口)에서 바우처→실물 교환",
               highlights: [
@@ -115,6 +116,7 @@ const DAYS = [
             detail: {
               name: "하카타 → 구마모토 신칸센",
               category: "교통",
+              image: "/images/sakura547.jpg",
               tip: "JR 북큐슈 5일권으로 자유석 탑승 가능 · 지정석도 6회까지 OK",
               timetable: {
                 station: "하카타역",
@@ -197,6 +199,7 @@ const DAYS = [
             detail: {
               name: "스가노야 긴자도리점 (菅乃屋 銀座通り店)",
               category: "식사",
+              image: "/images/suginoya.jpg",
               address: "熊本市中央区下通1-9-1 ダイワロイネットホテル 2F",
               hours: "11:30~14:00 / 17:00~20:30",
               price: "코스 5,000~8,000엔",
@@ -230,6 +233,7 @@ const DAYS = [
             detail: {
               name: "구마모토 → 아소 (JR 호히본선)",
               category: "교통",
+              image: "/images/asoboi.jpeg",
               tip: "JR 북큐슈 5일권 커버 · 특급 이용 시 지정석 횟수 차감",
               timetable: {
                 station: "구마모토역",
@@ -307,6 +311,7 @@ const DAYS = [
             detail: {
               name: "아소 → 구마모토 (JR 호히본선)",
               category: "교통",
+              image: "/images/asoboi.jpeg",
               tip: "JR 북큐슈 5일권 커버 · 놓치면 다음 열차까지 대기 길어짐",
               timetable: {
                 station: "아소역",
