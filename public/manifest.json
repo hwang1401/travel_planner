@@ -1,7 +1,7 @@
 {
-  "name": "여행 플래너 - 후쿠오카 · 구마모토 · 유후인",
-  "short_name": "여행 플래너",
-  "description": "후쿠오카, 구마모토, 유후인 여행 일정 관리 앱",
+  "name": "TravelUnu",
+  "short_name": "TravelUnu",
+  "description": "함께 만드는 여행 일정",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
