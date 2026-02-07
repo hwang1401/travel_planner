@@ -191,7 +191,7 @@ export default function FullMapDialog({ days, onClose }) {
       {/* Day tabs — same size as main day tabs (md) */}
       <div style={{ background: "var(--color-surface-container-lowest)", flexShrink: 0 }}>
         <Tab
-          items={days.map((d, i) => ({ label: `D${d.day}`, value: i }))}
+          items={days.map((d, i) => ({ label: `D${i + 1}`, value: i }))}
           value={selectedDay}
           onChange={(v) => { setSelectedDay(v); setSelectedPin(null); setFlyTarget(null); }}
           size="md"
@@ -277,7 +277,7 @@ export default function FullMapDialog({ days, onClose }) {
             fontSize: "var(--typo-caption-1-bold-size)", fontWeight: "var(--typo-caption-1-bold-weight)",
             color: "var(--color-primary)",
           }}>
-            Day {day?.day} — {day?.label}
+            Day {selectedDay + 1} — {day?.label}
           </span>
           <span style={{
             fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)",

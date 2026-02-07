@@ -229,7 +229,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         {/* Actions */}
         <div style={{ padding: "0 20px 16px", display: "flex", gap: "8px", flexShrink: 0 }}>
           {!isNew && onDelete && (
-            <Button variant="ghost-neutral" size="lg" onClick={() => onDelete(dayIdx, sectionIdx, itemIdx)}>
+            <Button variant="ghost-neutral" size="lg" onClick={() => onDelete(dayIdx, sectionIdx, itemIdx, item)}>
               삭제
             </Button>
           )}

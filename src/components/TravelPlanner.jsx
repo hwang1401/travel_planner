@@ -340,18 +340,56 @@ export default function TravelPlanner() {
     setToast({ message: "Day 순서가 변경되었습니다", icon: "swap" });
   }, [reorderList, updateCustomData]);
 
-  const handleSaveItem = useCallback((newItem, dayIdx, sectionIdx, itemIdx) => {
+  const handleSaveItem = useCallback((newItem, dayIdx, sectionIdx, itemIdx, opts = {}) => {
+    // Check for duplicate timestamp
+    if (!opts.skipDuplicateCheck && sectionIdx === -1 && itemIdx === null) {
+      // New item — check all sections for same time
+      const day = DAYS[dayIndexMap.indexOf ? dayIndexMap.indexOf(dayIdx) : Object.keys(dayIndexMap).find((k) => dayIndexMap[k] === dayIdx) || 0];
+      const actualDay = DAYS.find((_, i) => toOrigIdx(i) === dayIdx) || current;
+      if (actualDay) {
+        const duplicate = actualDay.sections.some((sec) =>
+          sec.items.some((it) => it.time === newItem.time)
+        );
+        if (duplicate) {
+          setConfirmDialog({
+            title: "중복 시간",
+            message: `${newItem.time}에 이미 일정이 있습니다.\n그래도 추가하시겠습니까?`,
+            confirmLabel: "추가",
+            onConfirm: () => {
+              setConfirmDialog(null);
+              handleSaveItem(newItem, dayIdx, sectionIdx, itemIdx, { skipDuplicateCheck: true });
+            },
+          });
+          return;
+        }
+      }
+    }
+
     updateCustomData((prev) => {
       const next = { ...prev };
       if (sectionIdx === -1) {
         if (!next[dayIdx]) next[dayIdx] = {};
         if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
-        next[dayIdx].extraItems.push(newItem);
+        if (itemIdx !== undefined && itemIdx !== null) {
+          // Editing existing extra item — find by old item reference
+          const oldItem = editTarget?.item;
+          if (oldItem) {
+            const idx = next[dayIdx].extraItems.findIndex((it) =>
+              it.time === oldItem.time && it.desc === oldItem.desc
+            );
+            if (idx >= 0) {
+              next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+              next[dayIdx].extraItems[idx] = newItem;
+            }
+          }
+        } else {
+          next[dayIdx].extraItems.push(newItem);
+        }
       } else {
         if (!next[dayIdx]) next[dayIdx] = {};
         if (!next[dayIdx].sections) next[dayIdx].sections = {};
         if (!next[dayIdx].sections[sectionIdx]) {
-          next[dayIdx].sections[sectionIdx] = { items: [...BASE_DAYS[dayIdx].sections[sectionIdx].items] };
+          next[dayIdx].sections[sectionIdx] = { items: [...BASE_DAYS[dayIdx]?.sections?.[sectionIdx]?.items || []] };
         }
         if (itemIdx !== undefined && itemIdx !== null) {
           next[dayIdx].sections[sectionIdx].items[itemIdx] = newItem;
@@ -362,9 +400,9 @@ export default function TravelPlanner() {
     setEditTarget(null);
     const isEdit = itemIdx !== undefined && itemIdx !== null;
     setToast({ message: isEdit ? "일정이 수정되었습니다" : "일정이 추가되었습니다", icon: isEdit ? "edit" : "check" });
-  }, [updateCustomData]);
+  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget]);
 
-  const handleDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx) => {
+  const handleDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
     setConfirmDialog({
       title: "일정 삭제",
       message: "이 일정을 삭제하시겠습니까?",
@@ -373,16 +411,28 @@ export default function TravelPlanner() {
         updateCustomData((prev) => {
           const next = { ...prev };
           if (sectionIdx === -1) {
+            // Extra item — find by time+desc match
             if (next[dayIdx]?.extraItems) {
               next[dayIdx] = { ...next[dayIdx] };
-              next[dayIdx].extraItems = [...next[dayIdx].extraItems];
-              next[dayIdx].extraItems.splice(itemIdx, 1);
+              const target = itemRef || editTarget?.item;
+              if (target) {
+                const idx = next[dayIdx].extraItems.findIndex((it) =>
+                  it.time === target.time && it.desc === target.desc
+                );
+                if (idx >= 0) {
+                  next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+                  next[dayIdx].extraItems.splice(idx, 1);
+                }
+              } else {
+                next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+                next[dayIdx].extraItems.splice(itemIdx, 1);
+              }
             }
           } else {
             if (!next[dayIdx]) next[dayIdx] = {};
             if (!next[dayIdx].sections) next[dayIdx].sections = {};
             if (!next[dayIdx].sections[sectionIdx]) {
-              next[dayIdx].sections[sectionIdx] = { items: [...BASE_DAYS[dayIdx].sections[sectionIdx].items] };
+              next[dayIdx].sections[sectionIdx] = { items: [...(BASE_DAYS[dayIdx]?.sections?.[sectionIdx]?.items || [])] };
             } else {
               next[dayIdx].sections[sectionIdx] = { ...next[dayIdx].sections[sectionIdx], items: [...next[dayIdx].sections[sectionIdx].items] };
             }
@@ -395,7 +445,7 @@ export default function TravelPlanner() {
         setToast({ message: "일정이 삭제되었습니다", icon: "trash" });
       },
     });
-  }, [updateCustomData]);
+  }, [updateCustomData, editTarget]);
 
   /* ── Share link copy ── */
   const handleCopyShareLink = useCallback(async () => {
@@ -580,7 +630,7 @@ export default function TravelPlanner() {
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <Tab
-            items={DAYS.map((day, i) => ({ label: `D${day.day}`, value: i }))}
+            items={DAYS.map((day, i) => ({ label: `D${i + 1}`, value: i }))}
             value={selectedDay}
             onChange={setSelectedDay}
             size="md"
@@ -732,7 +782,7 @@ export default function TravelPlanner() {
                     const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
                     const isLast = ii === section.items.length - 1;
                     const hasDetail = !!item.detail && !!(item.detail.image || item.detail.tip || item.detail.address || item.detail.timetable);
-                    const effectiveSi = section._isExtra ? -1 : si;
+                    const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
                     const handleClick = () => {
                       if (hasDetail) {
                         setActiveDetail({ ...item.detail, _item: item, _si: effectiveSi, _ii: ii, _di: selectedDay });
@@ -792,7 +842,7 @@ export default function TravelPlanner() {
                             <Button variant="ghost-neutral" size="xsm" iconOnly="edit"
                               onClick={() => setEditTarget({ item, sectionIdx: effectiveSi, itemIdx: ii, dayIdx: toOrigIdx(selectedDay) })} />
                             <Button variant="ghost-neutral" size="xsm" iconOnly="trash"
-                              onClick={() => handleDeleteItem(toOrigIdx(selectedDay), effectiveSi, ii)} />
+                              onClick={() => handleDeleteItem(toOrigIdx(selectedDay), effectiveSi, ii, item)} />
                           </div>
                         )}
                       </div>
