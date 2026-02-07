@@ -77,6 +77,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const fileInputRef = useRef(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [importPreview, setImportPreview] = useState(null);
+  const [fileError, setFileError] = useState("");
 
   /* ── AI Recommendation (chat) state ── */
   const [chatMessages, setChatMessages] = useState([]); // {role: "user"|"ai", text: string, items?: Array}
@@ -127,21 +128,35 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
+    setFileError("");
 
     try {
       const content = await readFileAsText(file);
-      if (!content.trim()) return;
+      if (!content.trim()) {
+        setFileError("파일 내용이 비어있습니다");
+        return;
+      }
 
       setAiLoading(true);
       const { items, error } = await analyzeScheduleWithAI(content, currentDay?.label || "");
       setAiLoading(false);
 
-      if (error || items.length === 0) return;
+      if (error) {
+        setFileError(`AI 분석 실패: ${error}`);
+        return;
+      }
+
+      if (items.length === 0) {
+        setFileError("문서에서 일정을 추출할 수 없습니다. 다른 파일을 시도해주세요.");
+        return;
+      }
 
       const conflicts = detectConflicts(items, currentDay);
       setImportPreview({ items, errors: [], conflicts });
-    } catch {
+    } catch (err) {
+      console.error("[FileImport] Error:", err);
       setAiLoading(false);
+      setFileError("파일을 읽는 중 오류가 발생했습니다");
     }
   }, [currentDay]);
 
@@ -499,6 +514,21 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                     .txt, .md 파일을 업로드하면<br/>AI가 자동으로 일정을 분석합니다
                   </p>
                 </div>
+
+                {/* Error message */}
+                {fileError && (
+                  <div style={{
+                    width: "100%", padding: "10px 14px",
+                    background: "var(--color-error-container, #FEE2E2)",
+                    borderRadius: "var(--radius-md, 8px)",
+                    display: "flex", alignItems: "center", gap: "10px",
+                  }}>
+                    <Icon name="info" size={16} style={{ color: "var(--color-error)", flexShrink: 0 }} />
+                    <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-error)", lineHeight: 1.5 }}>
+                      {fileError}
+                    </p>
+                  </div>
+                )}
 
                 <div style={{
                   width: "100%", padding: "10px 14px",
