@@ -176,29 +176,31 @@ export default function TravelPlanner() {
     }
   }, [customData, isLegacy]);
 
+  /* ── Base length: legacy/duplicated trips use BASE_DAYS, new trips use 0 ── */
+  const baseLen = useMemo(() => {
+    if (isLegacy) return BASE_DAYS.length;
+    const hasLegacyRefs = Object.keys(customData).some(
+      (k) => !k.startsWith("_") && !isNaN(Number(k)) && Number(k) < BASE_DAYS.length
+    );
+    return hasLegacyRefs ? BASE_DAYS.length : 0;
+  }, [customData, isLegacy]);
+
   /* ── Merge data ── */
   const DAYS = useMemo(() => {
-    if (isLegacy) {
-      return mergeData(BASE_DAYS, customData);
-    }
-    // Supabase trips: customData IS the full schedule
-    // For now, still use BASE_DAYS for legacy and empty for new trips
-    if (customData._extraDays || Object.keys(customData).some((k) => !k.startsWith("_"))) {
-      return mergeData(BASE_DAYS, customData);
-    }
-    return mergeData(BASE_DAYS, customData);
-  }, [customData, isLegacy]);
+    const base = baseLen > 0 ? BASE_DAYS : [];
+    return mergeData(base, customData);
+  }, [customData, baseLen]);
 
   const current = DAYS[selectedDay];
 
   /* Map display index → original (pre-reorder) index for customData access */
   const dayIndexMap = useMemo(() => {
-    const totalDays = [...BASE_DAYS, ...(customData._extraDays || [])].length;
+    const totalDays = baseLen + (customData._extraDays || []).length;
     if (customData._dayOrder && customData._dayOrder.length === totalDays) {
       return customData._dayOrder;
     }
     return Array.from({ length: totalDays }, (_, i) => i);
-  }, [customData._dayOrder, customData._extraDays]);
+  }, [customData._dayOrder, customData._extraDays, baseLen]);
 
   const toOrigIdx = useCallback((displayIdx) => {
     return dayIndexMap[displayIdx] !== undefined ? dayIndexMap[displayIdx] : displayIdx;
@@ -254,21 +256,21 @@ export default function TravelPlanner() {
       const extraDays = customData._extraDays || [];
       if (overwrite) {
         const idx = extraDays.findIndex((d) => d.day === dayNum);
-        if (idx >= 0) setSelectedDay(BASE_DAYS.length + idx);
+        if (idx >= 0) setSelectedDay(baseLen + idx);
       } else {
-        setSelectedDay(BASE_DAYS.length + extraDays.length);
+        setSelectedDay(baseLen + extraDays.length);
       }
     }, 50);
-  }, [customData, updateCustomData]);
+  }, [customData, updateCustomData, baseLen]);
 
   const handleEditDayLabel = useCallback((dayIdx, newLabel) => {
     updateCustomData((prev) => {
       const next = { ...prev };
-      if (dayIdx < BASE_DAYS.length) {
+      if (dayIdx < baseLen) {
         if (!next._dayOverrides) next._dayOverrides = {};
         next._dayOverrides[dayIdx] = { ...(next._dayOverrides[dayIdx] || {}), label: newLabel };
       } else {
-        const extraIdx = dayIdx - BASE_DAYS.length;
+        const extraIdx = dayIdx - baseLen;
         if (next._extraDays && next._extraDays[extraIdx]) {
           next._extraDays = [...next._extraDays];
           next._extraDays[extraIdx] = { ...next._extraDays[extraIdx], label: newLabel };
@@ -278,10 +280,10 @@ export default function TravelPlanner() {
     });
     setEditingDayIdx(null);
     setToast({ message: "날짜 이름이 변경되었습니다", icon: "edit" });
-  }, [updateCustomData]);
+  }, [updateCustomData, baseLen]);
 
   const handleDeleteDay = useCallback((dayIdx) => {
-    if (dayIdx < BASE_DAYS.length) return;
+    if (dayIdx < baseLen) return;
     setConfirmDialog({
       title: "날짜 삭제",
       message: "이 날짜와 포함된 모든 일정이 삭제됩니다.\n정말 삭제하시겠습니까?",
@@ -289,11 +291,11 @@ export default function TravelPlanner() {
       onConfirm: () => {
         updateCustomData((prev) => {
           const next = { ...prev };
-          const extraIdx = dayIdx - BASE_DAYS.length;
+          const extraIdx = dayIdx - baseLen;
           if (next._extraDays) {
             next._extraDays = next._extraDays.filter((_, i) => i !== extraIdx);
             next._extraDays = next._extraDays.map((d, i) => ({
-              ...d, day: BASE_DAYS.length + i + 1,
+              ...d, day: baseLen + i + 1,
             }));
           }
           // Clear day order — indices are now stale
@@ -305,7 +307,7 @@ export default function TravelPlanner() {
         setToast({ message: "날짜가 삭제되었습니다", icon: "trash" });
       },
     });
-  }, [updateCustomData]);
+  }, [updateCustomData, baseLen]);
 
   /* ── Day Reorder ── */
   const handleOpenReorder = useCallback(() => {
@@ -389,7 +391,8 @@ export default function TravelPlanner() {
         if (!next[dayIdx]) next[dayIdx] = {};
         if (!next[dayIdx].sections) next[dayIdx].sections = {};
         if (!next[dayIdx].sections[sectionIdx]) {
-          next[dayIdx].sections[sectionIdx] = { items: [...BASE_DAYS[dayIdx]?.sections?.[sectionIdx]?.items || []] };
+          const baseSec = (baseLen > 0 ? BASE_DAYS : [])[dayIdx]?.sections?.[sectionIdx];
+          next[dayIdx].sections[sectionIdx] = { items: [...(baseSec?.items || [])] };
         }
         if (itemIdx !== undefined && itemIdx !== null) {
           next[dayIdx].sections[sectionIdx].items[itemIdx] = newItem;
@@ -400,7 +403,7 @@ export default function TravelPlanner() {
     setEditTarget(null);
     const isEdit = itemIdx !== undefined && itemIdx !== null;
     setToast({ message: isEdit ? "일정이 수정되었습니다" : "일정이 추가되었습니다", icon: isEdit ? "edit" : "check" });
-  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget]);
+  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget, baseLen]);
 
   const handleDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
     setConfirmDialog({
@@ -436,7 +439,8 @@ export default function TravelPlanner() {
             if (!next[dayIdx]) next[dayIdx] = {};
             if (!next[dayIdx].sections) next[dayIdx].sections = {};
             if (!next[dayIdx].sections[sectionIdx]) {
-              next[dayIdx].sections[sectionIdx] = { items: [...(BASE_DAYS[dayIdx]?.sections?.[sectionIdx]?.items || [])] };
+              const baseSec2 = (baseLen > 0 ? BASE_DAYS : [])[dayIdx]?.sections?.[sectionIdx];
+              next[dayIdx].sections[sectionIdx] = { items: [...(baseSec2?.items || [])] };
             } else {
               next[dayIdx].sections[sectionIdx] = { ...next[dayIdx].sections[sectionIdx], items: [...next[dayIdx].sections[sectionIdx].items] };
             }
@@ -633,20 +637,28 @@ export default function TravelPlanner() {
         flexShrink: 0, alignItems: "center",
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Tab
-            items={DAYS.map((day, i) => ({ label: `D${i + 1}`, value: i }))}
-            value={selectedDay}
-            onChange={setSelectedDay}
-            size="md"
-          />
+          {DAYS.length > 0 ? (
+            <Tab
+              items={DAYS.map((day, i) => ({ label: `D${i + 1}`, value: i }))}
+              value={selectedDay}
+              onChange={setSelectedDay}
+              size="md"
+            />
+          ) : (
+            <div style={{ padding: "10px 4px", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
+              날짜를 추가해 주세요
+            </div>
+          )}
         </div>
 
         {/* Day reorder + add buttons (only if can edit) */}
         {canEdit && (
           <div style={{ flexShrink: 0, display: "flex", gap: "6px", marginLeft: "12px", paddingRight: "4px" }}>
-            <Button variant="neutral" size="sm" iconOnly="swap"
-              onClick={handleOpenReorder}
-              title="순서 변경" />
+            {DAYS.length > 1 && (
+              <Button variant="neutral" size="sm" iconOnly="swap"
+                onClick={handleOpenReorder}
+                title="순서 변경" />
+            )}
             <Button variant="neutral" size="sm" iconOnly="plus"
               onClick={() => setShowAddDay(true)}
               title="날짜 추가" />
@@ -657,8 +669,32 @@ export default function TravelPlanner() {
       {/* Main content */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 32px" }}>
 
+        {/* Empty trip state */}
+        {!current && (
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            justifyContent: "center", gap: "16px", padding: "60px 20px",
+            textAlign: "center",
+          }}>
+            <Icon name="calendar" size={48} style={{ color: "var(--color-on-surface-variant2)", opacity: 0.5 }} />
+            <div>
+              <p style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
+                아직 일정이 없습니다
+              </p>
+              <p style={{ margin: "8px 0 0", fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant2)" }}>
+                날짜를 추가하고 일정을 계획해 보세요
+              </p>
+            </div>
+            {canEdit && (
+              <Button variant="primary" size="md" iconLeft="plus" onClick={() => setShowAddDay(true)}>
+                날짜 추가
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Day title card */}
-        <div style={{
+        {current && <div style={{
           display: "flex", alignItems: "center", gap: "12px",
           marginBottom: "16px", padding: "14px 16px",
           background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px)", border: "1px solid var(--color-outline-variant)",
@@ -689,7 +725,7 @@ export default function TravelPlanner() {
                     onClick={() => { setEditingDayIdx(toOrigIdx(selectedDay)); setEditDayLabel(current.label); }}
                     style={{ width: "24px", height: "24px" }} />
                 )}
-                {canEdit && toOrigIdx(selectedDay) >= BASE_DAYS.length && (
+                {canEdit && toOrigIdx(selectedDay) >= baseLen && (
                   <Button variant="ghost-neutral" size="xsm" iconOnly="trash"
                     onClick={() => handleDeleteDay(toOrigIdx(selectedDay))}
                     style={{ width: "24px", height: "24px" }} />
@@ -707,10 +743,10 @@ export default function TravelPlanner() {
               </Button>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Sections */}
-        {current.sections.length === 0 || current.sections.every((s) => !s.items || s.items.length === 0) ? (
+        {current && ((current.sections.length === 0 || current.sections.every((s) => !s.items || s.items.length === 0)) ? (
           /* ── Empty State: no schedule items at all ── */
           <div style={{
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -856,10 +892,10 @@ export default function TravelPlanner() {
               </div>
             </div>
           ))
-        )}
+        ))}
 
         {/* Auto-generated day summary */}
-        {(() => {
+        {current && (() => {
           const summary = generateDaySummary(current);
           return summary ? (
             <div style={{
@@ -888,7 +924,7 @@ export default function TravelPlanner() {
       {showGuide && <ShoppingGuideDialog onClose={() => setShowGuide(false)} destinations={tripMeta?.destinations} />}
 
       {/* Day Info Dialog */}
-      {dayInfoTab && <DayInfoDialog dayNum={current.day} tab={dayInfoTab} onClose={() => setDayInfoTab(null)} color="var(--color-primary)" />}
+      {dayInfoTab && current && <DayInfoDialog dayNum={current.day} tab={dayInfoTab} onClose={() => setDayInfoTab(null)} color="var(--color-primary)" />}
 
       {/* Edit/Add Item Dialog (only if can edit) */}
       {editTarget && canEdit && (
