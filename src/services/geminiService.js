@@ -35,21 +35,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Extract text from Gemini response.
- * Gemini 2.5 Flash includes "thought" parts (thought:true) — skip those.
+ * Gemini 2.5 Flash includes "thought" parts — take the LAST text part (actual output).
  */
 function extractText(data) {
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!parts || parts.length === 0) return null;
 
-  // First pass: find non-thought text parts
+  // Take the LAST part with text — thinking comes first, actual response comes last
+  let lastText = null;
   for (const part of parts) {
-    if (!part.thought && part.text !== undefined && part.text !== null) {
-      return part.text;
+    if (part.text !== undefined && part.text !== null && !part.thought) {
+      lastText = part.text;
     }
   }
 
-  // Fallback: last part regardless
-  return parts[parts.length - 1]?.text || null;
+  // If no non-thought part found, try last part anyway
+  if (!lastText) lastText = parts[parts.length - 1]?.text || null;
+
+  return lastText;
 }
 
 /**
@@ -144,16 +147,24 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus } 
     const reqBody = {
       system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 4096, responseMimeType: "application/json" },
+      generationConfig: { temperature: 0.2, maxOutputTokens: 65536, responseMimeType: "application/json" },
     };
 
     const response = await fetchWithRetry(reqBody, { onStatus });
     if (response._errMsg) return { items: [], error: response._errMsg };
 
     const data = await response.json();
+
+    // Check if response was truncated
+    const finishReason = data?.candidates?.[0]?.finishReason;
+    if (finishReason === "MAX_TOKENS") {
+      console.warn("[GeminiService] Response truncated (MAX_TOKENS)");
+    }
+
     const text = extractText(data);
 
     if (!text) {
+      console.error("[GeminiService] Empty text. finishReason:", finishReason, "parts:", JSON.stringify(data?.candidates?.[0]?.content?.parts?.map(p => ({ thought: p.thought, hasText: !!p.text, textLen: p.text?.length }))));
       return { items: [], error: "AI 응답이 비어있습니다" };
     }
 
@@ -168,8 +179,8 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus } 
         try { parsed = JSON.parse(jsonMatch[0]); } catch { /* fall through */ }
       }
       if (!parsed) {
-        console.error("[GeminiService] Failed to parse:", text.substring(0, 200));
-        return { items: [], error: "AI 응답을 파싱할 수 없습니다" };
+        console.error("[GeminiService] Failed to parse:", text.substring(0, 500), "finishReason:", finishReason);
+        return { items: [], error: finishReason === "MAX_TOKENS" ? "AI 응답이 잘렸습니다. 문서를 줄여서 다시 시도해주세요." : "AI 응답을 파싱할 수 없습니다" };
       }
     }
 
@@ -281,16 +292,18 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
     const reqBody = {
       system_instruction: { parts: [{ text: RECOMMEND_SYSTEM_PROMPT }] },
       contents,
-      generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: "application/json" },
+      generationConfig: { temperature: 0.7, maxOutputTokens: 65536, responseMimeType: "application/json" },
     };
 
     const response = await fetchWithRetry(reqBody, { onStatus });
     if (response._errMsg) return { message: "", items: [], error: response._errMsg };
 
     const data = await response.json();
+    const finishReason = data?.candidates?.[0]?.finishReason;
     const text = extractText(data);
 
     if (!text) {
+      console.error("[GeminiService] Recommend empty. finishReason:", finishReason);
       return { message: "", items: [], error: "AI 응답이 비어있습니다" };
     }
 
@@ -423,16 +436,18 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
     const reqBody = {
       system_instruction: { parts: [{ text: TRIP_GEN_SYSTEM_PROMPT }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 8192, responseMimeType: "application/json" },
+      generationConfig: { temperature: 0.7, maxOutputTokens: 65536, responseMimeType: "application/json" },
     };
 
     const response = await fetchWithRetry(reqBody, { onStatus });
     if (response._errMsg) return { days: [], error: response._errMsg };
 
     const data = await response.json();
+    const finishReason = data?.candidates?.[0]?.finishReason;
     const text = extractText(data);
 
     if (!text) {
+      console.error("[GeminiService] Trip gen empty. finishReason:", finishReason);
       return { days: [], error: "AI 응답이 비어있습니다" };
     }
 
@@ -445,8 +460,8 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
         try { parsed = JSON.parse(jsonMatch[0]); } catch { /* fall through */ }
       }
       if (!parsed) {
-        console.error("[GeminiService] Trip gen parse fail:", text.substring(0, 200));
-        return { days: [], error: "AI 응답을 파싱할 수 없습니다" };
+        console.error("[GeminiService] Trip gen parse fail:", text.substring(0, 500), "finishReason:", finishReason);
+        return { days: [], error: finishReason === "MAX_TOKENS" ? "AI 응답이 잘렸습니다. 일정 기간을 줄여서 다시 시도해주세요." : "AI 응답을 파싱할 수 없습니다" };
       }
     }
 
