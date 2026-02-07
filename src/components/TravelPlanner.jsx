@@ -7,6 +7,7 @@ import { usePresence } from "../hooks/usePresence";
 import { BASE_DAYS } from "../data/days";
 import { loadCustomData, mergeData, generateDaySummary } from "../data/storage";
 import { TYPE_CONFIG } from "../data/guides";
+import { parseScheduleFile, readFileAsText } from "../utils/scheduleParser";
 
 /* Service imports */
 import { getTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
@@ -68,6 +69,9 @@ export default function TravelPlanner() {
   const [shareCode, setShareCode] = useState(null);
   const [showReorder, setShowReorder] = useState(false);
   const [reorderList, setReorderList] = useState([]);
+
+  /* ── File import ref ── */
+  const fileImportRef = useRef(null);
 
   /* ── Debounced save ref ── */
   const debouncedSaveRef = useRef(null);
@@ -477,6 +481,41 @@ export default function TravelPlanner() {
     });
   }, [updateCustomData, editTarget]);
 
+  /* ── File Import: bulk add items from text/md file ── */
+  const handleFileImport = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so same file can be re-selected
+    e.target.value = "";
+
+    try {
+      const content = await readFileAsText(file);
+      const { items, errors } = parseScheduleFile(content);
+
+      if (items.length === 0) {
+        setToast({ message: errors[0] || "파일에서 일정을 찾을 수 없습니다", icon: "info" });
+        return;
+      }
+
+      const dayIdx = toOrigIdx(selectedDay);
+      updateCustomData((prev) => {
+        const next = { ...prev };
+        if (!next[dayIdx]) next[dayIdx] = {};
+        if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
+        next[dayIdx].extraItems = [...next[dayIdx].extraItems, ...items];
+        return { ...next };
+      });
+
+      setToast({
+        message: `${items.length}개 일정이 추가되었습니다${errors.length > 0 ? ` (${errors.length}개 오류 무시)` : ""}`,
+        icon: "check",
+      });
+    } catch (err) {
+      console.error("[FileImport] Error:", err);
+      setToast({ message: "파일을 읽는 중 오류가 발생했습니다", icon: "info" });
+    }
+  }, [updateCustomData, toOrigIdx, selectedDay]);
+
   /* ── Share link copy ── */
   const handleCopyShareLink = useCallback(async () => {
     if (!shareCode) return;
@@ -758,7 +797,11 @@ export default function TravelPlanner() {
             </p>
           </div>
           {canEdit && (
-            <div style={{ flexShrink: 0 }}>
+            <div style={{ flexShrink: 0, display: "flex", gap: "6px", alignItems: "center" }}>
+              <Button variant="neutral" size="sm" iconOnly="file"
+                onClick={() => fileImportRef.current?.click()}
+                title="파일로 일정 추가"
+                style={{ width: "32px", height: "32px" }} />
               <Button variant="primary" size="sm" iconLeft="plus"
                 onClick={() => setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null })}>
                 일정 추가
@@ -1277,6 +1320,15 @@ export default function TravelPlanner() {
           </div>
         </BottomSheet>
       )}
+
+      {/* Hidden file input for schedule import */}
+      <input
+        ref={fileImportRef}
+        type="file"
+        accept=".txt,.md,.text,text/plain,text/markdown"
+        style={{ display: "none" }}
+        onChange={handleFileImport}
+      />
 
       {/* Toast */}
       {toast && (
