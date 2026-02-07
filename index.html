@@ -2,11 +2,33 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <title>여행 플래너 - 후쿠오카 · 구마모토 · 유후인</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#8b7bff" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="여행 플래너" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { -webkit-font-smoothing: antialiased; }
+      body {
+        -webkit-font-smoothing: antialiased;
+        /* Prevent pull-to-refresh on mobile */
+        overscroll-behavior-y: contain;
+      }
+      /* iOS safe area padding */
+      #root {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
     </style>
   </head>
   <body>

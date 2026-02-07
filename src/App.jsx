@@ -3,6 +3,47 @@ import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
+/* ── Icon Helper ── */
+const ICON_MAP = {
+  /* ── Button icons (solid, for action triggers) ── */
+  close: "/icons/Close/Close.svg",
+  edit: "/icons/Edit/Edit 1.svg",
+  trash: "/icons/Trash/Trash 2.svg",
+  plus: "/icons/Plus/Plus.svg",
+  plusCircle: "/icons/Plus/Circle.svg",
+  sync: "/icons/Sync.svg",
+  /* ── Flat icons (for text/header companions) ── */
+  map: "/icons/Map.svg",
+  pin: "/icons/Pin.svg",
+  clock: "/icons/Clock.svg",
+  calendar: "/icons/Calendar.svg",
+  pricetag: "/icons/Pricetag.svg",
+  file: "/icons/File/File.svg",
+  home: "/icons/Home.svg",
+  shopping: "/icons/Shopping/Bag.svg",
+  briefcase: "/icons/Briefcase.svg",
+  navigation: "/icons/Navigation/Navigation 1.svg",
+  bookmark: "/icons/Bookmark.svg",
+  flash: "/icons/Flash/On.svg",
+  lock: "/icons/Lock.svg",
+  globe: "/icons/Globe/Globe 1.svg",
+  car: "/icons/Car.svg",
+  compass: "/icons/Compass.svg",
+  fire: "/icons/Fire.svg",
+  bulb: "/icons/Bulb.svg",
+  bookOpen: "/icons/Book/Open.svg",
+  info: "/icons/Info.svg",
+  flag: "/icons/Flag.svg",
+  star: "/icons/Star/fiiled.svg",
+  chevronDown: "/icons/Arrow/Arrowhead/Down.svg",
+  chevronUp: "/icons/Arrow/Arrowhead/Up.svg",
+  externalLink: "/icons/External Link.svg",
+};
+function Icon({ name, size = 16, style = {}, className = "" }) {
+  const src = ICON_MAP[name] || name;
+  return <img src={src} alt="" width={size} height={size} style={{ display: "block", flexShrink: 0, ...style }} className={className} />;
+}
+
 /* ── Location Coordinates DB ── */
 const LOCATION_COORDS = {
   // 후쿠오카
@@ -112,6 +153,37 @@ function FitBounds({ positions }) {
   return null;
 }
 
+/* ── Bottom Sheet (reusable wrapper for mobile-style modals) ── */
+function BottomSheet({ onClose, maxHeight = "85vh", zIndex = 1000, children }) {
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex,
+      background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "flex-end", justifyContent: "center",
+      animation: "fadeIn 0.2s ease",
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: "100%", maxWidth: "420px", maxHeight,
+        background: "#fff", borderRadius: "20px 20px 0 0",
+        overflow: "hidden", animation: "bottomSheetUp 0.3s cubic-bezier(0.16,1,0.3,1)",
+        display: "flex", flexDirection: "column",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}>
+        {/* Drag Handle */}
+        <div style={{
+          padding: "10px 0 2px", display: "flex", justifyContent: "center", flexShrink: 0,
+          cursor: "grab",
+        }}>
+          <div style={{
+            width: "36px", height: "4px", borderRadius: "2px", background: "#D5D4D8",
+          }} />
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /* ── Confirm Dialog ── */
 function ConfirmDialog({ title, message, confirmLabel, confirmColor, onConfirm, onCancel }) {
   return (
@@ -152,8 +224,8 @@ function ConfirmDialog({ title, message, confirmLabel, confirmColor, onConfirm, 
 /* ── Add Day Dialog ── */
 function AddDayDialog({ onAdd, onCancel }) {
   const [label, setLabel] = useState("");
-  const [icon, setIcon] = useState("📌");
-  const icons = ["📌", "✈️", "🚄", "♨️", "🛍️", "🏖", "⛰", "🎌", "🍽", "🏯"];
+  const [icon, setIcon] = useState("pin");
+  const icons = ["pin", "navigation", "car", "compass", "shopping", "flag", "home", "fire", "star", "bookmark"];
 
   return (
     <div onClick={onCancel} style={{
@@ -169,7 +241,7 @@ function AddDayDialog({ onAdd, onCancel }) {
         boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
       }}>
         <div style={{ padding: "20px 24px 16px" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 800, color: "#1a1a1a" }}>📅 날짜 추가</h3>
+          <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}><Icon name="calendar" size={16} />날짜 추가</h3>
           <div style={{ marginBottom: "14px" }}>
             <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#888" }}>아이콘</p>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -178,10 +250,10 @@ function AddDayDialog({ onAdd, onCancel }) {
                   width: "36px", height: "36px", borderRadius: "10px",
                   border: icon === ic ? "2px solid #1a1a1a" : "1px solid #E8E6E1",
                   background: icon === ic ? "#F5F5F0" : "#FAFAF8",
-                  fontSize: "18px", cursor: "pointer", display: "flex",
+                  cursor: "pointer", display: "flex",
                   alignItems: "center", justifyContent: "center",
                   transition: "all 0.1s",
-                }}>{ic}</button>
+                }}><Icon name={ic} size={18} /></button>
               ))}
             </div>
           </div>
@@ -238,6 +310,7 @@ function FullMapDialog({ days, onClose }) {
   const [flyTarget, setFlyTarget] = useState(null);
   const [selectedPin, setSelectedPin] = useState(null);
   const [cardExpanded, setCardExpanded] = useState(true);
+  const [mapDetail, setMapDetail] = useState(null);
   const markerRefs = useRef({});
 
   const day = days[selectedDay];
@@ -254,6 +327,7 @@ function FullMapDialog({ days, onClose }) {
           const coordKey = loc.coords[0] + "," + loc.coords[1];
           // Skip only consecutive duplicates (same place back-to-back)
           if (coordKey !== lastCoordKey) {
+            const hasDetail = item.detail && (item.detail.image || item.detail.tip || item.detail.address || item.detail.timetable);
             dayPins.push({
               coords: loc.coords,
               label: loc.label,
@@ -262,6 +336,7 @@ function FullMapDialog({ days, onClose }) {
               color: day.color,
               dayNum: day.day,
               order: orderNum++,
+              _detail: hasDetail ? item.detail : null,
             });
           }
           lastCoordKey = coordKey;
@@ -368,12 +443,12 @@ function FullMapDialog({ days, onClose }) {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexShrink: 0,
       }}>
-        <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#1a1a1a" }}>🗺 여행 지도</h3>
+        <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}><Icon name="map" size={16} />여행 지도</h3>
         <button onClick={onClose} style={{
           border: "none", background: "#F2F1ED", borderRadius: "50%",
           width: "28px", height: "28px", cursor: "pointer",
           fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
-        }}>✕</button>
+        }}><Icon name="close" size={14} /></button>
       </div>
 
       {/* Day tabs */}
@@ -393,7 +468,7 @@ function FullMapDialog({ days, onClose }) {
               fontSize: "11px", fontFamily: "inherit",
               transition: "all 0.15s", whiteSpace: "nowrap",
             }}>
-              {d.icon} D{d.day}
+              D{d.day}
             </button>
           );
         })}
@@ -430,13 +505,20 @@ function FullMapDialog({ days, onClose }) {
               eventHandlers={{ click: () => handlePinClick(pin) }}
             >
               <Popup>
-                <div style={{ fontSize: "12px", fontFamily: "-apple-system,BlinkMacSystemFont,sans-serif", minWidth: "120px" }}>
+                <div style={{ fontSize: "12px", fontFamily: "-apple-system,BlinkMacSystemFont,sans-serif", minWidth: "140px" }}>
                   <strong style={{ fontSize: "13px" }}>{pin.label}</strong>
                   {pin.descs.map((d, di) => (
-                    <div key={di} style={{ color: "#555", marginTop: "3px" }}>
-                      <span style={{ color: "#888" }}>{d.time}</span> {d.desc}
+                    <div key={di} style={{ color: "#48464d", marginTop: "3px" }}>
+                      <span style={{ color: "#78767e" }}>{d.time}</span> {d.desc}
                     </div>
                   ))}
+                  {pin._detail && (
+                    <button onClick={(e) => { e.stopPropagation(); setMapDetail(pin._detail); }} style={{
+                      marginTop: "8px", width: "100%", padding: "6px 0", border: "1px solid #E8E6E1",
+                      borderRadius: "6px", background: "#FAFAF8", cursor: "pointer",
+                      fontSize: "11px", fontWeight: 600, color: pin.color, fontFamily: "inherit",
+                    }}>상세보기</button>
+                  )}
                 </div>
               </Popup>
             </Marker>
@@ -444,33 +526,10 @@ function FullMapDialog({ days, onClose }) {
           })}
         </MapContainer>
 
-        {/* Selected pin info card */}
-        {selectedPin && (
-          <div style={{
-            position: "absolute", top: "12px", left: "12px", right: "12px", zIndex: 1000,
-            background: "#fff", borderRadius: "12px", padding: "12px 14px",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-            display: "flex", alignItems: "center", gap: "10px",
-            animation: "fadeIn 0.15s ease",
-          }}>
-            <div style={{
-              minWidth: "28px", height: "28px", borderRadius: "14px", padding: selectedPin.mapLabel?.includes("·") ? "0 6px" : 0,
-              background: day.color, color: "#fff", fontSize: selectedPin.mapLabel?.includes("·") ? "10px" : "12px", fontWeight: 800,
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>{selectedPin.mapLabel || selectedPin.order}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: "#1a1a1a" }}>{selectedPin.label}</p>
-              {selectedPin.descs ? selectedPin.descs.map((d, di) => (
-                <p key={di} style={{ margin: "2px 0 0", fontSize: "11px", color: "#888" }}>{d.time} · {d.desc}</p>
-              )) : (
-                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#888" }}>{selectedPin.time} · {selectedPin.desc}</p>
-              )}
-            </div>
-            <button onClick={() => setSelectedPin(null)} style={{
-              border: "none", background: "#F2F1ED", borderRadius: "50%",
-              width: "22px", height: "22px", fontSize: "10px", color: "#999",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>✕</button>
+        {/* DetailDialog for map */}
+        {mapDetail && (
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1100 }}>
+            <DetailDialog detail={mapDetail} onClose={() => setMapDetail(null)} dayColor={day?.color || "#333"} />
           </div>
         )}
       </div>
@@ -488,7 +547,7 @@ function FullMapDialog({ days, onClose }) {
           cursor: "pointer", fontFamily: "inherit", flexShrink: 0,
         }}>
           <span style={{ fontSize: "12px", fontWeight: 700, color: day?.color || "#333" }}>
-            {day?.icon} Day {day?.day} — {day?.label}
+            Day {day?.day} — {day?.label}
           </span>
           <span style={{ fontSize: "11px", color: "#bbb" }}>
             {dayPins.length}곳 · {cardExpanded ? "▾" : "▴"}
@@ -554,7 +613,7 @@ const TIMETABLE_DB = [
   {
     id: "hakata_kumamoto",
     label: "하카타 → 구마모토 (신칸센)",
-    icon: "🚅",
+    icon: "car",
     station: "하카타역",
     direction: "구마모토 방면",
     trains: [
@@ -576,13 +635,13 @@ const TIMETABLE_DB = [
     ],
     highlights: [
       "みずほ·さくら = 빠름(33분) / つばめ = 느림(50분)",
-      "⚠️ みずほ는 지정석만 가능 (자유석 없음, 지정석 횟수 차감)",
+      "[참고] みずほ는 지정석만 가능 (자유석 없음, 지정석 횟수 차감)",
     ],
   },
   {
     id: "kumamoto_hakata",
     label: "구마모토 → 하카타 (신칸센)",
-    icon: "🚅",
+    icon: "car",
     station: "구마모토역",
     direction: "하카타 방면",
     trains: [
@@ -605,7 +664,7 @@ const TIMETABLE_DB = [
   {
     id: "kumamoto_aso",
     label: "구마모토 → 아소 (JR 호히본선)",
-    icon: "🚂",
+    icon: "car",
     station: "구마모토역",
     direction: "아소 방면 (호히본선)",
     trains: [
@@ -618,13 +677,13 @@ const TIMETABLE_DB = [
     highlights: [
       "특급 あそぼーい!(아소보이): 토·일·공휴일 운행 관광열차",
       "보통열차는 히고오즈(肥後大津)에서 환승 필요할 수 있음",
-      "⚠️ 열차 편수가 적으니 시간 반드시 확인!",
+      "[참고] 열차 편수가 적으니 시간 반드시 확인!",
     ],
   },
   {
     id: "aso_kumamoto",
     label: "아소 → 구마모토 (JR 호히본선)",
-    icon: "🚂",
+    icon: "car",
     station: "아소역",
     direction: "구마모토 방면 (호히본선)",
     trains: [
@@ -637,13 +696,13 @@ const TIMETABLE_DB = [
     highlights: [
       "あそぼーい! 15:46발이 가장 빠름 (17:01 도착)",
       "놓칠 경우 16:28 보통열차 (18:08 도착)",
-      "⚠️ 열차 편수 적음 — 시간 조절 필요!",
+      "[참고] 열차 편수 적음 — 시간 조절 필요!",
     ],
   },
   {
     id: "hakata_yufuin",
     label: "하카타 → 유후인 (JR 특급)",
-    icon: "🚂",
+    icon: "car",
     station: "하카타역",
     direction: "유후인 방면",
     trains: [
@@ -656,13 +715,13 @@ const TIMETABLE_DB = [
     highlights: [
       "ゆふいんの森: 전석 지정석 관광열차 (지정석 횟수 차감)",
       "ゆふ: 자유석 있음 (JR 북큐슈 5일권 자유석 탑승 가능)",
-      "⚠️ ゆふいんの森는 인기 많아 미리 예약 추천!",
+      "[참고] ゆふいんの森는 인기 많아 미리 예약 추천!",
     ],
   },
   {
     id: "yufuin_hakata",
     label: "유후인 → 하카타 (JR 특급)",
-    icon: "🚂",
+    icon: "car",
     station: "유후인역",
     direction: "하카타 방면",
     trains: [
@@ -680,7 +739,7 @@ const TIMETABLE_DB = [
   {
     id: "kumamoto_tram",
     label: "구마모토 노면전차",
-    icon: "🚋",
+    icon: "car",
     station: "구마모토역 전정",
     direction: "시모토리·스이젠지 방면",
     trains: [
@@ -692,13 +751,13 @@ const TIMETABLE_DB = [
       "B계통: 가미구마모토 → 시모토리 → 스이젠지 공원",
       "배차 간격 짧아 시간 구애 없이 탑승 가능",
       "1일권: 500엔 (3회 이상 탑승 시 이득)",
-      "💡 하나바타초역 = 구마모토성 최근접역",
+      "[팁] 하나바타초역 = 구마모토성 최근접역",
     ],
   },
   {
     id: "fukuoka_airport_bus",
     label: "후쿠오카공항 → 하카타역 (버스/지하철)",
-    icon: "🚌",
+    icon: "car",
     station: "후쿠오카공항 국제선 터미널",
     direction: "하카타역 방면",
     trains: [
@@ -709,13 +768,13 @@ const TIMETABLE_DB = [
       "직행버스: 국제선→하카타역 치쿠시구치 (환승 불필요)",
       "지하철: 무료셔틀로 국내선 이동 → 공항선 2정거장 (5분)",
       "짐 많으면 직행버스 추천 / 시간 정확성은 지하철 우세",
-      "⚠️ 직행버스는 도로 상황에 따라 지연 가능",
+      "[참고] 직행버스는 도로 상황에 따라 지연 가능",
     ],
   },
   {
     id: "hakata_fukuoka_airport",
     label: "하카타역 → 후쿠오카공항 (버스/지하철)",
-    icon: "🚌",
+    icon: "car",
     station: "하카타역",
     direction: "후쿠오카공항 국제선 방면",
     trains: [
@@ -726,13 +785,13 @@ const TIMETABLE_DB = [
       "직행버스: 하카타역 치쿠시구치 → 국제선 직행",
       "지하철: 하카타역 → 공항역(5분) → 무료셔틀로 국제선(10분)",
       "출국 2시간 전 공항 도착 권장",
-      "⚠️ 국제선은 국내선과 별도 터미널 — 환승 시간 여유 두기",
+      "[참고] 국제선은 국내선과 별도 터미널 — 환승 시간 여유 두기",
     ],
   },
   {
     id: "aso_bus_up",
     label: "아소역 → 쿠사센리·아소산 (산교버스)",
-    icon: "🚌",
+    icon: "car",
     station: "아소역앞",
     direction: "쿠사센리·아소산상 터미널 방면",
     trains: [
@@ -747,15 +806,15 @@ const TIMETABLE_DB = [
     highlights: [
       "산교(産交)버스 운행 — JR패스 미적용",
       "쿠사센리 초원 + 나카다케 화구 전망",
-      "⚠️ 편수 적음 — 반드시 시간 확인 후 이동",
-      "⚠️ 혼잡 시 탑승 불가할 수 있으니 여유있게",
+      "[참고] 편수 적음 — 반드시 시간 확인 후 이동",
+      "[참고] 혼잡 시 탑승 불가할 수 있으니 여유있게",
       "동절기(2월) 시간표 변동 가능 — 현지 확인 필수",
     ],
   },
   {
     id: "aso_bus_down",
     label: "아소산·쿠사센리 → 아소역 (산교버스)",
-    icon: "🚌",
+    icon: "car",
     station: "쿠사센리·아소산상 터미널",
     direction: "아소역앞 방면",
     trains: [
@@ -769,14 +828,14 @@ const TIMETABLE_DB = [
     ],
     highlights: [
       "산교(産交)버스 운행 — JR패스 미적용",
-      "⚠️ 마지막 버스 놓치지 않도록 주의!",
+      "[참고] 마지막 버스 놓치지 않도록 주의!",
       "동절기(2월) 시간표 변동 가능 — 현지 확인 필수",
     ],
   },
   {
     id: "kumamoto_kurume",
     label: "구마모토 → 쿠루메 (신칸센)",
-    icon: "🚅",
+    icon: "car",
     station: "구마모토역",
     direction: "쿠루메(하카타) 방면",
     trains: [
@@ -796,7 +855,7 @@ const TIMETABLE_DB = [
   {
     id: "kurume_yufuin",
     label: "쿠루메 → 유후인 (JR 큐다이본선)",
-    icon: "🚂",
+    icon: "car",
     station: "쿠루메역",
     direction: "유후인·오이타 방면",
     trains: [
@@ -811,7 +870,7 @@ const TIMETABLE_DB = [
       "ゆふいんの森: 전석 지정석 관광열차 (지정석 횟수 차감)",
       "ゆふ: 자유석 있음 (JR 북큐슈 5일권 자유석 탑승 가능)",
       "보통열차는 히타(日田)에서 환승 필요",
-      "⚠️ ゆふいんの森는 인기 많아 미리 예약 추천!",
+      "[참고] ゆふいんの森는 인기 많아 미리 예약 추천!",
     ],
   },
 ];
@@ -837,7 +896,7 @@ function findBestTrain(trains, targetTime) {
 const BASE_DAYS = [
   {
     day: 1, date: "2/19 (목)", label: "인천 → 하카타",
-    color: "#D94F3B", icon: "✈️", stay: "하카타 1박", booked: true,
+    color: "#D94F3B", icon: "navigation", stay: "하카타 1박", booked: true,
     sections: [
       {
         title: "이동",
@@ -951,7 +1010,7 @@ const BASE_DAYS = [
   },
   {
     day: 2, date: "2/20 (금)", label: "하카타 → 구마모토",
-    color: "#D97B2B", icon: "🚄", stay: "구마모토 1박", booked: false,
+    color: "#D97B2B", icon: "car", stay: "구마모토 1박", booked: false,
     sections: [
       {
         title: "오전 · 이동",
@@ -993,7 +1052,7 @@ const BASE_DAYS = [
               },
               highlights: [
                 "みずほ·さくら = 빠름(33분) / つばめ = 느림(50분)",
-                "⚠️ みずほ는 지정석만 가능 (자유석 없음, 지정석 횟수 차감)",
+                "[참고] みずほ는 지정석만 가능 (자유석 없음, 지정석 횟수 차감)",
               ],
             }
           },
@@ -1024,7 +1083,7 @@ const BASE_DAYS = [
                 "A계통 탑승 → '시모토리(辛島町)' 하차 (약 15분)",
                 "배차 6~8분 간격이라 대기 시간 짧음",
                 "1일권 500엔 (3회 이상 타면 이득)",
-                "💡 하나바타초역 = 구마모토성 최근접",
+                "[팁] 하나바타초역 = 구마모토성 최근접",
               ],
             }
           },
@@ -1052,7 +1111,7 @@ const BASE_DAYS = [
               hours: "9:00~16:30 (입장 16:00까지)",
               price: "800엔 (와쿠와쿠자 세트 850엔)",
               tip: "구마모토성 공식 앱 다운로드 → AR로 옛 모습 비교 가능",
-              highlights: ["일본 3대 명성", "천수각 6층 360도 파노라마 전망", "2016 지진 후 복원 — 돌담 복구 과정 볼 수 있음", "💡 하나바타초역에서 내리면 더 가까움"],
+              highlights: ["일본 3대 명성", "천수각 6층 360도 파노라마 전망", "2016 지진 후 복원 — 돌담 복구 과정 볼 수 있음", "[팁] 하나바타초역에서 내리면 더 가까움"],
             }
           },
           { time: "14:30", desc: "성채원(조사이엔)", type: "shop", sub: "기념품 + 카라시렌콘 간식",
@@ -1132,7 +1191,7 @@ const BASE_DAYS = [
               hours: "11:30~14:00 / 17:00~20:30",
               price: "코스 5,000~8,000엔",
               tip: "구마모토 바사시의 대명사! 자사 목장 직송 말고기",
-              highlights: ["코스: 바사시 모둠 → 구이 → 말고기 초밥 → 디저트", "희소 부위도 맛볼 수 있음", "⚠️ 코스는 전일 예약 필수!", "온라인 예약 가능 (핫페퍼/구루나비)"],
+              highlights: ["코스: 바사시 모둠 → 구이 → 말고기 초밥 → 디저트", "희소 부위도 맛볼 수 있음", "[참고] 코스는 전일 예약 필수!", "온라인 예약 가능 (핫페퍼/구루나비)"],
             }
           },
           { time: "19:30", desc: "시모토리 야간 산책", type: "spot",
@@ -1152,7 +1211,7 @@ const BASE_DAYS = [
   },
   {
     day: 3, date: "2/21 (토)", label: "아소산 당일치기",
-    color: "#B8912A", icon: "🌋", stay: "구마모토 1박", booked: false,
+    color: "#B8912A", icon: "flag", stay: "구마모토 1박", booked: false,
     sections: [
       {
         title: "오전 · 이동",
@@ -1176,7 +1235,7 @@ const BASE_DAYS = [
               highlights: [
                 "특급 あそぼーい!(아소보이): 토·일·공휴일 운행 관광열차",
                 "보통열차는 히고오즈(肥後大津)에서 환승 필요할 수 있음",
-                "⚠️ 열차 편수가 적으니 시간 반드시 확인!",
+                "[참고] 열차 편수가 적으니 시간 반드시 확인!",
               ],
             }
           },
@@ -1230,8 +1289,8 @@ const BASE_DAYS = [
               },
               highlights: [
                 "산교(産交)버스 운행 — JR패스 미적용",
-                "⚠️ 편수 적음 — 반드시 시간 확인",
-                "⚠️ 혼잡 시 탑승 불가 가능 — 여유있게",
+                "[참고] 편수 적음 — 반드시 시간 확인",
+                "[참고] 혼잡 시 탑승 불가 가능 — 여유있게",
                 "동절기(2월) 시간표 변동 가능 — 현지 확인 필수",
               ],
             }
@@ -1242,7 +1301,7 @@ const BASE_DAYS = [
               category: "관광",
               address: "아소산 정상부",
               tip: "화산활동에 따라 화구 접근 제한 가능 — 당일 확인 필수",
-              highlights: ["쿠사센리 초원 산책 + 나카다케 활화산 전망", "⚠️ 화구 제한 시 Plan B: 승마체험 + 아소 화산박물관", "🌡 2월 아소산은 0~5°C → 방한 준비 필수!", "화구 상황 확인: aso.ne.jp/~volcano/"],
+              highlights: ["쿠사센리 초원 산책 + 나카다케 활화산 전망", "[참고] 화구 제한 시 Plan B: 승마체험 + 아소 화산박물관", "[참고] 2월 아소산은 0~5°C → 방한 준비 필수!", "화구 상황 확인: aso.ne.jp/~volcano/"],
             }
           },
           { time: "14:30", desc: "버스로 하산 → 아소역", type: "move", sub: "약 26분 · ~600엔",
@@ -1266,7 +1325,7 @@ const BASE_DAYS = [
               },
               highlights: [
                 "산교(産交)버스 운행 — JR패스 미적용",
-                "⚠️ 마지막 버스 놓치지 않도록 시간 체크!",
+                "[참고] 마지막 버스 놓치지 않도록 시간 체크!",
                 "하산 후 아소 신사 방면으로 이동",
               ],
             }
@@ -1314,7 +1373,7 @@ const BASE_DAYS = [
               highlights: [
                 "あそぼーい! 15:46발이 가장 빠름 (17:01 도착)",
                 "놓칠 경우 16:28 보통열차 (18:08 도착)",
-                "⚠️ 열차 편수 적음 — 아소 신사에서 시간 조절 필요!",
+                "[참고] 열차 편수 적음 — 아소 신사에서 시간 조절 필요!",
               ],
             }
           },
@@ -1362,7 +1421,7 @@ const BASE_DAYS = [
   },
   {
     day: 4, date: "2/22 (일)", label: "구마모토 → 유후인",
-    color: "#3E8E5B", icon: "♨️", stay: "유후인 1박", booked: false,
+    color: "#3E8E5B", icon: "compass", stay: "유후인 1박", booked: false,
     sections: [
       {
         title: "이동",
@@ -1413,7 +1472,7 @@ const BASE_DAYS = [
               highlights: [
                 "ゆふいんの森: 전석 지정석 관광열차 (지정석 횟수 차감)",
                 "ゆふ: 자유석 있음 (JR 북큐슈 5일권 자유석 탑승 가능)",
-                "⚠️ ゆふいんの森는 인기 많아 미리 예약 추천!",
+                "[참고] ゆふいんの森는 인기 많아 미리 예약 추천!",
                 "차창 밖 큐슈 산간 풍경이 절경",
               ],
             }
@@ -1459,7 +1518,7 @@ const BASE_DAYS = [
   },
   {
     day: 5, date: "2/23 (월)", label: "유후인 → 하카타",
-    color: "#3A7DB5", icon: "🛍️", stay: "하카타 1박", booked: false,
+    color: "#3A7DB5", icon: "shopping", stay: "하카타 1박", booked: false,
     sections: [
       {
         title: "오전",
@@ -1499,7 +1558,7 @@ const BASE_DAYS = [
               highlights: [
                 "ゆふいんの森: 전석 지정석 관광열차",
                 "ゆふ: 자유석 있음 (JR 북큐슈 5일권)",
-                "⚠️ ゆふいんの森는 인기 많아 미리 예약!",
+                "[참고] ゆふいんの森는 인기 많아 미리 예약!",
                 "차창 밖 큐슈 산간 풍경 감상",
               ],
             }
@@ -1545,7 +1604,7 @@ const BASE_DAYS = [
   },
   {
     day: 6, date: "2/24 (화)", label: "하카타 → 인천",
-    color: "#7161A5", icon: "✈️", stay: "귀국", booked: true,
+    color: "#7161A5", icon: "navigation", stay: "귀국", booked: true,
     sections: [
       {
         title: "오전",
@@ -1568,7 +1627,7 @@ const BASE_DAYS = [
               highlights: [
                 "직행버스: 하카타역 치쿠시구치 → 국제선 직행",
                 "지하철: 하카타역 → 공항역(5분) → 무료셔틀로 국제선(10분)",
-                "⚠️ 국제선은 국내선과 별도 터미널!",
+                "[참고] 국제선은 국내선과 별도 터미널!",
                 "출국 2시간 전 공항 도착 권장",
               ],
             }
@@ -1620,7 +1679,7 @@ const DAY_INFO = {
         { name: "코란테이 (紅蘭亭)", time: "12:10", price: "~1,200엔", mapQuery: "紅蘭亭 下通本店 熊本", note: "타이피엔 — 구마모토 향토 중화 당면 스프" },
       ],
       dinner: [
-        { name: "스가노야 긴자도리점", time: "18:00", price: "코스 5,000~8,000엔", mapQuery: "菅乃屋 銀座通り店 熊本", note: "바사시(말고기) 코스 · ⚠️ 전일 예약 필수!" },
+        { name: "스가노야 긴자도리점", time: "18:00", price: "코스 5,000~8,000엔", mapQuery: "菅乃屋 銀座通り店 熊本", note: "바사시(말고기) 코스 · [참고] 전일 예약 필수!" },
       ],
     },
     stay: { name: "구마모토 호텔", address: "구마모토역 근처", mapQuery: "熊本駅 ホテル", checkin: "16:35", checkout: "Day3 아침", note: "구마모토역에서 도보 이동" },
@@ -1670,25 +1729,7 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
   if (meals.dinner) mealSections.push({ label: "석식", items: meals.dinner });
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "flex-end", justifyContent: "center",
-        padding: "16px",
-        animation: "fadeIn 0.2s ease",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%", maxWidth: "420px", maxHeight: "75vh",
-          background: "#fff", borderRadius: "20px 20px 16px 16px",
-          overflow: "hidden", animation: "slideUp 0.25s ease",
-          display: "flex", flexDirection: "column",
-        }}
-      >
+    <BottomSheet onClose={onClose} maxHeight="75vh">
         {/* Header with tabs */}
         <div style={{
           display: "flex", borderBottom: "1px solid #EEECE6", flexShrink: 0,
@@ -1701,8 +1742,9 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
               fontSize: "13px", fontWeight: activeTab === t ? 700 : 400,
               cursor: "pointer", fontFamily: "inherit",
               transition: "all 0.15s",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
             }}>
-              {t === "meals" ? "🍽 식사" : "🏨 숙소"}
+              {t === "meals" ? <><Icon name="fire" size={14} />식사</> : <><Icon name="home" size={14} />숙소</>}
             </button>
           ))}
           <button onClick={onClose} style={{
@@ -1711,7 +1753,7 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
             width: "28px", height: "28px", cursor: "pointer",
             fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "inherit",
-          }}>✕</button>
+          }}><Icon name="close" size={14} /></button>
         </div>
 
         {/* Content */}
@@ -1722,7 +1764,7 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
             <>
               {mealSections.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "30px 0", color: "#bbb", fontSize: "13px" }}>
-                  이 날은 식사 정보가 없습니다
+                  식사 정보가 없습니다
                 </div>
               ) : (
                 mealSections.map((section, si) => (
@@ -1753,8 +1795,8 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
                           <MapButton query={meal.mapQuery} />
                         </div>
                         <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "10px", color: "#888" }}>
-                          <span>🕐 {meal.time}</span>
-                          <span>💰 {meal.price}</span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Icon name="clock" size={12} />{meal.time}</span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Icon name="pricetag" size={12} />{meal.price}</span>
                         </div>
                       </div>
                     ))}
@@ -1774,35 +1816,34 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
                 <p style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#111" }}>{info.stay.name}</p>
                 <MapButton query={info.stay.mapQuery} />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>📍</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{info.stay.address}</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pin" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{info.stay.address}</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>🔑</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>체크인 {info.stay.checkin} / 체크아웃 {info.stay.checkout}</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="lock" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>체크인 {info.stay.checkin} / 체크아웃 {info.stay.checkout}</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>💡</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{info.stay.note}</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="bulb" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{info.stay.note}</span>
                 </div>
               </div>
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
 const TYPE_CONFIG = {
-  food: { emoji: "🍽", bg: "#FFF3EC", border: "#FDDCC8", text: "#C75D20" },
-  spot: { emoji: "📍", bg: "#EEF6FF", border: "#C8DFF5", text: "#2B6CB0" },
-  shop: { emoji: "🛍", bg: "#F3F0FF", border: "#D5CCF5", text: "#6B46C1" },
-  move: { emoji: "→",  bg: "#F5F5F4", border: "#E0DFDC", text: "#6B6B67" },
-  stay: { emoji: "🏨", bg: "#F0FAF4", border: "#C6F0D5", text: "#2A7D4F" },
-  info: { emoji: "💡", bg: "#FFFDE8", border: "#F0EAAC", text: "#8A7E22" },
+  food: { icon: "fire", bg: "#FFF3EC", border: "#FDDCC8", text: "#C75D20" },
+  spot: { icon: "pin", bg: "#EEF6FF", border: "#C8DFF5", text: "#2B6CB0" },
+  shop: { icon: "shopping", bg: "#F3F0FF", border: "#D5CCF5", text: "#6B46C1" },
+  move: { icon: "navigation", bg: "#F5F5F4", border: "#E0DFDC", text: "#6B6B67" },
+  stay: { icon: "home", bg: "#F0FAF4", border: "#C6F0D5", text: "#2A7D4F" },
+  info: { icon: "flash", bg: "#FFFDE8", border: "#F0EAAC", text: "#8A7E22" },
 };
 
 const CATEGORY_COLORS = {
@@ -1884,7 +1925,7 @@ function MapButton({ query }) {
         cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0,
       }}
     >
-      📍 지도
+      <Icon name="pin" size={10} />지도
     </button>
   );
 }
@@ -1905,7 +1946,7 @@ function GuideCard({ item }) {
       </div>
       <p style={{ margin: "0 0 8px", fontSize: "11px", color: "#666", lineHeight: 1.5 }}>{item.desc}</p>
       {item.schedule && (
-        <p style={{ margin: "0 0 8px", fontSize: "11px", color: "#C75D20", fontWeight: 600 }}>🕐 {item.schedule}</p>
+        <p style={{ margin: "0 0 8px", fontSize: "11px", color: "#C75D20", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}><Icon name="clock" size={12} />{item.schedule}</p>
       )}
       {item.details && item.details.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "8px" }}>
@@ -1922,7 +1963,7 @@ function GuideCard({ item }) {
           padding: "6px 10px", background: "#FFF9E8", borderRadius: "8px",
           border: "1px solid #F0E8C8",
         }}>
-          <span style={{ fontSize: "10px", color: "#8A7322", lineHeight: 1.5 }}>💡 {item.tip}</span>
+          <span style={{ fontSize: "10px", color: "#8A7322", lineHeight: 1.5, display: "flex", alignItems: "flex-start", gap: "4px" }}><Icon name="bulb" size={12} style={{ marginTop: "1px" }} /><span>{item.tip}</span></span>
         </div>
       )}
     </div>
@@ -1936,38 +1977,20 @@ function ShoppingGuideDialog({ onClose }) {
   const filtered = chipIdx === 0 ? region.items : region.items.filter((it) => it.chip === region.chips[chipIdx]);
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "16px",
-        animation: "fadeIn 0.2s ease",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%", maxWidth: "420px", maxHeight: "85vh",
-          background: "#fff", borderRadius: "18px",
-          overflow: "hidden", animation: "slideUp 0.25s ease",
-          display: "flex", flexDirection: "column",
-        }}
-      >
+    <BottomSheet onClose={onClose} maxHeight="85vh">
         {/* Header */}
         <div style={{
-          padding: "16px 16px 0 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "6px 16px 0 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1a1a1a" }}>
-            🗾 여행 팁 가이드
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}>
+            <Icon name="bookOpen" size={16} />여행 가이드
           </h3>
           <button onClick={onClose} style={{
             border: "none", background: "#F2F1ED", borderRadius: "50%",
             width: "28px", height: "28px", cursor: "pointer",
             fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "inherit",
-          }}>✕</button>
+          }}><Icon name="close" size={14} /></button>
         </div>
 
         {/* Region Tabs */}
@@ -2020,8 +2043,7 @@ function ShoppingGuideDialog({ onClose }) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -2029,44 +2051,26 @@ function DocumentDialog({ onClose }) {
   const [tab, setTab] = useState(0);
   const [viewImage, setViewImage] = useState(null);
   const tabs = [
-    { label: "✈️ 항공권", image: "/images/ticket_departure.jpg", caption: "KE8795 인천→후쿠오카 / KE788 후쿠오카→인천" },
-    { label: "🚄 JR패스", image: "/images/jrpass.jpg", caption: "JR 북큐슈 5일권 · 예약번호: FGY393247 (성인 2매)" },
+    { label: "항공권", icon: "navigation", image: "/images/ticket_departure.jpg", caption: "KE8795 인천→후쿠오카 / KE788 후쿠오카→인천" },
+    { label: "JR패스", icon: "car", image: "/images/jrpass.jpg", caption: "JR 북큐슈 5일권 · 예약번호: FGY393247 (성인 2매)" },
   ];
   const current = tabs[tab];
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "16px",
-        animation: "fadeIn 0.2s ease",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%", maxWidth: "420px", maxHeight: "85vh",
-          background: "#fff", borderRadius: "18px",
-          overflow: "hidden", animation: "slideUp 0.25s ease",
-          display: "flex", flexDirection: "column",
-        }}
-      >
+    <BottomSheet onClose={onClose} maxHeight="85vh">
         {/* Dialog header */}
         <div style={{
-          padding: "16px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "6px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1a1a1a" }}>
-            📄 여행 서류
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}>
+            <Icon name="file" size={16} />여행 서류
           </h3>
           <button onClick={onClose} style={{
             border: "none", background: "#F2F1ED", borderRadius: "50%",
             width: "28px", height: "28px", cursor: "pointer",
             fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "inherit",
-          }}>✕</button>
+          }}><Icon name="close" size={14} /></button>
         </div>
 
         {/* Tabs */}
@@ -2081,8 +2085,9 @@ function DocumentDialog({ onClose }) {
               fontSize: "12px", fontWeight: tab === i ? 700 : 500,
               cursor: "pointer", fontFamily: "inherit",
               transition: "all 0.15s",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
             }}>
-              {t.label}
+              <Icon name={t.icon} size={12} style={tab === i ? { filter: "brightness(0) invert(1)" } : {}} />{t.label}
             </button>
           ))}
         </div>
@@ -2125,7 +2130,7 @@ function DocumentDialog({ onClose }) {
               padding: "40px 20px", textAlign: "center",
               background: "#FDFCF8",
             }}>
-              <p style={{ margin: 0, fontSize: "32px" }}>🎫</p>
+              <Icon name="pricetag" size={32} />
               <p style={{
                 margin: "10px 0 4px", fontSize: "13px", fontWeight: 600, color: "#999",
               }}>
@@ -2146,26 +2151,26 @@ function DocumentDialog({ onClose }) {
               background: "#FAFAF8", borderRadius: "12px",
               border: "1px solid #EEECE6",
             }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>🎫</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>JR 북큐슈 5일권 (17,000엔/인)</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pricetag" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>JR 북큐슈 5일권 (17,000엔/인)</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>📅</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>Day2~6 커버 (2/20~2/24)</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="calendar" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>Day2~6 커버 (2/20~2/24)</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>🔢</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>예약번호: FGY393247 (성인 2매)</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="bookmark" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>예약번호: FGY393247 (성인 2매)</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>💡</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>하카타역 みどりの窓口에서 바우처→실물 교환<br/>여권 + Klook 바우처 바코드 필요</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="bulb" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>하카타역 みどりの窓口에서 바우처→실물 교환<br/>여권 + Klook 바우처 바코드 필요</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>🚄</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>신칸센 자유석 무제한 · 지정석 6회</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="car" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>신칸센 자유석 무제한 · 지정석 6회</span>
                 </div>
               </div>
             </div>
@@ -2178,28 +2183,27 @@ function DocumentDialog({ onClose }) {
               background: "#FAFAF8", borderRadius: "12px",
               border: "1px solid #EEECE6",
             }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>✈️</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}><b>가는편</b> KE8795 · 인천 15:30 → 후쿠오카 17:10</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="navigation" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}><b>가는편</b> KE8795 · 인천 15:30 → 후쿠오카 17:10</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>✈️</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}><b>오는편</b> KE788 · 후쿠오카 10:30 → 인천 12:00</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="navigation" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}><b>오는편</b> KE788 · 후쿠오카 10:30 → 인천 12:00</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>🧳</span>
-                  <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>수하물 1pc 포함</span>
+                  <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="briefcase" size={14} /></div>
+                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>수하물 1pc 포함</span>
                 </div>
               </div>
             </div>
           )}
         </div>
-      </div>
 
       {/* Image Viewer */}
       <ImageViewer src={viewImage} alt={current.label} onClose={() => setViewImage(null)} />
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -2222,7 +2226,7 @@ function ImageViewer({ src, alt, onClose }) {
         width: "36px", height: "36px", cursor: "pointer",
         fontSize: "18px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
         fontFamily: "inherit", backdropFilter: "blur(4px)",
-      }}>✕</button>
+      }}><Icon name="close" size={14} /></button>
       <img
         src={src}
         alt={alt || ""}
@@ -2243,32 +2247,10 @@ function DetailDialog({ detail, onClose, dayColor }) {
   const cat = CATEGORY_COLORS[detail.category] || { bg: "#f5f5f5", color: "#555", border: "#ddd" };
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "flex-end", justifyContent: "center",
-        padding: "16px",
-        animation: "fadeIn 0.2s ease",
-      }}
-    >
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes slideUp { from { transform: translateY(40px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
-      `}</style>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%", maxWidth: "420px", maxHeight: "80vh",
-          background: "#fff", borderRadius: "20px 20px 16px 16px",
-          overflow: "hidden", animation: "slideUp 0.25s ease",
-          display: "flex", flexDirection: "column",
-        }}
-      >
+    <BottomSheet onClose={onClose} maxHeight="80vh">
         {/* Header */}
         <div style={{
-          padding: "14px 16px 12px 20px", flexShrink: 0,
+          padding: "6px 16px 12px 20px", flexShrink: 0,
           borderBottom: "1px solid #EEECE6",
           display: "flex", alignItems: "center", gap: "10px",
         }}>
@@ -2289,14 +2271,13 @@ function DetailDialog({ detail, onClose, dayColor }) {
               {detail.category}
             </span>
           </div>
-          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-            <button onClick={onClose} style={{
-              border: "none", background: "#F2F1ED", borderRadius: "50%",
-              width: "28px", height: "28px", cursor: "pointer",
-              fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
-              fontFamily: "inherit",
-            }}>✕</button>
-          </div>
+          <button onClick={onClose} style={{
+            border: "none", background: "#F2F1ED", borderRadius: "50%",
+            width: "28px", height: "28px", cursor: "pointer",
+            fontSize: "14px", color: "#999", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "inherit",
+          }}><Icon name="close" size={14} /></button>
         </div>
 
         {/* Image - top, outside scroll area for full bleed */}
@@ -2324,33 +2305,33 @@ function DetailDialog({ detail, onClose, dayColor }) {
 
           {/* Info rows */}
           <div style={{
-            display: "flex", flexDirection: "column", gap: "8px",
+            display: "flex", flexDirection: "column", gap: "10px",
             padding: "14px", background: "#FAFAF8", borderRadius: "12px",
             border: "1px solid #EEECE6", marginBottom: "14px",
           }}>
             {detail.address && (
               <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>📍</span>
-                <span style={{ flex: 1, fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{detail.address}</span>
+                <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pin" size={14} /></div>
+                <span style={{ flex: 1, fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{detail.address}</span>
                 <MapButton query={detail.address} />
               </div>
             )}
             {detail.hours && (
               <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>🕐</span>
-                <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{detail.hours}</span>
+                <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="clock" size={14} /></div>
+                <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{detail.hours}</span>
               </div>
             )}
             {detail.price && (
               <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>💰</span>
-                <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{detail.price}</span>
+                <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pricetag" size={14} /></div>
+                <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{detail.price}</span>
               </div>
             )}
             {detail.tip && (
               <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>💡</span>
-                <span style={{ fontSize: "12px", color: "#555", lineHeight: 1.5 }}>{detail.tip}</span>
+                <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="bulb" size={14} /></div>
+                <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{detail.tip}</span>
               </div>
             )}
           </div>
@@ -2360,9 +2341,10 @@ function DetailDialog({ detail, onClose, dayColor }) {
             <div style={{ marginBottom: "14px" }}>
               <p style={{
                 margin: "0 0 8px", fontSize: "11px", fontWeight: 700,
-                color: "#999", letterSpacing: "0.5px",
+                color: "#78767e", letterSpacing: "0.5px",
+                display: "flex", alignItems: "center", gap: "4px",
               }}>
-                🚆 {detail.timetable.station} 발차 시간표 — {detail.timetable.direction}
+                <Icon name="car" size={14} />{detail.timetable.station} 발차 시간표 — {detail.timetable.direction}
               </p>
               <div style={{
                 borderRadius: "12px", overflow: "hidden",
@@ -2460,8 +2442,7 @@ function DetailDialog({ detail, onClose, dayColor }) {
           )}
         </div>
 
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -2485,12 +2466,12 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
   const [loadedTimetable, setLoadedTimetable] = useState(item?.detail?.timetable || null);
 
   const typeOptions = [
-    { value: "food", label: "🍽 식사" },
-    { value: "spot", label: "📍 관광" },
-    { value: "shop", label: "🛍 쇼핑" },
+    { value: "food", label: "식사" },
+    { value: "spot", label: "관광" },
+    { value: "shop", label: "쇼핑" },
     { value: "move", label: "→ 이동" },
-    { value: "stay", label: "🏨 숙소" },
-    { value: "info", label: "💡 정보" },
+    { value: "stay", label: "숙소" },
+    { value: "info", label: "정보" },
   ];
 
   const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "교통" };
@@ -2552,43 +2533,35 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
     borderRadius: "10px", fontSize: "13px", fontFamily: "inherit",
     background: "#FAFAF8", outline: "none", boxSizing: "border-box",
   };
+  const selectStyle = {
+    ...fieldStyle, cursor: "pointer", paddingRight: "36px",
+    appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
+    backgroundImage: `url("/icons/Arrow/Arrowhead/Down.svg")`,
+    backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
+    backgroundSize: "14px",
+  };
   const labelStyle = { margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#888" };
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "flex-end", justifyContent: "center",
-        padding: "16px",
-        animation: "fadeIn 0.2s ease",
-      }}
+    <BottomSheet
+      onClose={onClose}
+      maxHeight="85vh"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%", maxWidth: "420px", maxHeight: "85vh",
-          background: "#fff", borderRadius: "20px 20px 16px 16px",
-          overflow: "hidden", animation: "slideUp 0.25s ease",
-          display: "flex", flexDirection: "column",
-        }}
-      >
         {/* Header */}
         <div style={{
-          padding: "16px 16px 12px 20px", flexShrink: 0,
+          padding: "6px 16px 12px 20px", flexShrink: 0,
           borderBottom: "1px solid #EEECE6",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1a1a1a" }}>
-            {isNew ? "➕ 일정 추가" : "✏️ 일정 수정"}
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}>
+            {isNew ? <><Icon name="plus" size={16} />일정 추가</> : <><Icon name="edit" size={16} />일정 수정</>}
           </h3>
           <button onClick={onClose} style={{
             border: "none", background: "#F2F1ED", borderRadius: "50%",
             width: "28px", height: "28px", cursor: "pointer",
             fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "inherit",
-          }}>✕</button>
+          }}><Icon name="close" size={14} /></button>
         </div>
 
         {/* Form */}
@@ -2597,9 +2570,9 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
           {isNew && days && (
             <div>
               <p style={labelStyle}>추가할 날짜</p>
-              <select value={selectedDayIdx} onChange={(e) => setSelectedDayIdx(Number(e.target.value))} style={{ ...fieldStyle, cursor: "pointer" }}>
+              <select value={selectedDayIdx} onChange={(e) => setSelectedDayIdx(Number(e.target.value))} style={selectStyle}>
                 {days.map((d, i) => (
-                  <option key={i} value={i}>{d.icon} Day {d.day} — {d.date} {d.label}</option>
+                  <option key={i} value={i}>Day {d.day} — {d.date} {d.label}</option>
                 ))}
               </select>
             </div>
@@ -2613,7 +2586,7 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
             </div>
             <div style={{ flex: 1 }}>
               <p style={labelStyle}>유형</p>
-              <select value={type} onChange={(e) => setType(e.target.value)} style={{ ...fieldStyle, cursor: "pointer" }}>
+              <select value={type} onChange={(e) => setType(e.target.value)} style={selectStyle}>
                 {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
@@ -2633,13 +2606,13 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
 
           {/* Divider */}
           <div style={{ borderTop: "1px solid #EEECE6", paddingTop: "10px" }}>
-            <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "#555" }}>상세 정보 (다이얼로그)</p>
+            <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "#555" }}>상세 정보</p>
           </div>
 
           {/* Detail name */}
           <div>
             <p style={labelStyle}>장소명 (상세)</p>
-            <input value={detailName} onChange={(e) => setDetailName(e.target.value)} placeholder="비워두면 일정명 사용" style={fieldStyle} />
+            <input value={detailName} onChange={(e) => setDetailName(e.target.value)} placeholder="미입력 시 일정명 사용" style={fieldStyle} />
           </div>
 
           {/* Address */}
@@ -2663,7 +2636,7 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
           {/* Tip */}
           <div>
             <p style={labelStyle}>팁 / 메모</p>
-            <textarea value={detailTip} onChange={(e) => setDetailTip(e.target.value)} placeholder="참고사항을 적어주세요" rows={2}
+            <textarea value={detailTip} onChange={(e) => setDetailTip(e.target.value)} placeholder="참고사항 입력" rows={2}
               style={{ ...fieldStyle, resize: "vertical" }} />
           </div>
 
@@ -2677,18 +2650,18 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
           {type === "move" && (
             <>
               <div style={{ borderTop: "1px solid #EEECE6", paddingTop: "10px" }}>
-                <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "#555" }}>🚆 시간표 불러오기</p>
+                <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "#48464d", display: "flex", alignItems: "center", gap: "4px" }}><Icon name="car" size={14} />시간표 불러오기</p>
               </div>
               <div>
                 <p style={labelStyle}>노선 선택</p>
                 <select
                   value={selectedRoute}
                   onChange={(e) => setSelectedRoute(e.target.value)}
-                  style={{ ...fieldStyle, cursor: "pointer" }}
+                  style={selectStyle}
                 >
                   <option value="">시간표 없음</option>
                   {TIMETABLE_DB.map((r) => (
-                    <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
+                    <option key={r.id} value={r.id}>{r.label}</option>
                   ))}
                 </select>
               </div>
@@ -2701,9 +2674,10 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
                   color: selectedRoute ? "#2B6CB0" : "#bbb",
                   fontSize: "12px", fontWeight: 700, cursor: selectedRoute ? "pointer" : "default",
                   fontFamily: "inherit", transition: "all 0.15s",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
                 }}
               >
-                🔄 {loadedTimetable ? "시간표 다시 불러오기" : "시간표 불러오기"}
+                <Icon name="sync" size={12} />{loadedTimetable ? "시간표 다시 불러오기" : "시간표 불러오기"}
                 {time.trim() ? ` (${time.trim()} 기준)` : ""}
               </button>
 
@@ -2759,8 +2733,7 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
             {isNew ? "추가" : "저장"}
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -2829,7 +2802,7 @@ export default function TravelPlanner() {
         date: `Day ${totalDays + 1}`,
         label: label,
         color: DAY_COLORS[totalDays % DAY_COLORS.length],
-        icon: icon || "📌",
+        icon: icon || "pin",
         stay: "",
         booked: false,
         sections: [{ title: "종일", items: [] }],
@@ -2976,9 +2949,9 @@ export default function TravelPlanner() {
             cursor: "pointer", fontSize: "16px", flexShrink: 0,
             transition: "background 0.15s",
           }}
-          title="쇼핑 가이드"
+          title="여행 가이드"
         >
-          🐻
+          <Icon name="compass" size={18} />
         </button>
         <button
           onClick={() => setShowDocs(true)}
@@ -2991,7 +2964,7 @@ export default function TravelPlanner() {
           }}
           title="여행 서류"
         >
-          📄
+          <Icon name="file" size={18} />
         </button>
       </div>
 
@@ -3001,21 +2974,19 @@ export default function TravelPlanner() {
         background: "#fff", borderBottom: "1px solid #E8E6E1",
         flexShrink: 0, alignItems: "center",
       }}>
-        <div style={{ display: "flex", flex: 1, overflowX: "auto", alignItems: "center" }}>
+        <div style={{ display: "flex", flex: 1, overflowX: "auto", alignItems: "center", position: "relative", maskImage: "linear-gradient(to right, black calc(100% - 24px), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 24px), transparent 100%)" }}>
           {DAYS.map((day, i) => {
             const active = selectedDay === i;
             return (
               <button key={i} onClick={() => setSelectedDay(i)} style={{
-                flex: "none", padding: "10px 14px", border: "none",
+                flex: "none", padding: "12px 16px", border: "none",
                 background: "none", cursor: "pointer",
                 borderBottom: active ? `2.5px solid ${day.color}` : "2.5px solid transparent",
                 color: active ? day.color : "#aaa",
-                fontWeight: active ? 700 : 400,
-                fontSize: "12px", fontFamily: "inherit",
+                fontWeight: active ? 700 : 500,
+                fontSize: "13px", fontFamily: "inherit",
                 transition: "all 0.15s", whiteSpace: "nowrap",
-                opacity: active ? 1 : 0.7,
               }}>
-                <span style={{ fontSize: "14px", marginRight: "3px" }}>{day.icon}</span>
                 D{day.day}
               </button>
             );
@@ -3038,7 +3009,7 @@ export default function TravelPlanner() {
         </div>
 
         {/* Gap + Schedule add button */}
-        <div style={{ flexShrink: 0, marginLeft: "12px", paddingRight: "4px" }}>
+        <div style={{ flexShrink: 0, marginLeft: "20px", paddingRight: "4px" }}>
           <button
             onClick={() => setEditTarget({ dayIdx: selectedDay, sectionIdx: -1, itemIdx: null, item: null })}
             style={{
@@ -3070,30 +3041,11 @@ export default function TravelPlanner() {
             width: "40px", height: "40px", borderRadius: "12px",
             background: current.color, display: "flex",
             alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: "18px", flexShrink: 0,
+            flexShrink: 0,
           }}>
-            {current.icon}
+            <Icon name={current.icon} size={20} style={{ filter: "brightness(0) invert(1)" }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            {editingDayIdx === selectedDay ? (
-              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                <input
-                  value={editDayLabel}
-                  onChange={(e) => setEditDayLabel(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleEditDayLabel(selectedDay, editDayLabel); if (e.key === "Escape") setEditingDayIdx(null); }}
-                  autoFocus
-                  style={{
-                    flex: 1, padding: "4px 8px", border: `1.5px solid ${current.color}`,
-                    borderRadius: "8px", fontSize: "14px", fontWeight: 700,
-                    fontFamily: "inherit", outline: "none", background: "#FAFAF8",
-                  }}
-                />
-                <button onClick={() => handleEditDayLabel(selectedDay, editDayLabel)} style={{
-                  border: "none", background: current.color, color: "#fff", borderRadius: "6px",
-                  padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                }}>저장</button>
-              </div>
-            ) : (
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <h2
                   onClick={() => { setEditingDayIdx(selectedDay); setEditDayLabel(current.label); }}
@@ -3102,7 +3054,7 @@ export default function TravelPlanner() {
                     letterSpacing: "-0.3px", cursor: "pointer",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}
-                  title="클릭하여 이름 변경"
+                  title="이름 수정"
                 >
                   {current.label}
                 </h2>
@@ -3112,7 +3064,7 @@ export default function TravelPlanner() {
                     border: "none", background: "none", cursor: "pointer",
                     fontSize: "10px", color: "#ccc", padding: "2px", flexShrink: 0,
                   }}
-                >✏️</button>
+                ><Icon name="edit" size={14} /></button>
                 {selectedDay >= BASE_DAYS.length && (
                   <button
                     onClick={() => handleDeleteDay(selectedDay)}
@@ -3120,10 +3072,9 @@ export default function TravelPlanner() {
                       border: "none", background: "none", cursor: "pointer",
                       fontSize: "10px", color: "#dbb", padding: "2px", flexShrink: 0,
                     }}
-                  >🗑</button>
+                  ><Icon name="trash" size={14} /></button>
                 )}
               </div>
-            )}
             <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#999" }}>
               {current.date} · {current.stay}
             </p>
@@ -3135,7 +3086,7 @@ export default function TravelPlanner() {
               fontSize: "12px", cursor: "pointer", fontFamily: "inherit",
               display: "flex", alignItems: "center", gap: "3px",
             }}>
-              🍽<span style={{ fontSize: "10px", fontWeight: 600, color: "#C75D20" }}>식사</span>
+              <Icon name="fire" size={12} /><span style={{ fontSize: "10px", fontWeight: 600, color: "#C75D20" }}>식사</span>
             </button>
             <button onClick={() => setDayInfoTab("stay")} style={{
               padding: "6px 10px", borderRadius: "10px",
@@ -3143,7 +3094,7 @@ export default function TravelPlanner() {
               fontSize: "12px", cursor: "pointer", fontFamily: "inherit",
               display: "flex", alignItems: "center", gap: "3px",
             }}>
-              🏨<span style={{ fontSize: "10px", fontWeight: 600, color: "#2A7D4F" }}>숙소</span>
+              <Icon name="home" size={12} /><span style={{ fontSize: "10px", fontWeight: 600, color: "#2A7D4F" }}>숙소</span>
             </button>
           </div>
         </div>
@@ -3184,8 +3135,8 @@ export default function TravelPlanner() {
                     key={ii}
                     onClick={hasDetail ? handleClick : undefined}
                     style={{
-                      display: "flex", alignItems: "flex-start", gap: "10px",
-                      padding: "10px 10px 10px 14px",
+                      display: "flex", alignItems: "flex-start", gap: "8px",
+                      padding: "10px 14px",
                       borderBottom: isLast ? "none" : "1px solid #F2F1ED",
                       background: "transparent",
                       cursor: hasDetail ? "pointer" : "default",
@@ -3194,27 +3145,19 @@ export default function TravelPlanner() {
                     onMouseEnter={(e) => { if (hasDetail) e.currentTarget.style.background = "#FAFAF8"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                   >
-                    <div style={{ width: "48px", flexShrink: 0, textAlign: "right" }}>
-                      <span style={{
-                        fontSize: "11px", fontWeight: 700, color: "#555",
-                        fontVariantNumeric: "tabular-nums",
-                        lineHeight: "22px", whiteSpace: "nowrap",
-                      }}>
-                        {item.time}
-                      </span>
-                    </div>
-                    <div style={{
-                      width: "22px", height: "22px", borderRadius: "6px",
-                      background: cfg.bg, border: `1px solid ${cfg.border}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "11px", flexShrink: 0,
+                    <span style={{
+                      width: "44px", flexShrink: 0, textAlign: "right",
+                      fontSize: "11px", fontWeight: 700, color: cfg.text,
+                      fontVariantNumeric: "tabular-nums",
+                      lineHeight: "20px", whiteSpace: "nowrap",
                     }}>
-                      {cfg.emoji}
-                    </div>
+                      {item.time}
+                    </span>
+                    <div style={{ width: "3px", flexShrink: 0, borderRadius: "2px", background: cfg.border, alignSelf: "stretch", minHeight: "20px" }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", minHeight: "22px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", minHeight: "20px" }}>
                         <p style={{
-                          margin: 0, fontSize: "13px", fontWeight: 500, color: "#222", lineHeight: "22px",
+                          margin: 0, fontSize: "13px", fontWeight: 500, color: "#1c1b21", lineHeight: "20px",
                         }}>
                           {item.desc}
                         </p>
@@ -3225,7 +3168,7 @@ export default function TravelPlanner() {
                         )}
                       </div>
                       {item.sub && (
-                        <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#999", lineHeight: 1.3 }}>
+                        <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#78767e", lineHeight: 1.4 }}>
                           {item.sub}
                         </p>
                       )}
@@ -3243,12 +3186,12 @@ export default function TravelPlanner() {
                         width: "24px", height: "24px", border: "none", borderRadius: "6px",
                         background: "#F2F1ED", cursor: "pointer", fontSize: "10px",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>✏️</button>
+                      }}><Icon name="edit" size={14} /></button>
                       <button onClick={() => handleDeleteItem(selectedDay, si, ii)} style={{
                         width: "24px", height: "24px", border: "none", borderRadius: "6px",
                         background: "#FFF0F0", cursor: "pointer", fontSize: "10px",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>🗑</button>
+                      }}><Icon name="trash" size={14} /></button>
                     </div>
                   </div>
                 );
@@ -3263,8 +3206,8 @@ export default function TravelPlanner() {
             marginTop: "4px", padding: "11px 14px",
             background: "#FDFCF8", borderRadius: "12px", border: "1px dashed #DDD8CB",
           }}>
-            <p style={{ margin: 0, fontSize: "11px", color: "#888", lineHeight: 1.6 }}>
-              📌 {current.notes}
+            <p style={{ margin: 0, fontSize: "11px", color: "#78767e", lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: "6px" }}>
+              <Icon name="pin" size={12} style={{ marginTop: "2px" }} /><span>{current.notes}</span>
             </p>
           </div>
         )}
@@ -3317,7 +3260,7 @@ export default function TravelPlanner() {
         onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.25)"; }}
         title="여행 지도"
       >
-        🗺
+        <Icon name="map" size={22} style={{ filter: "brightness(0) invert(1)" }} />
       </button>
 
       {/* Full Map Dialog */}
@@ -3333,6 +3276,67 @@ export default function TravelPlanner() {
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
         />
+      )}
+
+      {/* Edit Day Name Dialog */}
+      {editingDayIdx !== null && (
+        <div onClick={() => setEditingDayIdx(null)} style={{
+          position: "fixed", inset: 0, zIndex: 3000,
+          background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "24px", animation: "fadeIn 0.15s ease",
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            width: "100%", maxWidth: "320px", background: "#fff",
+            borderRadius: "18px", overflow: "hidden",
+            animation: "slideUp 0.2s ease",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
+          }}>
+            <div style={{ padding: "24px 24px 20px" }}>
+              <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 800, color: "#1a1a1a", display: "flex", alignItems: "center", gap: "6px" }}>
+                <Icon name="edit" size={16} />이름 수정
+              </h3>
+              <input
+                value={editDayLabel}
+                onChange={(e) => setEditDayLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && editDayLabel.trim()) { handleEditDayLabel(editingDayIdx, editDayLabel); }
+                  if (e.key === "Escape") setEditingDayIdx(null);
+                }}
+                autoFocus
+                placeholder="이름을 입력하세요"
+                style={{
+                  width: "100%", padding: "12px 14px",
+                  border: "1.5px solid #E8E6E1", borderRadius: "12px",
+                  fontSize: "14px", fontWeight: 600,
+                  fontFamily: "inherit", outline: "none",
+                  background: "#FAFAF8", boxSizing: "border-box",
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={(e) => { e.target.style.borderColor = DAYS[editingDayIdx]?.color || "#8b7bff"; }}
+                onBlur={(e) => { e.target.style.borderColor = "#E8E6E1"; }}
+              />
+            </div>
+            <div style={{ display: "flex", borderTop: "1px solid #EEECE6" }}>
+              <button onClick={() => setEditingDayIdx(null)} style={{
+                flex: 1, padding: "14px", border: "none", background: "none",
+                fontSize: "14px", fontWeight: 500, color: "#888",
+                cursor: "pointer", fontFamily: "inherit",
+                borderRight: "1px solid #EEECE6",
+              }}>취소</button>
+              <button
+                onClick={() => { if (editDayLabel.trim()) handleEditDayLabel(editingDayIdx, editDayLabel); }}
+                style={{
+                  flex: 1, padding: "14px", border: "none", background: "none",
+                  fontSize: "14px", fontWeight: 700,
+                  color: editDayLabel.trim() ? (DAYS[editingDayIdx]?.color || "#8b7bff") : "#ccc",
+                  cursor: editDayLabel.trim() ? "pointer" : "default",
+                  fontFamily: "inherit",
+                }}
+              >저장</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add Day Dialog */}

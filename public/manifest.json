@@ -1,0 +1,24 @@
+{
+  "name": "여행 플래너 - 후쿠오카 · 구마모토 · 유후인",
+  "short_name": "여행 플래너",
+  "description": "후쿠오카, 구마모토, 유후인 여행 일정 관리 앱",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf8ff",
+  "theme_color": "#8b7bff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

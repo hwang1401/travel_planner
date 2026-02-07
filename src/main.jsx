@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "./index.css";
 import TravelPlanner from "./App";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
@@ -7,3 +8,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <TravelPlanner />
   </React.StrictMode>
 );
+
+// Register Service Worker for PWA
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
