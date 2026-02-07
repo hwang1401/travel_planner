@@ -49,7 +49,7 @@ export default function ImportPreviewDialog({
               fontWeight: "var(--typo-body-1-n---bold-weight)",
               color: "var(--color-on-surface)",
             }}>
-              일정 파일 가져오기
+              AI 일정 분석 결과
             </h3>
             <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onCancel} />
           </div>

@@ -7,7 +7,8 @@ import { usePresence } from "../hooks/usePresence";
 import { BASE_DAYS } from "../data/days";
 import { loadCustomData, mergeData, generateDaySummary } from "../data/storage";
 import { TYPE_CONFIG } from "../data/guides";
-import { parseScheduleFile, readFileAsText, detectConflicts } from "../utils/scheduleParser";
+import { readFileAsText, detectConflicts } from "../utils/scheduleParser";
+import { analyzeScheduleWithAI } from "../services/geminiService";
 import ImportPreviewDialog from "./dialogs/ImportPreviewDialog";
 
 /* Service imports */
@@ -484,6 +485,8 @@ export default function TravelPlanner() {
   }, [updateCustomData, editTarget]);
 
   /* ── File Import: parse file and show preview dialog ── */
+  const [aiLoading, setAiLoading] = useState(false);
+
   const handleFileImport = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -491,20 +494,37 @@ export default function TravelPlanner() {
 
     try {
       const content = await readFileAsText(file);
-      const { items, errors } = parseScheduleFile(content);
+      if (!content.trim()) {
+        setToast({ message: "파일 내용이 비어있습니다", icon: "info" });
+        return;
+      }
+
+      // AI analysis
+      setAiLoading(true);
+      setToast({ message: "AI가 문서를 분석하고 있습니다...", icon: "flash" });
+      const dayContext = current?.label || `Day ${selectedDay + 1}`;
+      const { items, error } = await analyzeScheduleWithAI(content, dayContext);
+      setAiLoading(false);
+
+      if (error) {
+        setToast({ message: `AI 분석 실패: ${error}`, icon: "info" });
+        return;
+      }
 
       if (items.length === 0) {
-        setToast({ message: errors[0] || "파일에서 일정을 찾을 수 없습니다", icon: "info" });
+        setToast({ message: "문서에서 일정을 추출할 수 없습니다", icon: "info" });
         return;
       }
 
       const conflicts = detectConflicts(items, current);
-      setImportPreview({ items, errors, conflicts });
+      setImportPreview({ items, errors: [], conflicts });
+      setToast(null);
     } catch (err) {
       console.error("[FileImport] Error:", err);
+      setAiLoading(false);
       setToast({ message: "파일을 읽는 중 오류가 발생했습니다", icon: "info" });
     }
-  }, [current]);
+  }, [current, selectedDay]);
 
   /* ── Import: replace entire day ── */
   const handleImportReplace = useCallback(() => {
@@ -831,9 +851,10 @@ export default function TravelPlanner() {
           {canEdit && (
             <div style={{ flexShrink: 0, display: "flex", gap: "6px", alignItems: "center" }}>
               <Button variant="neutral" size="sm" iconOnly="file"
-                onClick={() => fileImportRef.current?.click()}
-                title="파일로 일정 추가"
-                style={{ width: "32px", height: "32px" }} />
+                onClick={() => !aiLoading && fileImportRef.current?.click()}
+                title="AI로 문서 분석하여 일정 추가"
+                disabled={aiLoading}
+                style={{ width: "32px", height: "32px", opacity: aiLoading ? 0.5 : 1 }} />
               <Button variant="primary" size="sm" iconLeft="plus"
                 onClick={() => setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null })}>
                 일정 추가
