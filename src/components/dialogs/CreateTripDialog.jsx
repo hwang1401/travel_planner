@@ -4,6 +4,8 @@ import Field from '../common/Field';
 import Icon from '../common/Icon';
 import AddressSearch from '../common/AddressSearch';
 import BottomSheet from '../common/BottomSheet';
+import ImagePicker from '../common/ImagePicker';
+import { uploadImage, generateImagePath } from '../../services/imageService';
 
 /*
  * ── Create Trip Dialog ──
@@ -173,6 +175,8 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
   const [startDate, setStartDate] = useState(editTrip?.startDate || '');
   const [endDate, setEndDate] = useState(editTrip?.endDate || '');
   const [datePickerTarget, setDatePickerTarget] = useState(null); // 'start' | 'end' | null
+  const [coverImage, setCoverImage] = useState(editTrip?.coverImage || '');
+  const [coverUploading, setCoverUploading] = useState(false);
 
   /* ── Destination helpers ── */
   const addDestination = useCallback((dest, lat, lon) => {
@@ -195,9 +199,29 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} (${days[d.getDay()]})`;
   }, []);
 
+  /* ── Cover image upload ── */
+  const handleCoverFile = useCallback(async (file) => {
+    setCoverUploading(true);
+    try {
+      // Use editTrip id or a temp id for new trips
+      const id = editTrip?.id || `tmp_${Date.now()}`;
+      const path = generateImagePath(id, 'cover');
+      const url = await uploadImage(file, path);
+      setCoverImage(url);
+    } catch (err) {
+      console.error('Cover upload error:', err);
+    } finally {
+      setCoverUploading(false);
+    }
+  }, [editTrip]);
+
+  const handleCoverRemove = useCallback(() => {
+    setCoverImage('');
+  }, []);
+
   /* ── Submit ── */
   const [submitting, setSubmitting] = useState(false);
-  const canSubmit = name.trim() && startDate && !submitting;
+  const canSubmit = name.trim() && startDate && !submitting && !coverUploading;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -208,6 +232,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         destinations: destinations.map((d) => d.name),
         startDate,
         endDate: endDate || startDate,
+        coverImage: coverImage || '',
         ...(isEdit ? { tripId: editTrip.id } : {}),
       });
     } catch (err) {
@@ -237,6 +262,25 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
 
       {/* Form */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+        {/* ── Cover Image ── */}
+        <section>
+          <p style={{
+            margin: '0 0 10px', fontSize: 'var(--typo-caption-1-bold-size)',
+            fontWeight: 'var(--typo-caption-1-bold-weight)', color: 'var(--color-primary)',
+            display: 'flex', alignItems: 'center', gap: '6px',
+          }}>
+            커버 이미지
+          </p>
+          <ImagePicker
+            value={coverImage}
+            onChange={handleCoverFile}
+            onRemove={handleCoverRemove}
+            placeholder="여행 커버 이미지를 선택하세요"
+            aspect="cover"
+            uploading={coverUploading}
+          />
+        </section>
 
         {/* ── Section: 여행 정보 ── */}
         <section>

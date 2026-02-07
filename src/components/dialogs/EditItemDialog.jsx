@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import Field from '../common/Field';
 import AddressSearch from '../common/AddressSearch';
 import BottomSheet from '../common/BottomSheet';
+import { MultiImagePicker } from '../common/ImagePicker';
+import { uploadImage, generateImagePath } from '../../services/imageService';
 import { TIMETABLE_DB, findBestTrain } from '../../data/timetable';
 
 /* ── Edit Item Dialog (일정 추가/수정) ── */
-export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color }) {
+export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color, tripId }) {
   const isNew = !item;
   const [time, setTime] = useState(item?.time || "");
   const [desc, setDesc] = useState(item?.desc || "");
@@ -18,12 +20,53 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const [detailTip, setDetailTip] = useState(item?.detail?.tip || "");
   const [detailPrice, setDetailPrice] = useState(item?.detail?.price || "");
   const [detailHours, setDetailHours] = useState(item?.detail?.hours || "");
-  const [detailImage, setDetailImage] = useState(item?.detail?.image || "");
+  // Multi-image support: migrate from single image to array
+  const [detailImages, setDetailImages] = useState(() => {
+    if (item?.detail?.images && Array.isArray(item.detail.images)) return [...item.detail.images];
+    if (item?.detail?.image) return [item.detail.image];
+    return [];
+  });
+  const [detailMainImage, setDetailMainImage] = useState(item?.detail?.image || '');
+  const [imageUploading, setImageUploading] = useState(false);
 
   // Timetable state
   const currentRouteId = item?.detail?.timetable?._routeId || "";
   const [selectedRoute, setSelectedRoute] = useState(currentRouteId);
   const [loadedTimetable, setLoadedTimetable] = useState(item?.detail?.timetable || null);
+
+  /* ── Image handlers ── */
+  const handleAddImage = useCallback(async (file) => {
+    if (!tripId) return; // no trip context — skip upload
+    setImageUploading(true);
+    try {
+      const path = generateImagePath(tripId, 'items');
+      const url = await uploadImage(file, path);
+      setDetailImages((prev) => {
+        const next = [...prev, url];
+        if (!detailMainImage) setDetailMainImage(url);
+        return next;
+      });
+    } catch (err) {
+      console.error('Image upload error:', err);
+    } finally {
+      setImageUploading(false);
+    }
+  }, [tripId, detailMainImage]);
+
+  const handleRemoveImage = useCallback((index) => {
+    setDetailImages((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      // If we removed the main image, pick the first remaining
+      if (prev[index] === detailMainImage) {
+        setDetailMainImage(next[0] || '');
+      }
+      return next;
+    });
+  }, [detailMainImage]);
+
+  const handleSetMainImage = useCallback((index) => {
+    setDetailMainImage(detailImages[index] || '');
+  }, [detailImages]);
 
   const typeOptions = [
     { value: "food", label: "식사" },
@@ -61,7 +104,8 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
 
   const handleSave = () => {
     if (!time.trim() || !desc.trim()) return;
-    const hasDetailContent = detailName.trim() || address.trim() || detailTip.trim() || detailImage.trim() || detailPrice.trim() || detailHours.trim();
+    const hasImages = detailImages.length > 0;
+    const hasDetailContent = detailName.trim() || address.trim() || detailTip.trim() || hasImages || detailPrice.trim() || detailHours.trim();
 
     const newItem = {
       time: time.trim(),
@@ -80,6 +124,8 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     }
 
     if (hasDetailContent || timetable) {
+      // Determine representative image
+      const mainImg = detailMainImage || detailImages[0] || '';
       newItem.detail = {
         name: detailName.trim() || desc.trim(),
         category: catMap[type] || "관광",
@@ -87,7 +133,8 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         ...(detailTip.trim() ? { tip: detailTip.trim() } : {}),
         ...(detailPrice.trim() ? { price: detailPrice.trim() } : {}),
         ...(detailHours.trim() ? { hours: detailHours.trim() } : {}),
-        ...(detailImage.trim() ? { image: detailImage.trim() } : {}),
+        ...(mainImg ? { image: mainImg } : {}),
+        ...(hasImages ? { images: detailImages } : {}),
         ...(timetable ? { timetable } : {}),
         ...(highlights ? { highlights } : {}),
       };
@@ -168,9 +215,27 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
           <Field as="textarea" label="팁 / 메모" size="lg" variant="outlined"
             value={detailTip} onChange={(e) => setDetailTip(e.target.value)} placeholder="참고사항 입력" rows={2} />
 
-          {/* Image URL */}
-          <Field label="이미지 경로" size="lg" variant="outlined"
-            value={detailImage} onChange={(e) => setDetailImage(e.target.value)} placeholder="/images/filename.jpg" />
+          {/* Images */}
+          {tripId ? (
+            <div>
+              <p style={{ margin: '0 0 8px', fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant)' }}>
+                이미지 ({detailImages.length}/5)
+              </p>
+              <MultiImagePicker
+                images={detailImages}
+                mainImage={detailMainImage}
+                onAdd={handleAddImage}
+                onRemove={handleRemoveImage}
+                onSetMain={handleSetMainImage}
+                uploading={imageUploading}
+                maxImages={5}
+              />
+            </div>
+          ) : (
+            <Field label="이미지 경로" size="lg" variant="outlined"
+              value={detailImages[0] || ''} onChange={(e) => { setDetailImages(e.target.value ? [e.target.value] : []); setDetailMainImage(e.target.value || ''); }}
+              placeholder="/images/filename.jpg" />
+          )}
 
           {/* Timetable loader - only for move type */}
           {type === "move" && (

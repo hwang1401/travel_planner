@@ -12,6 +12,15 @@ export default function DetailDialog({ detail, onClose, dayColor }) {
   const [viewImage, setViewImage] = useState(null);
   const cat = CATEGORY_COLORS[detail.category] || { bg: "var(--color-surface-container-low)", color: "var(--color-on-surface-variant)", border: "var(--color-outline-variant)" };
 
+  // Support both single image and multi-image
+  const images = detail.images && Array.isArray(detail.images) && detail.images.length > 0
+    ? detail.images
+    : detail.image ? [detail.image] : [];
+  // Put main image first
+  const sortedImages = detail.image && images.length > 1
+    ? [detail.image, ...images.filter((img) => img !== detail.image)]
+    : images;
+
   return (
     <BottomSheet onClose={onClose} maxHeight="80vh">
         {/* Header */}
@@ -40,20 +49,49 @@ export default function DetailDialog({ detail, onClose, dayColor }) {
           <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
         </div>
 
-        {/* Image */}
-        {detail.image && (
+        {/* Images */}
+        {sortedImages.length === 1 && (
           <div
-            onClick={() => setViewImage(detail.image)}
+            onClick={() => setViewImage(sortedImages[0])}
             style={{ flexShrink: 0, overflow: "hidden", cursor: "zoom-in" }}
           >
             <img
-              src={detail.image}
+              src={sortedImages[0]}
               alt={detail.name}
               style={{
                 width: "100%", display: "block",
                 maxHeight: "200px", objectFit: "cover",
               }}
             />
+          </div>
+        )}
+        {sortedImages.length > 1 && (
+          <div style={{
+            flexShrink: 0, overflowX: "auto", overflowY: "hidden",
+            display: "flex", gap: "6px", padding: "0 20px",
+            scrollSnapType: "x mandatory",
+            WebkitOverflowScrolling: "touch",
+          }}>
+            {sortedImages.map((img, i) => (
+              <div
+                key={i}
+                onClick={() => setViewImage(img)}
+                style={{
+                  flexShrink: 0, width: "75%", scrollSnapAlign: "start",
+                  borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
+                  cursor: "zoom-in",
+                }}
+              >
+                <img
+                  src={img}
+                  alt={`${detail.name} ${i + 1}`}
+                  style={{
+                    width: "100%", height: "160px",
+                    objectFit: "cover", display: "block",
+                  }}
+                />
+              </div>
+            ))}
           </div>
         )}
 

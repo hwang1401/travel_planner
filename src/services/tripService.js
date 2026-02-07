@@ -79,7 +79,7 @@ export async function getTrip(tripId) {
  * Create a new trip.
  * Automatically adds the current user as owner in trip_members.
  */
-export async function createTrip({ name, destinations = [], startDate, endDate, members = [] }) {
+export async function createTrip({ name, destinations = [], startDate, endDate, members = [], coverImage = '' }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
@@ -100,6 +100,7 @@ export async function createTrip({ name, destinations = [], startDate, endDate, 
       start_date: startDate || null,
       end_date: endDate || startDate || null,
       cover_color: coverColor,
+      cover_image: coverImage || null,
       owner_id: user.id,
     })
     .select()
@@ -287,6 +288,7 @@ function formatTrip(raw) {
     startDate: raw.start_date,
     endDate: raw.end_date,
     coverColor: raw.cover_color,
+    coverImage: raw.cover_image || '',
     ownerId: raw.owner_id,
     shareCode: raw.share_code,
     members,

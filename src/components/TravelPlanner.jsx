@@ -785,7 +785,7 @@ export default function TravelPlanner() {
                   section.items.map((item, ii) => {
                     const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
                     const isLast = ii === section.items.length - 1;
-                    const hasDetail = !!item.detail && !!(item.detail.image || item.detail.tip || item.detail.address || item.detail.timetable);
+                    const hasDetail = !!item.detail && !!(item.detail.image || item.detail.images?.length || item.detail.tip || item.detail.address || item.detail.timetable);
                     const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
                     const handleClick = () => {
                       if (hasDetail) {
@@ -882,7 +882,7 @@ export default function TravelPlanner() {
       />
 
       {/* Document Dialog */}
-      {showDocs && <DocumentDialog onClose={() => setShowDocs(false)} />}
+      {showDocs && <DocumentDialog onClose={() => setShowDocs(false)} tripId={isLegacy ? null : tripId} isLegacy={isLegacy} />}
 
       {/* Shopping Guide Dialog */}
       {showGuide && <ShoppingGuideDialog onClose={() => setShowGuide(false)} />}
@@ -901,6 +901,7 @@ export default function TravelPlanner() {
           onDelete={editTarget.item?._custom ? handleDeleteItem : null}
           onClose={() => setEditTarget(null)}
           color="var(--color-primary)"
+          tripId={isLegacy ? null : tripId}
         />
       )}
 

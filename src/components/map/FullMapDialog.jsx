@@ -71,7 +71,7 @@ export default function FullMapDialog({ days, onClose }) {
         if (loc) {
           const coordKey = loc.coords[0] + "," + loc.coords[1];
           if (coordKey !== lastCoordKey) {
-            const hasDetail = item.detail && (item.detail.image || item.detail.tip || item.detail.address || item.detail.timetable);
+            const hasDetail = item.detail && (item.detail.image || item.detail.images?.length || item.detail.tip || item.detail.address || item.detail.timetable);
             dayPins.push({
               coords: loc.coords,
               label: loc.label,

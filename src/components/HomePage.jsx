@@ -20,7 +20,7 @@ const cardStyle = {
 };
 
 /* ── Trip Card Component ── */
-function TripCard({ title, subtitle, destinations, coverColor, badge, memberCount, onClick, onMore }) {
+function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge, memberCount, onClick, onMore }) {
   return (
     <div style={{ position: 'relative', marginBottom: '16px' }}>
       <div
@@ -29,17 +29,34 @@ function TripCard({ title, subtitle, destinations, coverColor, badge, memberCoun
         onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'; }}
       >
-        {/* Cover gradient */}
+        {/* Cover: image or gradient */}
         <div style={{
           height: '88px',
-          background: coverColor || 'linear-gradient(135deg, #3A7DB5, #5BAEE6)',
+          background: coverImage ? 'none' : (coverColor || 'linear-gradient(135deg, #3A7DB5, #5BAEE6)'),
           position: 'relative', padding: '0 16px',
           display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-          paddingBottom: '12px',
+          paddingBottom: '12px', overflow: 'hidden',
         }}>
+          {coverImage && (
+            <>
+              <img
+                src={coverImage}
+                alt=""
+                style={{
+                  position: 'absolute', inset: 0, width: '100%', height: '100%',
+                  objectFit: 'cover',
+                }}
+              />
+              {/* Gradient overlay for chip readability */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.05) 60%)',
+              }} />
+            </>
+          )}
           {/* Destination chips */}
           {destinations?.length > 0 && (
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
               {destinations.map((d, i) => (
                 <span key={i} style={{
                   padding: '3px 10px', borderRadius: '100px',
@@ -164,7 +181,7 @@ export default function HomePage() {
   /* ── Create trip ── */
   const handleCreate = useCallback(async (data) => {
     try {
-      const newTrip = await createTrip(data);
+      const newTrip = await createTrip({ ...data, coverImage: data.coverImage });
       setShowCreate(false);
       setToast({ message: `"${newTrip.name}" 여행이 생성되었습니다`, icon: 'check' });
       await fetchTrips();
@@ -183,6 +200,7 @@ export default function HomePage() {
         destinations: data.destinations,
         start_date: data.startDate || null,
         end_date: data.endDate || data.startDate || null,
+        cover_image: data.coverImage || '',
       });
       setEditTrip(null);
       setToast({ message: '여행이 수정되었습니다', icon: 'check' });
@@ -418,6 +436,7 @@ export default function HomePage() {
                 subtitle={formatDateRange(trip)}
                 destinations={trip.destinations}
                 coverColor={trip.coverColor}
+                coverImage={trip.coverImage}
                 memberCount={trip.members?.length || 0}
                 onClick={() => handleOpenTrip(trip)}
                 onMore={() => setMoreMenu({ trip })}
