@@ -76,6 +76,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   /* ── File import (bulk) state ── */
   const fileInputRef = useRef(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiStatusMsg, setAiStatusMsg] = useState(""); // real-time status from retry
   const [importPreview, setImportPreview] = useState(null);
   const [fileError, setFileError] = useState("");
 
@@ -102,8 +103,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     }));
 
     const dayContext = currentDay?.label || "";
-    const { message, items, error } = await getAIRecommendation(msg, history, dayContext);
+    const { message, items, error } = await getAIRecommendation(msg, history, dayContext, {
+      onStatus: (s) => setAiStatusMsg(s),
+    });
     setChatLoading(false);
+    setAiStatusMsg("");
 
     if (error) {
       setChatMessages((prev) => [...prev, { role: "ai", text: `오류가 발생했습니다: ${error}` }]);
@@ -138,8 +142,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       }
 
       setAiLoading(true);
-      const { items, error } = await analyzeScheduleWithAI(content, currentDay?.label || "");
+      setAiStatusMsg("AI가 문서를 분석 중입니다...");
+      const { items, error } = await analyzeScheduleWithAI(content, currentDay?.label || "", {
+        onStatus: (msg) => setAiStatusMsg(msg),
+      });
       setAiLoading(false);
+      setAiStatusMsg("");
 
       if (error) {
         setFileError(`AI 분석 실패: ${error}`);
@@ -406,8 +414,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                         }} />
                       ))}
                     </div>
-                    <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
-                      추천 일정을 만들고 있어요...
+                    <span style={{
+                      fontSize: "var(--typo-caption-2-regular-size)",
+                      color: aiStatusMsg.includes("재시도") ? "var(--color-warning, #E67E22)" : "var(--color-on-surface-variant2)",
+                      fontWeight: aiStatusMsg.includes("재시도") ? 600 : 400,
+                    }}>
+                      {aiStatusMsg || "추천 일정을 만들고 있어요..."}
                     </span>
                   </div>
                 </div>
@@ -484,11 +496,17 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                   <Icon name="flash" size={24} style={{ color: "var(--color-primary)" }} />
                 </div>
                 <p style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
-                  AI가 문서를 분석 중입니다
+                  {aiStatusMsg.includes("재시도") ? "잠시만 기다려주세요" : "AI가 문서를 분석 중입니다"}
                 </p>
-                <p style={{ margin: "8px 0 0", fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant2)" }}>
-                  일정 항목을 자동으로 추출하고 있습니다...
+                <p style={{
+                  margin: "8px 0 0",
+                  fontSize: "var(--typo-caption-1-regular-size)",
+                  color: aiStatusMsg.includes("재시도") ? "var(--color-warning, #E67E22)" : "var(--color-on-surface-variant2)",
+                  fontWeight: aiStatusMsg.includes("재시도") ? 600 : 400,
+                }}>
+                  {aiStatusMsg || "일정 항목을 자동으로 추출하고 있습니다..."}
                 </p>
+                <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
               </div>
             ) : (
               <>

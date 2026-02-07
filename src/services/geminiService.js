@@ -4,7 +4,7 @@
  */
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
 /** Convert raw API error to user-friendly Korean message */
 function friendlyError(rawMsg, status) {
@@ -56,10 +56,18 @@ async function fetchWithRetry(body, { maxRetries = 2, onStatus } = {}) {
       return { ok: false, status: response.status, _errMsg: friendlyError(rawMsg, response.status) };
     }
 
-    // Rate limit — wait and retry
+    // Rate limit — wait and retry with countdown
     const waitSec = retrySec + 2; // add small buffer
-    if (onStatus) onStatus(`요청 한도 초과 — ${waitSec}초 대기 후 자동 재시도...`);
-    await sleep(waitSec * 1000);
+    if (onStatus) {
+      // Countdown tick every second
+      for (let remaining = waitSec; remaining > 0; remaining--) {
+        onStatus(`요청 한도 초과 — ${remaining}초 후 자동 재시도 (${attempt + 1}/${maxRetries})`);
+        await sleep(1000);
+      }
+      onStatus("재시도 중...");
+    } else {
+      await sleep(waitSec * 1000);
+    }
   }
 }
 
@@ -104,7 +112,7 @@ const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
  * @param {string} [context] - optional context (e.g. "Day 3 아소산 당일치기")
  * @returns {Promise<{ items: Array, error: string|null }>}
  */
-export async function analyzeScheduleWithAI(content, context = "") {
+export async function analyzeScheduleWithAI(content, context = "", { onStatus } = {}) {
   if (!API_KEY) {
     return { items: [], error: "Gemini API 키가 설정되지 않았습니다" };
   }
@@ -120,7 +128,7 @@ export async function analyzeScheduleWithAI(content, context = "") {
       generationConfig: { temperature: 0.2, maxOutputTokens: 4096, responseMimeType: "application/json" },
     };
 
-    const response = await fetchWithRetry(reqBody);
+    const response = await fetchWithRetry(reqBody, { onStatus });
     if (response._errMsg) return { items: [], error: response._errMsg };
 
     const data = await response.json();
@@ -225,7 +233,7 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
  * @param {string} [dayContext] - e.g. "Day 2 오사카"
  * @returns {Promise<{ message: string, items: Array, error: string|null }>}
  */
-export async function getAIRecommendation(userMessage, chatHistory = [], dayContext = "") {
+export async function getAIRecommendation(userMessage, chatHistory = [], dayContext = "", { onStatus } = {}) {
   if (!API_KEY) {
     return { message: "", items: [], error: "Gemini API 키가 설정되지 않았습니다" };
   }
@@ -255,7 +263,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
       generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: "application/json" },
     };
 
-    const response = await fetchWithRetry(reqBody);
+    const response = await fetchWithRetry(reqBody, { onStatus });
     if (response._errMsg) return { message: "", items: [], error: response._errMsg };
 
     const data = await response.json();
@@ -376,7 +384,7 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
  * @param {string} params.preferences - user's natural language preferences
  * @returns {Promise<{ days: Array, error: string|null }>}
  */
-export async function generateFullTripSchedule({ destinations, duration, startDate, preferences }) {
+export async function generateFullTripSchedule({ destinations, duration, startDate, preferences, onStatus }) {
   if (!API_KEY) {
     return { days: [], error: "Gemini API 키가 설정되지 않았습니다" };
   }
@@ -396,7 +404,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
       generationConfig: { temperature: 0.7, maxOutputTokens: 8192, responseMimeType: "application/json" },
     };
 
-    const response = await fetchWithRetry(reqBody);
+    const response = await fetchWithRetry(reqBody, { onStatus });
     if (response._errMsg) return { days: [], error: response._errMsg };
 
     const data = await response.json();
