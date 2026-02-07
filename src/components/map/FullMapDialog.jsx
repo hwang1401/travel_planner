@@ -66,7 +66,7 @@ export default function FullMapDialog({ days, onClose }) {
     let orderNum = 1;
     let lastCoordKey = null;
     day.sections.forEach((sec) => {
-      sec.items.forEach((item) => {
+      (sec.items || []).filter(Boolean).forEach((item) => {
         const loc = getItemCoords(item, selectedDay);
         if (loc) {
           const coordKey = loc.coords[0] + "," + loc.coords[1];
@@ -116,7 +116,7 @@ export default function FullMapDialog({ days, onClose }) {
   if (day) {
     let lastCoordKey = null;
     day.sections.forEach((sec) => {
-      sec.items.forEach((item) => {
+      (sec.items || []).filter(Boolean).forEach((item) => {
         const loc = getItemCoords(item, selectedDay);
         let pinOrder = null;
         let coords = null;

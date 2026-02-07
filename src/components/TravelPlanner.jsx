@@ -915,7 +915,7 @@ export default function TravelPlanner() {
                     </span>
                   </div>
                 ) : (
-                  section.items.map((item, ii) => {
+                  section.items.filter(Boolean).map((item, ii) => {
                     const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
                     const isLast = ii === section.items.length - 1;
                     const hasDetail = !!item.detail && !!(item.detail.image || item.detail.images?.length || item.detail.tip || item.detail.address || item.detail.timetable);

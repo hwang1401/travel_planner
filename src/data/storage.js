@@ -22,8 +22,9 @@ function applyDayCustom(day, dayCustom, overrides) {
 
   const newSections = d.sections.map((sec, si) => {
     const secCustom = dayCustom.sections?.[si];
-    if (!secCustom) return sec;
-    return { ...sec, items: secCustom.items || sec.items };
+    if (!secCustom) return { ...sec, items: (sec.items || []).filter(Boolean) };
+    const items = (secCustom.items || sec.items || []).filter(Boolean);
+    return { ...sec, items };
   });
 
   // Merge extra items into existing sections by timestamp
@@ -136,7 +137,7 @@ function parseYen(str) {
 export function generateDaySummary(day) {
   if (!day || !day.sections) return "";
 
-  const allItems = day.sections.flatMap((sec) => sec.items || []);
+  const allItems = day.sections.flatMap((sec) => (sec.items || []).filter(Boolean));
   if (allItems.length === 0) return "";
 
   // 1) Count by type (only show food, spot, shop)
