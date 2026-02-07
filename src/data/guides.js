@@ -35,8 +35,8 @@ export function getGuidesForDestinations(destinations = []) {
     )
   );
 
-  // If no matches, show all guides as fallback
-  return matched.length > 0 ? matched : GUIDE_DATA;
+  // If no matches, return empty — no guide available for this destination
+  return matched;
 }
 
 /*

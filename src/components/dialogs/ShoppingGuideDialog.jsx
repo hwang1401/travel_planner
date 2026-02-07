@@ -54,7 +54,7 @@ export default function ShoppingGuideDialog({ onClose, destinations }) {
   const [regionIdx, setRegionIdx] = useState(0);
   const [chipIdx, setChipIdx] = useState(0);
   const region = guides[regionIdx];
-  const filtered = chipIdx === 0 ? region.items : region.items.filter((it) => it.chip === region.chips[chipIdx]);
+  const filtered = region ? (chipIdx === 0 ? region.items : region.items.filter((it) => it.chip === region.chips[chipIdx])) : [];
 
   return (
     <BottomSheet onClose={onClose} maxHeight="85vh" minHeight="70vh">
@@ -68,51 +68,82 @@ export default function ShoppingGuideDialog({ onClose, destinations }) {
           <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
         </div>
 
-        {/* Region Tabs */}
-        <div style={{ padding: "0 20px" }}>
-          <Tab
-            items={guides.map((r, i) => ({ label: r.region, value: i }))}
-            value={regionIdx}
-            onChange={(v) => { setRegionIdx(v); setChipIdx(0); }}
-            size="md"
-            fullWidth
-          />
-        </div>
-
-        {/* Category Chips */}
-        <div style={{ padding: "12px 20px 0" }}>
-          <Tab
-            items={region.chips.map((c, i) => ({ label: c, value: i }))}
-            value={chipIdx}
-            onChange={setChipIdx}
-            variant="pill"
-            size="sm"
-          />
-        </div>
-
-        {/* Content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px 20px" }}>
-          {filtered.map((item, i) => (
-            <GuideCard key={`${regionIdx}-${chipIdx}-${i}`} item={item} />
-          ))}
-          {filtered.length === 0 && (
+        {guides.length === 0 ? (
+          /* ── Empty: no guide for this destination ── */
+          <div style={{
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            padding: "60px 20px", textAlign: "center",
+          }}>
             <div style={{
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              padding: "48px 20px", textAlign: "center",
+              width: "56px", height: "56px", borderRadius: "50%",
+              background: "var(--color-surface-container-low)", display: "flex",
+              alignItems: "center", justifyContent: "center", marginBottom: "16px",
             }}>
-              <div style={{
-                width: "48px", height: "48px", borderRadius: "50%",
-                background: "var(--color-surface-container-low)", display: "flex",
-                alignItems: "center", justifyContent: "center", marginBottom: "12px",
-              }}>
-                <Icon name="search" size={20} style={{ opacity: 0.4 }} />
-              </div>
-              <p style={{ margin: 0, fontSize: "var(--typo-label-2-medium-size)", color: "var(--color-on-surface-variant2)" }}>
-                해당 카테고리에 항목이 없습니다
-              </p>
+              <Icon name="compass" size={24} style={{ opacity: 0.4 }} />
             </div>
-          )}
-        </div>
+            <p style={{
+              margin: 0, fontSize: "var(--typo-body-1-n---bold-size)",
+              fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)",
+            }}>
+              아직 가이드가 없습니다
+            </p>
+            <p style={{
+              margin: "8px 0 0", fontSize: "var(--typo-caption-1-regular-size)",
+              color: "var(--color-on-surface-variant2)", lineHeight: 1.5,
+            }}>
+              이 여행지에 대한 가이드는{"\n"}준비 중입니다
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Region Tabs */}
+            <div style={{ padding: "0 20px" }}>
+              <Tab
+                items={guides.map((r, i) => ({ label: r.region, value: i }))}
+                value={regionIdx}
+                onChange={(v) => { setRegionIdx(v); setChipIdx(0); }}
+                size="md"
+                fullWidth
+              />
+            </div>
+
+            {/* Category Chips */}
+            <div style={{ padding: "12px 20px 0" }}>
+              <Tab
+                items={region.chips.map((c, i) => ({ label: c, value: i }))}
+                value={chipIdx}
+                onChange={setChipIdx}
+                variant="pill"
+                size="sm"
+              />
+            </div>
+
+            {/* Content */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px 20px" }}>
+              {filtered.map((item, i) => (
+                <GuideCard key={`${regionIdx}-${chipIdx}-${i}`} item={item} />
+              ))}
+              {filtered.length === 0 && (
+                <div style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  padding: "48px 20px", textAlign: "center",
+                }}>
+                  <div style={{
+                    width: "48px", height: "48px", borderRadius: "50%",
+                    background: "var(--color-surface-container-low)", display: "flex",
+                    alignItems: "center", justifyContent: "center", marginBottom: "12px",
+                  }}>
+                    <Icon name="search" size={20} style={{ opacity: 0.4 }} />
+                  </div>
+                  <p style={{ margin: 0, fontSize: "var(--typo-label-2-medium-size)", color: "var(--color-on-surface-variant2)" }}>
+                    해당 카테고리에 항목이 없습니다
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
     </BottomSheet>
   );
 }
