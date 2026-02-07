@@ -841,7 +841,7 @@ export default function TravelPlanner() {
             )}
           </div>
         ) : (
-          current.sections.map((section, si) => (
+          current.sections.filter((sec) => sec.items && sec.items.filter(Boolean).length > 0).map((section, si) => (
             <div key={si} style={{ marginBottom: "12px" }}>
               <div style={{
                 display: "flex", alignItems: "center", gap: "8px",
@@ -862,21 +862,7 @@ export default function TravelPlanner() {
                 background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px)",
                 border: "1px solid var(--color-outline-variant)", overflow: "hidden",
               }}>
-                {section.items.length === 0 ? (
-                  <div style={{
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    padding: "24px 16px", gap: "8px",
-                  }}>
-                    <Icon name="plus" size={14} style={{ opacity: 0.3 }} />
-                    <span style={{
-                      fontSize: "var(--typo-caption-1-regular-size)",
-                      fontWeight: "var(--typo-caption-1-regular-weight)",
-                      color: "var(--color-on-surface-variant2)",
-                    }}>
-                      일정이 비어있습니다
-                    </span>
-                  </div>
-                ) : (
+                {(
                   section.items.filter(Boolean).map((item, ii) => {
                     const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
                     const isLast = ii === section.items.length - 1;
