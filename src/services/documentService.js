@@ -26,12 +26,13 @@ export async function loadDocuments(tripId) {
 /**
  * Create a new document.
  */
-export async function createDocument(tripId, { title, caption = '', imageUrl = '' }) {
+export async function createDocument(tripId, { title, category = '기타', caption = '', imageUrl = '' }) {
   const { data, error } = await supabase
     .from('trip_documents')
     .insert({
       trip_id: tripId,
       title,
+      category,
       caption,
       image_url: imageUrl,
     })
@@ -52,6 +53,7 @@ export async function createDocument(tripId, { title, caption = '', imageUrl = '
 export async function updateDocument(docId, updates) {
   const payload = {};
   if (updates.title !== undefined) payload.title = updates.title;
+  if (updates.category !== undefined) payload.category = updates.category;
   if (updates.caption !== undefined) payload.caption = updates.caption;
   if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl;
 
@@ -92,6 +94,7 @@ function formatDocument(raw) {
     id: raw.id,
     tripId: raw.trip_id,
     title: raw.title,
+    category: raw.category || '기타',
     caption: raw.caption || '',
     imageUrl: raw.image_url || '',
     createdAt: raw.created_at,
