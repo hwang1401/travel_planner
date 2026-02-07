@@ -34,6 +34,25 @@ function getRetrySeconds(rawMsg) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Extract text from Gemini response.
+ * Gemini 2.5 Flash may include "thought" parts — skip those and find the actual text.
+ */
+function extractText(data) {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!parts || parts.length === 0) return null;
+
+  // Find the first part with text (skip thought parts)
+  for (const part of parts) {
+    if (part.text !== undefined && part.text !== null) {
+      return part.text;
+    }
+  }
+
+  // Fallback: try last part
+  return parts[parts.length - 1]?.text || null;
+}
+
+/**
  * Fetch with auto-retry on rate limit (up to 2 retries).
  * onStatus callback for UI updates (e.g. "30초 대기 중...")
  */
@@ -132,7 +151,7 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus } 
     if (response._errMsg) return { items: [], error: response._errMsg };
 
     const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = extractText(data);
 
     if (!text) {
       return { items: [], error: "AI 응답이 비어있습니다" };
@@ -146,8 +165,10 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus } 
       // Try to extract JSON array from response
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
+        try { parsed = JSON.parse(jsonMatch[0]); } catch { /* fall through */ }
+      }
+      if (!parsed) {
+        console.error("[GeminiService] Failed to parse:", text.substring(0, 200));
         return { items: [], error: "AI 응답을 파싱할 수 없습니다" };
       }
     }
@@ -267,7 +288,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
     if (response._errMsg) return { message: "", items: [], error: response._errMsg };
 
     const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = extractText(data);
 
     if (!text) {
       return { message: "", items: [], error: "AI 응답이 비어있습니다" };
@@ -279,8 +300,9 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
     } catch {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
+        try { parsed = JSON.parse(jsonMatch[0]); } catch { /* fall through */ }
+      }
+      if (!parsed) {
         return { message: text, items: [], error: null };
       }
     }
@@ -408,7 +430,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
     if (response._errMsg) return { days: [], error: response._errMsg };
 
     const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = extractText(data);
 
     if (!text) {
       return { days: [], error: "AI 응답이 비어있습니다" };
@@ -420,8 +442,10 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
     } catch {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
+        try { parsed = JSON.parse(jsonMatch[0]); } catch { /* fall through */ }
+      }
+      if (!parsed) {
+        console.error("[GeminiService] Trip gen parse fail:", text.substring(0, 200));
         return { days: [], error: "AI 응답을 파싱할 수 없습니다" };
       }
     }
