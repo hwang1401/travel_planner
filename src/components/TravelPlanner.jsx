@@ -248,7 +248,11 @@ export default function TravelPlanner() {
         icon: icon || "pin",
         stay: "",
         booked: false,
-        sections: [{ title: "종일", items: [] }],
+        sections: [
+          { title: "오전", items: [] },
+          { title: "오후", items: [] },
+          { title: "저녁", items: [] },
+        ],
         notes: "",
         _custom: true,
       };

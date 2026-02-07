@@ -30,48 +30,102 @@ function applyDayCustom(day, dayCustom, overrides) {
   // Merge extra items into existing sections by timestamp
   if (dayCustom.extraItems && dayCustom.extraItems.length > 0) {
     const extras = [...dayCustom.extraItems];
+
+    // Auto-expand single "종일" section into 오전/오후/저녁 when importing multiple items
+    if (newSections.length === 1 && (!newSections[0].items || newSections[0].items.length === 0) && extras.length > 1) {
+      const title = newSections[0].title || "";
+      if (title === "종일" || title === "일정") {
+        newSections.splice(0, 1,
+          { title: "오전", items: [] },
+          { title: "오후", items: [] },
+          { title: "저녁", items: [] },
+        );
+      }
+    }
+
+    // Check if ALL sections are empty — use time-based assignment
+    const allEmpty = newSections.every((s) => !s.items || s.items.length === 0);
+
     extras.forEach((extraItem) => {
       const extraMin = timeToMin(extraItem.time);
       let bestSec = -1;
       let bestPos = -1;
 
-      // Find the best section and position for this item
-      for (let si = 0; si < newSections.length; si++) {
-        const items = newSections[si].items;
-        if (!items || items.length === 0) continue;
-
-        const firstMin = timeToMin(items[0]?.time);
-        const lastMin = timeToMin(items[items.length - 1]?.time);
-
-        if (extraMin >= firstMin && extraMin <= lastMin + 30) {
-          let pos = items.length;
+      if (allEmpty && newSections.length > 1) {
+        // Time-based section assignment by title keywords
+        const SECTION_RANGES = {
+          "오전": [0, 720],       // 00:00 – 11:59
+          "오후": [720, 1080],    // 12:00 – 17:59
+          "저녁": [1080, 1440],   // 18:00 – 23:59
+        };
+        for (let si = 0; si < newSections.length; si++) {
+          const title = newSections[si].title || "";
+          const range = SECTION_RANGES[title];
+          if (range && extraMin >= range[0] && extraMin < range[1]) {
+            bestSec = si;
+            break;
+          }
+        }
+        // If no title match, infer by position (first=morning, mid=afternoon, last=evening)
+        if (bestSec === -1) {
+          if (newSections.length === 3) {
+            if (extraMin < 720) bestSec = 0;
+            else if (extraMin < 1080) bestSec = 1;
+            else bestSec = 2;
+          } else if (newSections.length === 2) {
+            bestSec = extraMin < 720 ? 0 : 1;
+          }
+        }
+        if (bestSec >= 0) {
+          // Insert in time order within the section
+          const items = newSections[bestSec].items || [];
+          bestPos = items.length;
           for (let ii = 0; ii < items.length; ii++) {
             if (timeToMin(items[ii].time) > extraMin) {
-              pos = ii;
+              bestPos = ii;
               break;
             }
           }
-          bestSec = si;
-          bestPos = pos;
-          break;
         }
-
-        if (si === 0 && extraMin < firstMin) {
-          bestSec = 0;
-          bestPos = 0;
-          break;
-        }
-      }
-
-      if (bestSec === -1) {
-        for (let si = newSections.length - 1; si >= 0; si--) {
+      } else {
+        // Find the best section and position by comparing with existing items
+        for (let si = 0; si < newSections.length; si++) {
           const items = newSections[si].items;
           if (!items || items.length === 0) continue;
+
+          const firstMin = timeToMin(items[0]?.time);
           const lastMin = timeToMin(items[items.length - 1]?.time);
-          if (lastMin <= extraMin) {
+
+          if (extraMin >= firstMin && extraMin <= lastMin + 30) {
+            let pos = items.length;
+            for (let ii = 0; ii < items.length; ii++) {
+              if (timeToMin(items[ii].time) > extraMin) {
+                pos = ii;
+                break;
+              }
+            }
             bestSec = si;
-            bestPos = items.length;
+            bestPos = pos;
             break;
+          }
+
+          if (si === 0 && extraMin < firstMin) {
+            bestSec = 0;
+            bestPos = 0;
+            break;
+          }
+        }
+
+        if (bestSec === -1) {
+          for (let si = newSections.length - 1; si >= 0; si--) {
+            const items = newSections[si].items;
+            if (!items || items.length === 0) continue;
+            const lastMin = timeToMin(items[items.length - 1]?.time);
+            if (lastMin <= extraMin) {
+              bestSec = si;
+              bestPos = items.length;
+              break;
+            }
           }
         }
       }
