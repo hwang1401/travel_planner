@@ -1,6 +1,6 @@
 {
-  "name": "TravelUnu",
-  "short_name": "TravelUnu",
+  "name": "Travelunu",
+  "short_name": "Travelunu",
   "description": "함께 만드는 여행 일정",
   "start_url": "/",
   "display": "standalone",

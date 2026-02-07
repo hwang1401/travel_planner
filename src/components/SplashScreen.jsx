@@ -21,7 +21,7 @@ export default function SplashScreen() {
       {/* Logo */}
       <img
         src="/icons/logo-splash.png"
-        alt="TravelUnu"
+        alt="Travelunu"
         style={{
           width: '80px',
           height: 'auto',
@@ -41,7 +41,7 @@ export default function SplashScreen() {
         letterSpacing: '-0.5px',
         animation: 'fadeIn 0.6s ease 0.15s both',
       }}>
-        TravelUnu
+        Travelunu
       </h1>
 
       <p style={{

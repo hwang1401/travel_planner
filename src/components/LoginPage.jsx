@@ -32,7 +32,7 @@ export default function LoginPage() {
         {/* Logo */}
         <img
           src="/icons/logo-splash.png"
-          alt="TravelUnu"
+          alt="Travelunu"
           style={{
             width: '80px',
             height: 'auto',
@@ -48,7 +48,7 @@ export default function LoginPage() {
           color: 'var(--color-on-surface)',
           textAlign: 'center',
         }}>
-          TravelUnu
+          Travelunu
         </h1>
 
         <p style={{
