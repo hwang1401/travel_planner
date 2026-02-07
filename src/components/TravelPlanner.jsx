@@ -5,7 +5,7 @@ import { usePresence } from "../hooks/usePresence";
 
 /* Data imports */
 import { BASE_DAYS } from "../data/days";
-import { loadCustomData, mergeData } from "../data/storage";
+import { loadCustomData, mergeData, generateDaySummary } from "../data/storage";
 import { TYPE_CONFIG } from "../data/guides";
 
 /* Service imports */
@@ -858,17 +858,20 @@ export default function TravelPlanner() {
           ))
         )}
 
-        {/* Notes */}
-        {current.notes && (
-          <div style={{
-            marginTop: "4px", padding: "11px 14px",
-            background: "var(--color-surface-container-low)", borderRadius: "var(--radius-md, 8px)", border: "1px dashed var(--color-outline-variant)",
-          }}>
-            <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", fontWeight: "var(--typo-caption-2-regular-weight)", color: "var(--color-on-surface-variant2)", lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: "6px" }}>
-              <Icon name="pin" size={12} style={{ marginTop: "2px" }} /><span>{current.notes}</span>
-            </p>
-          </div>
-        )}
+        {/* Auto-generated day summary */}
+        {(() => {
+          const summary = generateDaySummary(current);
+          return summary ? (
+            <div style={{
+              marginTop: "4px", padding: "11px 14px",
+              background: "var(--color-surface-container-low)", borderRadius: "var(--radius-md, 8px)", border: "1px dashed var(--color-outline-variant)",
+            }}>
+              <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", fontWeight: "var(--typo-caption-2-regular-weight)", color: "var(--color-on-surface-variant2)", lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                <Icon name="pin" size={12} style={{ marginTop: "2px" }} /><span>{summary}</span>
+              </p>
+            </div>
+          ) : null;
+        })()}
       </div>
 
       {/* Detail Dialog */}

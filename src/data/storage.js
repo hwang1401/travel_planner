@@ -125,3 +125,77 @@ export function mergeData(base, custom) {
   }
   return merged;
 }
+
+/* ── Helper: extract yen amount from a string ── */
+function parseYen(str) {
+  if (!str) return 0;
+  // Remove commas, then find patterns like "1,000엔", "~500엔", "1,500~2,500엔"
+  const cleaned = str.replace(/,/g, "");
+  // Match range: "1500~2500엔" → take lower bound
+  const range = cleaned.match(/(\d+)\s*[~～]\s*(\d+)\s*엔/);
+  if (range) return parseInt(range[1], 10);
+  // Match single: "800엔", "~1000엔"
+  const single = cleaned.match(/~?\s*(\d+)\s*엔/);
+  if (single) return parseInt(single[1], 10);
+  return 0;
+}
+
+/**
+ * Auto-generate a day summary from its items.
+ * Returns a string like "식사 2 · 관광 1 | 교통 ~700엔 · 식비 ~2,200엔"
+ */
+export function generateDaySummary(day) {
+  if (!day || !day.sections) return "";
+
+  const allItems = day.sections.flatMap((sec) => sec.items || []);
+  if (allItems.length === 0) return "";
+
+  // 1) Count by type (only show food, spot, shop)
+  const typeLabels = { food: "식사", spot: "관광", shop: "쇼핑" };
+  const counts = {};
+  allItems.forEach((item) => {
+    if (typeLabels[item.type]) {
+      counts[item.type] = (counts[item.type] || 0) + 1;
+    }
+  });
+
+  const countParts = Object.entries(counts)
+    .map(([type, count]) => `${typeLabels[type]} ${count}`)
+    .filter(Boolean);
+
+  // 2) Parse costs by category
+  const costCategories = { food: 0, move: 0, other: 0 }; // food→식비, move→교통, spot/shop→기타
+
+  allItems.forEach((item) => {
+    let cost = 0;
+    // Try detail.price first
+    if (item.detail?.price) {
+      cost = parseYen(item.detail.price);
+    }
+    // Also check sub for transport costs (e.g. "170엔", "310엔")
+    if (item.sub) {
+      const subCost = parseYen(item.sub);
+      if (subCost > 0 && cost === 0) cost = subCost;
+      // For move type, sub often has the cost
+      if (item.type === "move" && subCost > 0) cost = subCost;
+    }
+
+    if (cost > 0) {
+      if (item.type === "food") costCategories.food += cost;
+      else if (item.type === "move") costCategories.move += cost;
+      else costCategories.other += cost;
+    }
+  });
+
+  const costParts = [];
+  if (costCategories.move > 0) costParts.push(`교통 ~${costCategories.move.toLocaleString()}엔`);
+  if (costCategories.food > 0) costParts.push(`식비 ~${costCategories.food.toLocaleString()}엔`);
+  if (costCategories.other > 0) costParts.push(`입장/쇼핑 ~${costCategories.other.toLocaleString()}엔`);
+
+  // 3) Build summary
+  const parts = [];
+  if (countParts.length > 0) parts.push(countParts.join(" · "));
+  if (costParts.length > 0) parts.push(costParts.join(" · "));
+
+  return parts.join(" | ");
+}
