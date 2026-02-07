@@ -127,10 +127,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
         <h3 style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
           여행 서류
         </h3>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <Button variant="ghost-primary" size="sm" iconOnly="plus" onClick={() => setShowForm('add')} />
-          <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
-        </div>
+        <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
       </div>
 
       {/* Loading */}
@@ -162,7 +159,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
       {/* Document tabs */}
       {!loading && docs.length > 0 && (
         <>
-          <div style={{ display: "flex", gap: "6px", padding: "14px 20px 0", overflowX: 'auto', flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: "6px", padding: "14px 20px 0", overflowX: 'auto', flexShrink: 0, alignItems: 'center' }}>
             {docs.map((doc) => (
               <Button key={doc.id}
                 variant={selectedDoc?.id === doc.id ? "primary" : "neutral"}
@@ -173,12 +170,16 @@ function DynamicDocumentDialog({ onClose, tripId }) {
                 {doc.title}
               </Button>
             ))}
+            <Button variant="ghost-primary" size="md" iconOnly="plus"
+              onClick={() => setShowForm('add')}
+              style={{ flexShrink: 0 }}
+            />
           </div>
 
           {selectedDoc && (
             <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px 20px" }}>
               {/* Category badge + caption */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <span style={{
                   padding: '3px 10px', borderRadius: '100px',
                   background: 'var(--color-primary-container)',
@@ -193,7 +194,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
               </div>
 
               {selectedDoc.caption && (
-                <p style={{ margin: "0 0 12px", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "var(--typo-caption-2-regular-line-height)", textAlign: "center" }}>
+                <p style={{ margin: "0 0 12px", fontSize: "var(--typo-label-2-medium-size)", fontWeight: "var(--typo-label-2-medium-weight)", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>
                   {selectedDoc.caption}
                 </p>
               )}
