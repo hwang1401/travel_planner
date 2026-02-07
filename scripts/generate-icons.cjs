@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 
 const LOGO_SRC = path.join(__dirname, "..", "public", "icons", "logo-original.png");
+const SPLASH_LOGO_SRC = path.join(__dirname, "..", "public", "icons", "logo-splash.png");
 const OUT_DIR = path.join(__dirname, "..", "public", "icons");
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 
@@ -102,11 +103,23 @@ async function generate() {
     .toFile(path.join(OUT_DIR, "apple-touch-icon.png"));
   console.log("Created: apple-touch-icon.png");
 
-  // ── iOS Splash Screens ──
+  // ── iOS Splash Screens (using high-res splash logo) ──
+  const splashMeta = await sharp(SPLASH_LOGO_SRC).metadata();
+  console.log(`Splash logo: ${splashMeta.width}x${splashMeta.height}`);
+
   for (const screen of SPLASH_SCREENS) {
-    // Logo occupies about 80px in CSS → scale by DPR (inferred from dimensions)
-    const logoDisplaySize = Math.round(Math.min(screen.w, screen.h) * 0.12);
-    const logo = await generateLogo(logoDisplaySize);
+    // Logo height = ~18% of screen height for balanced look
+    const logoH = Math.round(screen.h * 0.18);
+    const logoW = Math.round(logoH * (splashMeta.width / splashMeta.height));
+
+    const logo = await sharp(SPLASH_LOGO_SRC)
+      .resize(logoW, logoH, {
+        fit: "contain",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+        kernel: "lanczos3",
+      })
+      .png()
+      .toBuffer();
 
     const bg = Buffer.from(
       `<svg width="${screen.w}" height="${screen.h}">

@@ -221,79 +221,71 @@ function ConfirmDialog({ title, message, confirmLabel, confirmColor, onConfirm, 
   );
 }
 
-/* ── Add Day Dialog ── */
+/* ── Add Day Dialog (Bottom Sheet) ── */
 function AddDayDialog({ onAdd, onCancel }) {
   const [label, setLabel] = useState("");
   const [icon, setIcon] = useState("pin");
   const icons = ["pin", "navigation", "car", "compass", "shopping", "flag", "home", "fire", "star", "bookmark"];
 
   return (
-    <div onClick={onCancel} style={{
-      position: "fixed", inset: 0, zIndex: 3000,
-      background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: "24px", animation: "fadeIn 0.15s ease",
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        width: "100%", maxWidth: "340px", background: "#fff",
-        borderRadius: "18px", overflow: "hidden",
-        animation: "slideUp 0.2s ease",
-        boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
-      }}>
-        <div style={{ padding: "20px 24px 16px" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}><Icon name="calendar" size={16} />날짜 추가</h3>
-          <div style={{ marginBottom: "14px" }}>
-            <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#888" }}>아이콘</p>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {icons.map((ic) => (
-                <button key={ic} onClick={() => setIcon(ic)} style={{
-                  width: "36px", height: "36px", borderRadius: "10px",
-                  border: icon === ic ? "2px solid #1a1a1a" : "1px solid #E8E6E1",
-                  background: icon === ic ? "#F5F5F0" : "#FAFAF8",
-                  cursor: "pointer", display: "flex",
-                  alignItems: "center", justifyContent: "center",
-                  transition: "all 0.1s",
-                }}><Icon name={ic} size={18} /></button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#888" }}>날짜 이름 *</p>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && label.trim()) onAdd(label.trim(), icon); }}
-              placeholder="예: 후쿠오카 자유시간"
-              autoFocus
-              style={{
-                width: "100%", padding: "10px 12px",
-                border: "1px solid #E0DFDC", borderRadius: "10px",
-                fontSize: "13px", fontFamily: "inherit",
-                background: "#FAFAF8", outline: "none", boxSizing: "border-box",
-              }}
-            />
+    <BottomSheet onClose={onCancel} maxHeight="auto" zIndex={3000}>
+      <div style={{ padding: "8px 24px 24px" }}>
+        <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}>
+          <Icon name="calendar" size={16} />날짜 추가
+        </h3>
+        <div style={{ marginBottom: "16px" }}>
+          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "#888" }}>아이콘</p>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            {icons.map((ic) => (
+              <button key={ic} onClick={() => setIcon(ic)} style={{
+                width: "40px", height: "40px", borderRadius: "12px",
+                border: icon === ic ? "2px solid #1a1a1a" : "1px solid #E8E6E1",
+                background: icon === ic ? "#F5F5F0" : "#FAFAF8",
+                cursor: "pointer", display: "flex",
+                alignItems: "center", justifyContent: "center",
+                transition: "all 0.1s",
+              }}><Icon name={ic} size={18} /></button>
+            ))}
           </div>
         </div>
-        <div style={{ display: "flex", borderTop: "1px solid #EEECE6" }}>
+        <div style={{ marginBottom: "20px" }}>
+          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "#888" }}>날짜 이름 *</p>
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && label.trim()) onAdd(label.trim(), icon); }}
+            placeholder="예: 후쿠오카 자유시간"
+            style={{
+              width: "100%", padding: "12px 14px",
+              border: "1.5px solid #E8E6E1", borderRadius: "12px",
+              fontSize: "14px", fontFamily: "inherit", fontWeight: 500,
+              background: "#FAFAF8", outline: "none", boxSizing: "border-box",
+              transition: "border-color 0.15s",
+            }}
+            onFocus={(e) => { e.target.style.borderColor = "#1a1a1a"; }}
+            onBlur={(e) => { e.target.style.borderColor = "#E8E6E1"; }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: "10px" }}>
           <button onClick={onCancel} style={{
-            flex: 1, padding: "14px", border: "none", background: "none",
-            fontSize: "14px", fontWeight: 500, color: "#888",
+            flex: 1, padding: "14px", border: "1px solid #E8E6E1", background: "#fff",
+            borderRadius: "12px", fontSize: "14px", fontWeight: 600, color: "#888",
             cursor: "pointer", fontFamily: "inherit",
-            borderRight: "1px solid #EEECE6",
           }}>취소</button>
           <button
             onClick={() => { if (label.trim()) onAdd(label.trim(), icon); }}
             style={{
-              flex: 1, padding: "14px", border: "none", background: "none",
-              fontSize: "14px", fontWeight: 700,
-              color: label.trim() ? "#1a1a1a" : "#ccc",
+              flex: 1, padding: "14px", border: "none",
+              borderRadius: "12px", fontSize: "14px", fontWeight: 700,
+              background: label.trim() ? "#1a1a1a" : "#E8E6E1",
+              color: label.trim() ? "#fff" : "#bbb",
               cursor: label.trim() ? "pointer" : "default",
-              fontFamily: "inherit",
+              fontFamily: "inherit", transition: "all 0.15s",
             }}
           >추가</button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -3280,65 +3272,53 @@ export default function TravelPlanner() {
         />
       )}
 
-      {/* Edit Day Name Dialog */}
+      {/* Edit Day Name Dialog (Bottom Sheet) */}
       {editingDayIdx !== null && (
-        <div onClick={() => setEditingDayIdx(null)} style={{
-          position: "fixed", inset: 0, zIndex: 3000,
-          background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "24px", animation: "fadeIn 0.15s ease",
-        }}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            width: "100%", maxWidth: "320px", background: "#fff",
-            borderRadius: "18px", overflow: "hidden",
-            animation: "slideUp 0.2s ease",
-            boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
-          }}>
-            <div style={{ padding: "24px 24px 20px" }}>
-              <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 800, color: "#1a1a1a", display: "flex", alignItems: "center", gap: "6px" }}>
-                <Icon name="edit" size={16} />이름 수정
-              </h3>
-              <input
-                value={editDayLabel}
-                onChange={(e) => setEditDayLabel(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && editDayLabel.trim()) { handleEditDayLabel(editingDayIdx, editDayLabel); }
-                  if (e.key === "Escape") setEditingDayIdx(null);
-                }}
-                autoFocus
-                placeholder="이름을 입력하세요"
-                style={{
-                  width: "100%", padding: "12px 14px",
-                  border: "1.5px solid #E8E6E1", borderRadius: "12px",
-                  fontSize: "14px", fontWeight: 600,
-                  fontFamily: "inherit", outline: "none",
-                  background: "#FAFAF8", boxSizing: "border-box",
-                  transition: "border-color 0.15s",
-                }}
-                onFocus={(e) => { e.target.style.borderColor = DAYS[editingDayIdx]?.color || "#8b7bff"; }}
-                onBlur={(e) => { e.target.style.borderColor = "#E8E6E1"; }}
-              />
-            </div>
-            <div style={{ display: "flex", borderTop: "1px solid #EEECE6" }}>
+        <BottomSheet onClose={() => setEditingDayIdx(null)} maxHeight="auto" zIndex={3000}>
+          <div style={{ padding: "8px 24px 24px" }}>
+            <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: 800, color: "#1a1a1a", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Icon name="edit" size={16} />이름 수정
+            </h3>
+            <input
+              value={editDayLabel}
+              onChange={(e) => setEditDayLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && editDayLabel.trim()) { handleEditDayLabel(editingDayIdx, editDayLabel); }
+                if (e.key === "Escape") setEditingDayIdx(null);
+              }}
+              placeholder="이름을 입력하세요"
+              style={{
+                width: "100%", padding: "12px 14px",
+                border: "1.5px solid #E8E6E1", borderRadius: "12px",
+                fontSize: "14px", fontWeight: 600,
+                fontFamily: "inherit", outline: "none",
+                background: "#FAFAF8", boxSizing: "border-box",
+                transition: "border-color 0.15s",
+                marginBottom: "20px",
+              }}
+              onFocus={(e) => { e.target.style.borderColor = DAYS[editingDayIdx]?.color || "#8b7bff"; }}
+              onBlur={(e) => { e.target.style.borderColor = "#E8E6E1"; }}
+            />
+            <div style={{ display: "flex", gap: "10px" }}>
               <button onClick={() => setEditingDayIdx(null)} style={{
-                flex: 1, padding: "14px", border: "none", background: "none",
-                fontSize: "14px", fontWeight: 500, color: "#888",
+                flex: 1, padding: "14px", border: "1px solid #E8E6E1", background: "#fff",
+                borderRadius: "12px", fontSize: "14px", fontWeight: 600, color: "#888",
                 cursor: "pointer", fontFamily: "inherit",
-                borderRight: "1px solid #EEECE6",
               }}>취소</button>
               <button
                 onClick={() => { if (editDayLabel.trim()) handleEditDayLabel(editingDayIdx, editDayLabel); }}
                 style={{
-                  flex: 1, padding: "14px", border: "none", background: "none",
-                  fontSize: "14px", fontWeight: 700,
-                  color: editDayLabel.trim() ? (DAYS[editingDayIdx]?.color || "#8b7bff") : "#ccc",
+                  flex: 1, padding: "14px", border: "none",
+                  borderRadius: "12px", fontSize: "14px", fontWeight: 700,
+                  background: editDayLabel.trim() ? (DAYS[editingDayIdx]?.color || "#8b7bff") : "#E8E6E1",
+                  color: editDayLabel.trim() ? "#fff" : "#bbb",
                   cursor: editDayLabel.trim() ? "pointer" : "default",
-                  fontFamily: "inherit",
+                  fontFamily: "inherit", transition: "all 0.15s",
                 }}
               >저장</button>
             </div>
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* Add Day Dialog */}
