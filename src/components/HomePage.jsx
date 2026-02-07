@@ -141,9 +141,10 @@ export default function HomePage() {
   const [toast, setToast] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [moreMenu, setMoreMenu] = useState(null);
+  const [legacyHidden, setLegacyHidden] = useState(() => localStorage.getItem('legacy_trip_hidden') === 'true');
 
-  /* ── Legacy trip always exists (BASE_DAYS) ── */
-  const totalTrips = trips.length + 1; // +1 for legacy
+  /* ── Total trip count ── */
+  const totalTrips = trips.length + (legacyHidden ? 0 : 1);
 
   /* ── Load trips from Supabase ── */
   const fetchTrips = useCallback(async () => {
@@ -292,12 +293,14 @@ export default function HomePage() {
     setMoreMenu(null);
     setConfirmDialog({
       title: '로컬 여행 삭제',
-      message: '로컬에 저장된 커스텀 일정 데이터를 초기화하시겠습니까?\n기본 일정은 유지됩니다.',
-      confirmLabel: '초기화',
+      message: '이 여행을 목록에서 삭제하시겠습니까?\n로컬에 저장된 커스텀 데이터도 함께 삭제됩니다.',
+      confirmLabel: '삭제',
       onConfirm: () => {
         localStorage.removeItem('travel_custom_data');
+        localStorage.setItem('legacy_trip_hidden', 'true');
+        setLegacyHidden(true);
         setConfirmDialog(null);
-        setToast({ message: '로컬 데이터가 초기화되었습니다', icon: 'check' });
+        setToast({ message: '여행이 삭제되었습니다', icon: 'trash' });
       },
     });
   }, []);
@@ -394,8 +397,9 @@ export default function HomePage() {
 
         {!loading && (
           <>
-            {/* Legacy trip card (always visible) */}
-            <TripCard
+            {/* Legacy trip card */}
+            {!legacyHidden && (
+              <TripCard
                 title="후쿠오카 · 유후인 여행"
                 subtitle="2/19 (목) — 2/24 (화) · 5박6일"
                 destinations={['후쿠오카', '구마모토', '유후인']}
@@ -404,6 +408,7 @@ export default function HomePage() {
                 onClick={handleOpenLegacy}
                 onMore={() => setMoreMenu({ legacy: true })}
               />
+            )}
 
             {/* Supabase trips */}
             {trips.map((trip) => (
