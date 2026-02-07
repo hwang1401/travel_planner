@@ -500,10 +500,10 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
 
         {/* Footer */}
         <div style={{ padding: '0 20px 16px', flexShrink: 0, display: 'flex', gap: '8px' }}>
-          <Button variant="neutral" size="lg" onClick={onClose} style={{ flex: 0 }}>
+          <Button variant="neutral" size="lg" onClick={onClose} style={{ flex: 1 }}>
             취소
           </Button>
-          <Button variant="primary" size="lg" fullWidth onClick={handleSave} disabled={!canSave} style={{ flex: 1 }}>
+          <Button variant="primary" size="lg" onClick={handleSave} disabled={!canSave} style={{ flex: 1 }}>
             {saving ? '저장 중...' : (isEdit ? '저장' : '추가')}
           </Button>
         </div>
