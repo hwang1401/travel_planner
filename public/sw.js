@@ -1,4 +1,6 @@
-const CACHE_NAME = "travel-planner-v1";
+// 배포 시 버전을 올리면 이전 캐시가 자동 정리됩니다
+const CACHE_VERSION = 2;
+const CACHE_NAME = `travel-planner-v${CACHE_VERSION}`;
 const PRECACHE_URLS = [
   "/",
   "/index.html",

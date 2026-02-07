@@ -433,8 +433,9 @@ function FullMapDialog({ days, onClose }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 2000,
-      background: "#000", display: "flex", flexDirection: "column",
+      background: "#fff", display: "flex", flexDirection: "column",
       animation: "fadeIn 0.2s ease",
+      paddingTop: "env(safe-area-inset-top, 0px)",
     }}>
       {/* Header */}
       <div style={{
@@ -539,6 +540,7 @@ function FullMapDialog({ days, onClose }) {
         background: "#fff", borderTop: "1px solid #E8E6E1", flexShrink: 0,
         maxHeight: cardExpanded ? "35vh" : "44px", transition: "max-height 0.25s ease",
         overflow: "hidden", display: "flex", flexDirection: "column",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}>
         {/* Card header */}
         <button onClick={() => setCardExpanded(!cardExpanded)} style={{
