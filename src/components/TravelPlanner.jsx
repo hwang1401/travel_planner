@@ -866,16 +866,28 @@ export default function TravelPlanner() {
                   section.items.filter(Boolean).map((item, ii) => {
                     const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
                     const isLast = ii === section.items.length - 1;
-                    const hasDetail = !!item.detail && !!(item.detail.image || item.detail.images?.length || item.detail.tip || item.detail.address || item.detail.timetable);
                     const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
                     const TYPE_TO_CATEGORY = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "정보" };
+
+                    // Resolve location: explicit detail.address OR fallback via getItemCoords
+                    const resolvedLoc = getItemCoords(item, selectedDay);
+                    const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
+
+                    // Enrich item with resolved address for edit dialog
+                    const enrichedItem = resolvedAddress && !item.detail?.address
+                      ? { ...item, detail: { ...(item.detail || {}), address: resolvedAddress, name: item.detail?.name || item.desc, category: item.detail?.category || TYPE_TO_CATEGORY[item.type] || "정보" } }
+                      : item;
+
+                    const hasDetail = !!(enrichedItem.detail && (enrichedItem.detail.image || enrichedItem.detail.images?.length || enrichedItem.detail.tip || enrichedItem.detail.address || enrichedItem.detail.timetable || enrichedItem.detail.hours));
+                    const mapQuery = resolvedAddress || (resolvedLoc ? resolvedLoc.label : null);
+
                     const handleClick = () => {
                       if (hasDetail) {
                         setActiveDetail({
-                          ...item.detail,
-                          name: item.detail.name || item.desc,
-                          category: item.detail.category || TYPE_TO_CATEGORY[item.type] || "정보",
-                          _item: item, _si: effectiveSi, _ii: ii, _di: selectedDay,
+                          ...enrichedItem.detail,
+                          name: enrichedItem.detail.name || enrichedItem.desc,
+                          category: enrichedItem.detail.category || TYPE_TO_CATEGORY[enrichedItem.type] || "정보",
+                          _item: enrichedItem, _si: effectiveSi, _ii: ii, _di: selectedDay,
                         });
                       }
                     };
@@ -920,23 +932,18 @@ export default function TravelPlanner() {
                             </p>
                           )}
                         </div>
-                        {(() => {
-                          const mapQuery = item.detail?.address;
-                          const resolvedLoc = !mapQuery ? getItemCoords(item, selectedDay) : null;
-                          const finalQuery = mapQuery || (resolvedLoc ? resolvedLoc.label : null);
-                          return finalQuery ? (
-                            <div style={{ flexShrink: 0, alignSelf: "center" }}>
-                              <MapButton query={finalQuery} />
-                            </div>
-                          ) : null;
-                        })()}
+                        {mapQuery && (
+                          <div style={{ flexShrink: 0, alignSelf: "center" }}>
+                            <MapButton query={mapQuery} />
+                          </div>
+                        )}
                         {/* Edit / Delete (only if can edit) */}
                         {canEdit && (
                           <div style={{ display: "flex", gap: "4px", flexShrink: 0, alignSelf: "center" }}
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Button variant="ghost-neutral" size="xsm" iconOnly="edit"
-                              onClick={() => setEditTarget({ item, sectionIdx: effectiveSi, itemIdx: ii, dayIdx: toOrigIdx(selectedDay) })} />
+                              onClick={() => setEditTarget({ item: enrichedItem, sectionIdx: effectiveSi, itemIdx: ii, dayIdx: toOrigIdx(selectedDay) })} />
                             <Button variant="ghost-neutral" size="xsm" iconOnly="trash"
                               onClick={() => handleDeleteItem(toOrigIdx(selectedDay), effectiveSi, ii, item)} />
                           </div>
