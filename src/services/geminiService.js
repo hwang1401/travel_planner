@@ -35,20 +35,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Extract text from Gemini response.
- * Gemini 2.5 Flash may include "thought" parts — skip those and find the actual text.
+ * Gemini 2.5 Flash includes "thought" parts (thought:true) — skip those.
  */
 function extractText(data) {
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!parts || parts.length === 0) return null;
 
-  // Find the first part with text (skip thought parts)
+  // First pass: find non-thought text parts
   for (const part of parts) {
-    if (part.text !== undefined && part.text !== null) {
+    if (!part.thought && part.text !== undefined && part.text !== null) {
       return part.text;
     }
   }
 
-  // Fallback: try last part
+  // Fallback: last part regardless
   return parts[parts.length - 1]?.text || null;
 }
 
