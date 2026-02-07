@@ -6,7 +6,7 @@ import Button from './common/Button';
 import Toast from './common/Toast';
 import ConfirmDialog from './common/ConfirmDialog';
 import CreateTripDialog from './dialogs/CreateTripDialog';
-import { loadTrips, createTrip, deleteTrip, duplicateTrip, getShareCode, formatDateRange } from '../services/tripService';
+import { loadTrips, createTrip, updateTrip, deleteTrip, duplicateTrip, getShareCode, formatDateRange } from '../services/tripService';
 import { getShareLink } from '../services/memberService';
 import { loadCustomData } from '../data/storage';
 import BottomSheet from './common/BottomSheet';
@@ -137,6 +137,7 @@ export default function HomePage() {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editTrip, setEditTrip] = useState(null); // trip object for edit mode
   const [toast, setToast] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [moreMenu, setMoreMenu] = useState(null);
@@ -172,6 +173,24 @@ export default function HomePage() {
       setToast({ message: '여행 생성에 실패했습니다', icon: 'info' });
     }
   }, [fetchTrips, navigate]);
+
+  /* ── Edit trip ── */
+  const handleEdit = useCallback(async (data) => {
+    try {
+      await updateTrip(data.tripId, {
+        name: data.name,
+        destinations: data.destinations,
+        start_date: data.startDate || null,
+        end_date: data.endDate || data.startDate || null,
+      });
+      setEditTrip(null);
+      setToast({ message: '여행이 수정되었습니다', icon: 'check' });
+      await fetchTrips();
+    } catch (err) {
+      console.error('Failed to edit trip:', err);
+      setToast({ message: '여행 수정에 실패했습니다', icon: 'info' });
+    }
+  }, [fetchTrips]);
 
   /* ── Delete trip ── */
   const handleDelete = useCallback((trip) => {
@@ -461,6 +480,11 @@ export default function HomePage() {
         <CreateTripDialog onClose={() => setShowCreate(false)} onCreate={handleCreate} />
       )}
 
+      {/* Edit Trip Dialog */}
+      {editTrip && (
+        <CreateTripDialog onClose={() => setEditTrip(null)} onCreate={handleEdit} editTrip={editTrip} />
+      )}
+
       {/* Confirm Dialog */}
       {confirmDialog && (
         <ConfirmDialog
@@ -484,6 +508,14 @@ export default function HomePage() {
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {/* 여행 수정 (Supabase only) */}
+              {!moreMenu.legacy && moreMenu.trip && (
+                <MoreMenuItem
+                  icon="edit" label="여행 수정"
+                  onClick={() => { setEditTrip(moreMenu.trip); setMoreMenu(null); }}
+                />
+              )}
+
               {/* 여행 공유 (Supabase only) */}
               {!moreMenu.legacy && moreMenu.trip && (
                 <MoreMenuItem

@@ -12,6 +12,19 @@ function timeToMin(t) {
   return (h || 0) * 60 + (m || 0);
 }
 
+/**
+ * Smart time: treats 00:00~05:59 as late night (24:00~29:59)
+ * when the day's schedule is mainly afternoon/evening.
+ */
+function smartTimeMin(t, dayLatestMin) {
+  const raw = timeToMin(t);
+  // If time is 00:00~05:59 and day has items past noon → treat as next-day late night
+  if (raw < 360 && dayLatestMin >= 720) {
+    return raw + 1440;
+  }
+  return raw;
+}
+
 export function mergeData(base, custom) {
   const merged = base.map((day, di) => {
     const dayCustom = custom[di];
@@ -26,9 +39,18 @@ export function mergeData(base, custom) {
     });
     // Merge extra items into existing sections by timestamp
     if (dayCustom.extraItems && dayCustom.extraItems.length > 0) {
+      // Find the latest time across all sections to detect afternoon/evening days
+      let dayLatestMin = 0;
+      newSections.forEach((sec) => {
+        (sec.items || []).forEach((it) => {
+          const m = timeToMin(it.time);
+          if (m > dayLatestMin) dayLatestMin = m;
+        });
+      });
+
       const extras = [...dayCustom.extraItems];
       extras.forEach((extraItem) => {
-        const extraMin = timeToMin(extraItem.time);
+        const extraMin = smartTimeMin(extraItem.time, dayLatestMin);
         let bestSec = -1;
         let bestPos = -1;
 
@@ -37,15 +59,15 @@ export function mergeData(base, custom) {
           const items = newSections[si].items;
           if (!items || items.length === 0) continue;
 
-          const firstMin = timeToMin(items[0]?.time);
-          const lastMin = timeToMin(items[items.length - 1]?.time);
+          const firstMin = smartTimeMin(items[0]?.time, dayLatestMin);
+          const lastMin = smartTimeMin(items[items.length - 1]?.time, dayLatestMin);
 
           // If extra item time falls within this section's range (or close)
           if (extraMin >= firstMin && extraMin <= lastMin + 30) {
             // Find exact insertion position
             let pos = items.length;
             for (let ii = 0; ii < items.length; ii++) {
-              if (timeToMin(items[ii].time) > extraMin) {
+              if (smartTimeMin(items[ii].time, dayLatestMin) > extraMin) {
                 pos = ii;
                 break;
               }
@@ -69,7 +91,7 @@ export function mergeData(base, custom) {
           for (let si = newSections.length - 1; si >= 0; si--) {
             const items = newSections[si].items;
             if (!items || items.length === 0) continue;
-            const lastMin = timeToMin(items[items.length - 1]?.time);
+            const lastMin = smartTimeMin(items[items.length - 1]?.time, dayLatestMin);
             if (lastMin <= extraMin) {
               bestSec = si;
               bestPos = items.length;
@@ -78,10 +100,9 @@ export function mergeData(base, custom) {
           }
         }
 
-        // Fallback: append to first section with items, or first section
+        // Fallback: append to last section (late night goes at the end)
         if (bestSec === -1) {
-          bestSec = newSections.findIndex((s) => s.items && s.items.length > 0);
-          if (bestSec === -1) bestSec = 0;
+          bestSec = newSections.length - 1;
           bestPos = newSections[bestSec]?.items?.length || 0;
         }
 

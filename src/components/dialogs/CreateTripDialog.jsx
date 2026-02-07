@@ -163,12 +163,15 @@ function DatePickerSheet({ label, value, onChange, onClose, minDate }) {
   );
 }
 
-export default function CreateTripDialog({ onClose, onCreate }) {
-  const [name, setName] = useState('');
-  const [destinations, setDestinations] = useState([]);
+export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
+  const isEdit = !!editTrip;
+  const [name, setName] = useState(editTrip?.name || '');
+  const [destinations, setDestinations] = useState(
+    editTrip?.destinations?.map((d) => typeof d === 'string' ? { name: d } : d) || []
+  );
   const [destInput, setDestInput] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(editTrip?.startDate || '');
+  const [endDate, setEndDate] = useState(editTrip?.endDate || '');
   const [datePickerTarget, setDatePickerTarget] = useState(null); // 'start' | 'end' | null
 
   /* ── Destination helpers ── */
@@ -196,7 +199,7 @@ export default function CreateTripDialog({ onClose, onCreate }) {
   const [submitting, setSubmitting] = useState(false);
   const canSubmit = name.trim() && startDate && !submitting;
 
-  const handleCreate = async () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
@@ -205,9 +208,10 @@ export default function CreateTripDialog({ onClose, onCreate }) {
         destinations: destinations.map((d) => d.name),
         startDate,
         endDate: endDate || startDate,
+        ...(isEdit ? { tripId: editTrip.id } : {}),
       });
     } catch (err) {
-      console.error('Create trip error:', err);
+      console.error(isEdit ? 'Edit trip error:' : 'Create trip error:', err);
       setSubmitting(false);
     }
   };
@@ -226,7 +230,7 @@ export default function CreateTripDialog({ onClose, onCreate }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <h3 style={{ margin: 0, fontSize: 'var(--typo-body-1-n---bold-size)', fontWeight: 'var(--typo-body-1-n---bold-weight)', color: 'var(--color-on-surface)' }}>
-          새 여행 만들기
+          {isEdit ? '여행 수정' : '새 여행 만들기'}
         </h3>
         <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
       </div>
@@ -392,8 +396,8 @@ export default function CreateTripDialog({ onClose, onCreate }) {
 
       {/* Submit */}
       <div style={{ padding: '0 20px 20px', flexShrink: 0 }}>
-        <Button variant="primary" size="xlg" fullWidth onClick={handleCreate} disabled={!canSubmit}>
-          {submitting ? '생성 중...' : '여행 만들기'}
+        <Button variant="primary" size="xlg" fullWidth onClick={handleSubmit} disabled={!canSubmit}>
+          {submitting ? (isEdit ? '저장 중...' : '생성 중...') : (isEdit ? '저장' : '여행 만들기')}
         </Button>
       </div>
 
