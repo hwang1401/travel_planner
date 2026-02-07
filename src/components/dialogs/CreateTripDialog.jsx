@@ -229,6 +229,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiPreview, setAiPreview] = useState(null); // { days: [...] }
   const [aiError, setAiError] = useState('');
+  const [expandedDay, setExpandedDay] = useState(null); // accordion: which day is expanded
   const previewScrollRef = useRef(null);
 
   /* ── Duration calc ── */
@@ -603,7 +604,6 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                     fontWeight: 'var(--typo-caption-1-bold-weight)',
                     color: 'var(--color-on-primary-container)',
                   }}>
-                    <Icon name="flash" size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                     AI 추천 일정 ({aiPreview.days.length}일)
                   </span>
                   <button
@@ -617,52 +617,106 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                   </button>
                 </div>
 
-                {/* Day list */}
-                <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                {/* Day accordion list */}
+                <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
                   {aiPreview.days.map((day, di) => {
-                    const totalItems = day.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
+                    const allItems = day.sections?.flatMap((s) => s.items || []) || [];
+                    const totalItems = allItems.length;
+                    const isOpen = expandedDay === di;
+                    const TYPE_ICONS = { food: "fire", spot: "pin", shop: "shopping", move: "navigation", stay: "home", info: "flash" };
+                    const TYPE_COLORS = { food: "#C75D20", spot: "#2B6CB0", shop: "#6B46C1", move: "#6B6B67", stay: "#2A7D4F", info: "#8A7E22" };
                     return (
                       <div key={di} style={{
-                        padding: '10px 14px',
                         borderBottom: di < aiPreview.days.length - 1 ? '1px solid var(--color-outline-variant)' : 'none',
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <span style={{
-                            fontSize: 'var(--typo-caption-1-bold-size)',
-                            fontWeight: 'var(--typo-caption-1-bold-weight)',
-                            color: 'var(--color-on-surface)',
-                          }}>
-                            Day {day.day} — {day.label}
-                          </span>
-                          <span style={{
-                            fontSize: 'var(--typo-caption-3-regular-size)',
-                            color: 'var(--color-on-surface-variant2)',
-                          }}>
-                            {totalItems}개 일정
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {day.sections?.flatMap((s) => s.items || []).slice(0, 4).map((it, j) => (
-                            <span key={j} style={{
-                              padding: '2px 8px', borderRadius: '4px',
-                              background: 'var(--color-surface-container-low)',
-                              fontSize: 'var(--typo-caption-3-regular-size)',
-                              color: 'var(--color-on-surface-variant)',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {it.time ? `${it.time} ` : ''}{it.desc}
-                            </span>
-                          ))}
-                          {(day.sections?.flatMap((s) => s.items || []).length || 0) > 4 && (
+                        {/* Day header — clickable accordion toggle */}
+                        <div
+                          onClick={() => setExpandedDay(isOpen ? null : di)}
+                          style={{
+                            padding: '10px 14px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            cursor: 'pointer', userSelect: 'none',
+                            background: isOpen ? 'var(--color-surface-container-low)' : 'transparent',
+                            transition: 'background 0.15s',
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <span style={{
-                              padding: '2px 8px', borderRadius: '4px',
+                              fontSize: 'var(--typo-caption-1-bold-size)',
+                              fontWeight: 'var(--typo-caption-1-bold-weight)',
+                              color: 'var(--color-on-surface)',
+                            }}>
+                              Day {day.day} — {day.label}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <span style={{
                               fontSize: 'var(--typo-caption-3-regular-size)',
                               color: 'var(--color-on-surface-variant2)',
                             }}>
-                              +{(day.sections?.flatMap((s) => s.items || []).length || 0) - 4}
+                              {totalItems}개
                             </span>
-                          )}
+                            <Icon
+                              name="chevronRight"
+                              size={12}
+                              style={{
+                                transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s',
+                                opacity: 0.4,
+                              }}
+                            />
+                          </div>
                         </div>
+
+                        {/* Expanded item list */}
+                        {isOpen && (
+                          <div style={{ padding: '0 14px 10px' }}>
+                            {allItems.map((it, j) => (
+                              <div key={j} style={{
+                                display: 'flex', alignItems: 'flex-start', gap: '8px',
+                                padding: '6px 0',
+                                borderBottom: j < allItems.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
+                              }}>
+                                <span style={{
+                                  width: '36px', flexShrink: 0, textAlign: 'right',
+                                  fontSize: 'var(--typo-caption-3-bold-size)',
+                                  fontWeight: 'var(--typo-caption-3-bold-weight)',
+                                  color: 'var(--color-on-surface-variant2)',
+                                  fontVariantNumeric: 'tabular-nums',
+                                  lineHeight: '18px',
+                                }}>
+                                  {it.time || ''}
+                                </span>
+                                <div style={{
+                                  width: '3px', flexShrink: 0, borderRadius: '2px',
+                                  background: TYPE_COLORS[it.type] || '#999',
+                                  alignSelf: 'stretch', minHeight: '16px',
+                                }} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{
+                                    margin: 0,
+                                    fontSize: 'var(--typo-caption-2-medium-size)',
+                                    fontWeight: 'var(--typo-caption-2-medium-weight)',
+                                    color: 'var(--color-on-surface)',
+                                    lineHeight: '18px',
+                                  }}>
+                                    {it.desc}
+                                  </p>
+                                  {it.sub && (
+                                    <p style={{
+                                      margin: '1px 0 0',
+                                      fontSize: 'var(--typo-caption-3-regular-size)',
+                                      color: 'var(--color-on-surface-variant2)',
+                                      lineHeight: '14px',
+                                    }}>
+                                      {it.sub}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
