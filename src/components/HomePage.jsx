@@ -8,7 +8,8 @@ import ConfirmDialog from './common/ConfirmDialog';
 import CreateTripDialog from './dialogs/CreateTripDialog';
 import { loadTrips, createTrip, updateTrip, deleteTrip, duplicateTrip, getShareCode, formatDateRange } from '../services/tripService';
 import { getShareLink } from '../services/memberService';
-import { loadCustomData } from '../data/storage';
+import { loadCustomData, mergeData } from '../data/storage';
+import { BASE_DAYS } from '../data/days';
 import BottomSheet from './common/BottomSheet';
 
 /* ── Shared card styles ── */
@@ -246,13 +247,24 @@ export default function HomePage() {
   const handleDuplicateLegacy = useCallback(async () => {
     setMoreMenu(null);
     try {
-      const legacyData = loadCustomData();
+      // Bake BASE_DAYS + any localStorage customizations into a standalone schedule
+      const legacyCustom = loadCustomData();
+      const mergedDays = mergeData(BASE_DAYS, legacyCustom);
+      // Convert merged days into standalone format (_extraDays + _standalone flag)
+      const standaloneData = {
+        _standalone: true,
+        _extraDays: mergedDays.map((day, i) => ({
+          ...day,
+          day: i + 1,
+          _custom: true,
+        })),
+      };
       const newTrip = await duplicateTrip({
         name: '후쿠오카 · 유후인 여행 (복제)',
         destinations: ['후쿠오카', '구마모토', '유후인'],
         startDate: '2026-02-19',
         endDate: '2026-02-24',
-        scheduleData: legacyData,
+        scheduleData: standaloneData,
       });
       setToast({ message: '여행이 복제되었습니다', icon: 'check' });
       await fetchTrips();
