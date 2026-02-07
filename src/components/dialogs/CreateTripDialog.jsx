@@ -311,7 +311,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
       </div>
 
       {/* Form */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div ref={previewScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
         {/* ── Cover Image ── */}
         <section>
@@ -586,7 +586,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
 
             {/* AI Preview */}
             {aiPreview && aiPreview.days.length > 0 && (
-              <div ref={previewScrollRef} style={{
+              <div style={{
                 marginTop: '12px',
                 border: '1px solid var(--color-outline-variant)',
                 borderRadius: 'var(--radius-md, 8px)',
@@ -676,7 +676,13 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
       </div>
 
       {/* Submit */}
-      <div style={{ padding: '0 20px 20px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{
+        padding: '14px 20px calc(14px + env(safe-area-inset-bottom, 0px))',
+        flexShrink: 0,
+        display: 'flex', flexDirection: 'column', gap: '8px',
+        borderTop: '1px solid var(--color-outline-variant)',
+        background: 'var(--color-surface-container-lowest)',
+      }}>
         {/* AI trip create button (only when preview is ready) */}
         {!isEdit && aiPreview?.days?.length > 0 && (
           <Button variant="primary" size="xlg" fullWidth iconLeft="flash"
