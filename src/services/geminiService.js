@@ -6,6 +6,20 @@
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
 
+/** Convert raw API error to user-friendly Korean message */
+function friendlyError(rawMsg, status) {
+  if (!rawMsg) return `API 오류 (${status})`;
+  if (rawMsg.includes("quota") || rawMsg.includes("rate")) {
+    const retryMatch = rawMsg.match(/retry in ([\d.]+)/i);
+    const sec = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 30;
+    return `요청 한도 초과 — ${sec}초 후 다시 시도해주세요`;
+  }
+  if (rawMsg.includes("API key")) return "API 키가 유효하지 않습니다";
+  if (rawMsg.includes("safety")) return "AI 안전 필터에 의해 차단되었습니다";
+  if (rawMsg.length > 80) return `API 오류 (${status})`;
+  return rawMsg;
+}
+
 const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
 사용자가 제공하는 텍스트/마크다운 문서를 분석하여 여행 일정 아이템을 추출해주세요.
 
@@ -80,7 +94,7 @@ export async function analyzeScheduleWithAI(content, context = "") {
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      const errMsg = errData?.error?.message || `API 오류 (${response.status})`;
+      const errMsg = friendlyError(errData?.error?.message, response.status);
       return { items: [], error: errMsg };
     }
 
@@ -228,7 +242,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      const errMsg = errData?.error?.message || `API 오류 (${response.status})`;
+      const errMsg = friendlyError(errData?.error?.message, response.status);
       return { message: "", items: [], error: errMsg };
     }
 
@@ -387,7 +401,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      const errMsg = errData?.error?.message || `API 오류 (${response.status})`;
+      const errMsg = friendlyError(errData?.error?.message, response.status);
       return { days: [], error: errMsg };
     }
 
