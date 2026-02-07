@@ -5,6 +5,7 @@ import Icon from '../common/Icon';
 import AddressSearch from '../common/AddressSearch';
 import BottomSheet from '../common/BottomSheet';
 import ImagePicker from '../common/ImagePicker';
+import Toast from '../common/Toast';
 import { uploadImage, generateImagePath } from '../../services/imageService';
 import { generateFullTripSchedule } from '../../services/geminiService';
 
@@ -315,7 +316,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
 
   /* ── Submit ── */
   const [submitting, setSubmitting] = useState(false);
-  const canSubmit = name.trim() && startDate && !submitting && !coverUploading;
+  const canSubmit = name.trim() && destinations.length > 0 && startDate && !submitting && !coverUploading;
 
   /* ── AI schedule generation ── */
   const [aiPreferences, setAiPreferences] = useState('');
@@ -323,6 +324,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
   const [aiPreview, setAiPreview] = useState(null); // { days: [...] }
   const [aiError, setAiError] = useState('');
   const [expandedDay, setExpandedDay] = useState(null); // accordion: which day is expanded
+  const [toast, setToast] = useState(null);
   const previewScrollRef = useRef(null);
 
   /* ── Duration calc ── */
@@ -330,10 +332,12 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1)
     : null;
 
-  const canGenerateAi = destinations.length > 0 && startDate && !aiGenerating && !submitting;
-
   const handleGenerateAi = useCallback(async () => {
-    if (!canGenerateAi) return;
+    // Validation
+    if (!name.trim()) { setToast({ message: '여행 이름을 입력해주세요', icon: 'info' }); return; }
+    if (destinations.length === 0) { setToast({ message: '여행지를 추가해주세요', icon: 'info' }); return; }
+    if (!startDate) { setToast({ message: '출발일을 선택해주세요', icon: 'info' }); return; }
+    if (aiGenerating || submitting) return;
     setAiGenerating(true);
     setAiError('');
     setAiPreview(null);
@@ -360,7 +364,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     setTimeout(() => {
       previewScrollRef.current?.scrollTo({ top: previewScrollRef.current.scrollHeight, behavior: 'smooth' });
     }, 200);
-  }, [canGenerateAi, destinations, startDate, duration, aiPreferences]);
+  }, [destinations, startDate, duration, aiPreferences, name, aiGenerating, submitting]);
 
   const handleSubmit = async (withAi = false) => {
     if (!canSubmit) return;
@@ -428,7 +432,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <Field label="여행 이름" required size="lg" variant="outlined"
+            <Field label="여행 이름" size="lg" variant="outlined"
               value={name} onChange={(e) => setName(e.target.value)}
               placeholder="예: 후쿠오카 가족여행" />
 
@@ -573,7 +577,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                 variant="neutral" size="lg" fullWidth
                 iconLeft="flash"
                 onClick={handleGenerateAi}
-                disabled={!canGenerateAi}
+                disabled={aiGenerating || submitting}
                 style={{ marginTop: '12px' }}
               >
                 {aiGenerating ? 'AI가 일정을 만들고 있어요...' : 'AI 일정 미리보기'}
@@ -584,7 +588,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                 variant="neutral" size="sm"
                 iconLeft="flash"
                 onClick={() => { setAiPreview(null); setExpandedDay(null); handleGenerateAi(); }}
-                disabled={!canGenerateAi}
+                disabled={aiGenerating || submitting}
                 style={{ marginTop: '12px', alignSelf: 'flex-start' }}
               >
                 다시 생성하기
@@ -816,6 +820,15 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
           endDate={endDate}
           onConfirm={(s, e) => { setStartDate(s); setEndDate(e); }}
           onClose={() => setShowDatePicker(false)}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          icon={toast.icon}
+          onDone={() => setToast(null)}
         />
       )}
     </BottomSheet>

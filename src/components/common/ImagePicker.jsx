@@ -51,7 +51,7 @@ export default function ImagePicker({
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
-      style={{ position: 'relative' }}
+      style={{ position: 'relative', width: '100%' }}
     >
       <input
         ref={fileRef}
@@ -129,8 +129,8 @@ export default function ImagePicker({
             borderRadius: borderRadius !== undefined ? borderRadius : 'var(--radius-md, 8px)',
             border: borderRadius === '0' ? 'none' : `2px dashed ${dragOver ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
             background: dragOver ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
+            width: '100%',
             aspectRatio,
-            maxHeight,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             gap: '8px',
