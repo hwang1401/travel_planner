@@ -122,11 +122,13 @@ const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
 
 규칙:
 1. 시간이 명시된 항목만 time을 채우세요. 시간이 없으면 time을 빈 문자열로.
-2. detail 안의 필드는 해당 정보가 있을 때만 포함하세요.
+2. food, spot, shop, stay 타입은 가능한 한 detail.address를 포함하세요 (문서에 주소가 있으면 그대로, 없으면 장소명으로 검색 가능한 이름을 넣으세요).
 3. 쇼핑 가이드나 기념품 목록은 개별 일정이 아니라, 관련 쇼핑 일정의 tip에 요약해서 넣으세요.
 4. 이동 구간은 출발지→도착지 형태로 desc에 넣으세요.
 5. 시간순으로 정렬해주세요.
-6. 문서가 여행 일정이 아닌 경우에도 최대한 시간대별 활동을 추론해주세요.`;
+6. 문서가 여행 일정이 아닌 경우에도 최대한 시간대별 활동을 추론해주세요.
+7. detail.timetable은 "영업시간" 문자열입니다 (예: "11:00~23:00").
+8. detail 객체는 address, tip, timetable 중 하나라도 있으면 반드시 포함하세요.`;
 
 /**
  * Analyze document content using Gemini AI and extract schedule items.
@@ -205,7 +207,7 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus } 
                   name: item.desc,
                   category: TYPE_CAT[itemType] || "정보",
                   ...(item.detail.address ? { address: item.detail.address } : {}),
-                  ...(item.detail.timetable ? { timetable: item.detail.timetable } : {}),
+                  ...(item.detail.timetable ? { hours: item.detail.timetable } : {}),
                   ...(item.detail.tip ? { tip: item.detail.tip } : {}),
                 },
               }
@@ -260,6 +262,8 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
 3. 이동 구간도 포함하여 실제로 따라할 수 있게 해주세요.
 4. 해당 지역의 유명 맛집, 관광지 위주로 현실적인 장소를 추천해주세요.
 5. sub에 예상 비용이나 소요시간을 넣어주세요.
+6. food, spot, shop, stay 타입은 반드시 detail.address를 포함하세요 (실제 주소 또는 구글맵에서 검색 가능한 장소명).
+7. detail 객체는 address가 있으면 반드시 포함하세요.
 6. message에는 추천 코스를 간단히 설명하고, 이모지를 적절히 사용해주세요.
 7. 보통 하루 일정은 5~10개 항목이 적당합니다.`;
 

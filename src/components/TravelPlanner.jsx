@@ -32,6 +32,7 @@ import AddDayDialog from "./dialogs/AddDayDialog";
 /* Map imports */
 import FullMapDialog from "./map/FullMapDialog";
 import MapButton from "./map/MapButton";
+import { getItemCoords } from "../data/locations";
 
 export default function TravelPlanner() {
   const navigate = useNavigate();
@@ -933,11 +934,16 @@ export default function TravelPlanner() {
                             </p>
                           )}
                         </div>
-                        {item.detail && item.detail.address && (
-                          <div style={{ flexShrink: 0, alignSelf: "center" }}>
-                            <MapButton query={item.detail.address} />
-                          </div>
-                        )}
+                        {(() => {
+                          const mapQuery = item.detail?.address;
+                          const resolvedLoc = !mapQuery ? getItemCoords(item, selectedDay) : null;
+                          const finalQuery = mapQuery || (resolvedLoc ? resolvedLoc.label : null);
+                          return finalQuery ? (
+                            <div style={{ flexShrink: 0, alignSelf: "center" }}>
+                              <MapButton query={finalQuery} />
+                            </div>
+                          ) : null;
+                        })()}
                         {/* Edit / Delete (only if can edit) */}
                         {canEdit && (
                           <div style={{ display: "flex", gap: "4px", flexShrink: 0, alignSelf: "center" }}
