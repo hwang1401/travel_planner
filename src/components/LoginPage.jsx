@@ -5,7 +5,6 @@
  */
 
 import { useAuth } from '../contexts/AuthContext';
-import Icon from './common/Icon';
 
 export default function LoginPage() {
   const { signInWithKakao, error } = useAuth();
@@ -31,19 +30,16 @@ export default function LoginPage() {
         minHeight: '50vh',
       }}>
         {/* Logo */}
-        <div style={{
-          width: '72px',
-          height: '72px',
-          borderRadius: '18px',
-          background: 'var(--color-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '24px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-        }}>
-          <Icon name="navigation" size={36} style={{ filter: 'brightness(0) invert(1)' }} />
-        </div>
+        <img
+          src="/icons/logo-splash.png"
+          alt="TravelUnu"
+          style={{
+            width: '80px',
+            height: 'auto',
+            marginBottom: '24px',
+            objectFit: 'contain',
+          }}
+        />
 
         <h1 style={{
           margin: '0 0 8px',

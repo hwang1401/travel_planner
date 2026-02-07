@@ -4,7 +4,6 @@
  * Displayed while AuthContext is loading.
  */
 
-import Icon from './common/Icon';
 
 export default function SplashScreen() {
   return (
@@ -19,21 +18,19 @@ export default function SplashScreen() {
       paddingTop: 'env(safe-area-inset-top, 0px)',
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     }}>
-      {/* Logo / Icon */}
-      <div style={{
-        width: '80px',
-        height: '80px',
-        borderRadius: '20px',
-        background: 'rgba(255,255,255,0.2)',
-        backdropFilter: 'blur(10px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: '20px',
-        animation: 'fadeIn 0.6s ease',
-      }}>
-        <Icon name="navigation" size={40} style={{ filter: 'brightness(0) invert(1)' }} />
-      </div>
+      {/* Logo */}
+      <img
+        src="/icons/logo-splash.png"
+        alt="TravelUnu"
+        style={{
+          width: '80px',
+          height: 'auto',
+          marginBottom: '20px',
+          objectFit: 'contain',
+          filter: 'brightness(0) invert(1)',
+          animation: 'fadeIn 0.6s ease',
+        }}
+      />
 
       {/* App name */}
       <h1 style={{
