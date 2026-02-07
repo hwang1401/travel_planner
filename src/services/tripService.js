@@ -116,10 +116,10 @@ export async function createTrip({ name, destinations = [], startDate, endDate, 
     .from('trip_members')
     .insert({ trip_id: trip.id, user_id: user.id, role: 'owner' });
 
-  // Create empty schedule
+  // Create empty schedule (standalone = not legacy-based)
   await supabase
     .from('trip_schedules')
-    .insert({ trip_id: trip.id, data: {}, updated_by: user.id });
+    .insert({ trip_id: trip.id, data: { _standalone: true }, updated_by: user.id });
 
   return formatTrip(trip);
 }

@@ -107,7 +107,17 @@ export default function TravelPlanner() {
         setTripMeta(trip);
         setMyRole(role);
         setShareCode(code);
-        setCustomData(schedule.data || {});
+
+        // Auto-migrate: add _standalone flag for non-legacy Supabase trips
+        const schedData = schedule.data || {};
+        if (!schedData._standalone) {
+          // Legacy-duplicated data has numeric keys with `sections` overrides
+          const hasLegacySections = Object.keys(schedData).some(
+            (k) => !k.startsWith("_") && !isNaN(Number(k)) && schedData[k]?.sections
+          );
+          if (!hasLegacySections) schedData._standalone = true;
+        }
+        setCustomData(schedData);
         setTripLoading(false);
         setScheduleLoading(false);
       } catch (err) {
@@ -143,7 +153,14 @@ export default function TravelPlanner() {
       }
       // Only update if someone else changed it
       if (payload.updatedBy !== user?.id) {
-        setCustomData(payload.data || {});
+        const rtData = payload.data || {};
+        if (!rtData._standalone) {
+          const hasLegacySections = Object.keys(rtData).some(
+            (k) => !k.startsWith("_") && !isNaN(Number(k)) && rtData[k]?.sections
+          );
+          if (!hasLegacySections) rtData._standalone = true;
+        }
+        setCustomData(rtData);
       }
     });
 
@@ -176,14 +193,14 @@ export default function TravelPlanner() {
     }
   }, [customData, isLegacy]);
 
-  /* ── Base length: legacy/duplicated trips use BASE_DAYS, new trips use 0 ── */
+  /* ── Base length: legacy/duplicated trips use BASE_DAYS, standalone trips use 0 ── */
   const baseLen = useMemo(() => {
     if (isLegacy) return BASE_DAYS.length;
-    const hasLegacyRefs = Object.keys(customData).some(
-      (k) => !k.startsWith("_") && !isNaN(Number(k)) && Number(k) < BASE_DAYS.length
-    );
-    return hasLegacyRefs ? BASE_DAYS.length : 0;
-  }, [customData, isLegacy]);
+    // _standalone flag = new Supabase trip → no BASE_DAYS
+    if (customData._standalone) return 0;
+    // No flag = duplicated-from-legacy → use BASE_DAYS
+    return BASE_DAYS.length;
+  }, [customData._standalone, isLegacy]);
 
   /* ── Merge data ── */
   const DAYS = useMemo(() => {
