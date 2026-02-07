@@ -44,6 +44,43 @@ function Icon({ name, size = 16, style = {}, className = "" }) {
   return <img src={src} alt="" width={size} height={size} style={{ display: "block", flexShrink: 0, ...style }} className={className} />;
 }
 
+/* ── Button Styles ── */
+const BTN = {
+  // CTA: primary colored background
+  cta: {
+    border: "none", borderRadius: "12px",
+    background: "var(--color-primary)", color: "var(--color-on-primary)",
+    fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+    padding: "14px", transition: "opacity 0.15s",
+  },
+  // Primary: dark inverse background
+  primary: {
+    border: "none", borderRadius: "12px",
+    background: "var(--color-inverse-surface)", color: "var(--color-on-inverse-surface)",
+    fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+    padding: "14px", transition: "all 0.15s",
+  },
+  // Neutral: light gray outlined
+  neutral: {
+    border: "1px solid var(--color-outline-variant)", borderRadius: "12px",
+    background: "var(--color-surface-container-lowest)", color: "var(--color-on-surface-variant)",
+    fontSize: "14px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+    padding: "14px", transition: "all 0.15s",
+  },
+  // Icon button: small circle (close, edit, etc.)
+  icon: {
+    border: "none", borderRadius: "50%",
+    background: "var(--color-surface-container-low)", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  // Disabled overrides
+  disabled: {
+    background: "var(--color-outline-variant)",
+    color: "var(--color-on-surface-variant2)",
+    cursor: "default",
+  },
+};
+
 /* ── Location Coordinates DB ── */
 const LOCATION_COORDS = {
   // 후쿠오카
@@ -164,7 +201,7 @@ function BottomSheet({ onClose, maxHeight = "85vh", zIndex = 1000, children }) {
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
         width: "100%", maxWidth: "420px", maxHeight,
-        background: "#fff", borderRadius: "20px 20px 0 0",
+        background: "var(--color-surface-container-lowest)", borderRadius: "20px 20px 0 0",
         overflow: "hidden", animation: "bottomSheetUp 0.3s cubic-bezier(0.16,1,0.3,1)",
         display: "flex", flexDirection: "column",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -175,7 +212,7 @@ function BottomSheet({ onClose, maxHeight = "85vh", zIndex = 1000, children }) {
           cursor: "grab",
         }}>
           <div style={{
-            width: "36px", height: "4px", borderRadius: "2px", background: "#D5D4D8",
+            width: "36px", height: "4px", borderRadius: "2px", background: "var(--color-outline-variant)",
           }} />
         </div>
         {children}
@@ -194,25 +231,25 @@ function ConfirmDialog({ title, message, confirmLabel, confirmColor, onConfirm, 
       padding: "24px", animation: "fadeIn 0.15s ease",
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        width: "100%", maxWidth: "320px", background: "#fff",
+        width: "100%", maxWidth: "320px", background: "var(--color-surface-container-lowest)",
         borderRadius: "18px", overflow: "hidden",
         animation: "slideUp 0.2s ease",
         boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
       }}>
         <div style={{ padding: "24px 24px 16px", textAlign: "center" }}>
-          <h3 style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: 800, color: "#1a1a1a" }}>{title}</h3>
-          <p style={{ margin: 0, fontSize: "13px", color: "#666", lineHeight: 1.5 }}>{message}</p>
+          <h3 style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: 800, color: "var(--color-on-surface)" }}>{title}</h3>
+          <p style={{ margin: 0, fontSize: "13px", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>{message}</p>
         </div>
-        <div style={{ display: "flex", borderTop: "1px solid #EEECE6" }}>
+        <div style={{ display: "flex", borderTop: "1px solid var(--color-outline-variant)" }}>
           <button onClick={onCancel} style={{
             flex: 1, padding: "14px", border: "none", background: "none",
-            fontSize: "14px", fontWeight: 500, color: "#888",
+            fontSize: "14px", fontWeight: 500, color: "var(--color-on-surface-variant)",
             cursor: "pointer", fontFamily: "inherit",
-            borderRight: "1px solid #EEECE6",
+            borderRight: "1px solid var(--color-outline-variant)",
           }}>취소</button>
           <button onClick={onConfirm} style={{
             flex: 1, padding: "14px", border: "none", background: "none",
-            fontSize: "14px", fontWeight: 700, color: confirmColor || "#D94F3B",
+            fontSize: "14px", fontWeight: 700, color: confirmColor || "var(--color-error)",
             cursor: "pointer", fontFamily: "inherit",
           }}>{confirmLabel || "확인"}</button>
         </div>
@@ -230,17 +267,17 @@ function AddDayDialog({ onAdd, onCancel }) {
   return (
     <BottomSheet onClose={onCancel} maxHeight="auto" zIndex={3000}>
       <div style={{ padding: "8px 24px 24px" }}>
-        <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}>
+        <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: 800, color: "var(--color-on-surface)", display: "flex", alignItems: "center", gap: "6px" }}>
           <Icon name="calendar" size={16} />날짜 추가
         </h3>
         <div style={{ marginBottom: "16px" }}>
-          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "#888" }}>아이콘</p>
+          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "var(--color-on-surface-variant)" }}>아이콘</p>
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             {icons.map((ic) => (
               <button key={ic} onClick={() => setIcon(ic)} style={{
                 width: "40px", height: "40px", borderRadius: "12px",
-                border: icon === ic ? "2px solid #1a1a1a" : "1px solid #E8E6E1",
-                background: icon === ic ? "#F5F5F0" : "#FAFAF8",
+                border: icon === ic ? "2px solid var(--color-on-surface)" : "1px solid var(--color-outline-variant)",
+                background: icon === ic ? "var(--color-surface-container-low)" : "var(--color-surface-container-lowest)",
                 cursor: "pointer", display: "flex",
                 alignItems: "center", justifyContent: "center",
                 transition: "all 0.1s",
@@ -249,7 +286,7 @@ function AddDayDialog({ onAdd, onCancel }) {
           </div>
         </div>
         <div style={{ marginBottom: "20px" }}>
-          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "#888" }}>날짜 이름 *</p>
+          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "var(--color-on-surface-variant)" }}>날짜 이름 *</p>
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
@@ -257,31 +294,20 @@ function AddDayDialog({ onAdd, onCancel }) {
             placeholder="예: 후쿠오카 자유시간"
             style={{
               width: "100%", padding: "12px 14px",
-              border: "1.5px solid #E8E6E1", borderRadius: "12px",
+              border: "1.5px solid var(--color-outline-variant)", borderRadius: "12px",
               fontSize: "14px", fontFamily: "inherit", fontWeight: 500,
-              background: "#FAFAF8", outline: "none", boxSizing: "border-box",
+              background: "var(--color-surface-container-low)", outline: "none", boxSizing: "border-box",
               transition: "border-color 0.15s",
             }}
-            onFocus={(e) => { e.target.style.borderColor = "#1a1a1a"; }}
-            onBlur={(e) => { e.target.style.borderColor = "#E8E6E1"; }}
+            onFocus={(e) => { e.target.style.borderColor = "var(--color-on-surface)"; }}
+            onBlur={(e) => { e.target.style.borderColor = "var(--color-outline-variant)"; }}
           />
         </div>
         <div style={{ display: "flex", gap: "10px" }}>
-          <button onClick={onCancel} style={{
-            flex: 1, padding: "14px", border: "1px solid #E8E6E1", background: "#fff",
-            borderRadius: "12px", fontSize: "14px", fontWeight: 600, color: "#888",
-            cursor: "pointer", fontFamily: "inherit",
-          }}>취소</button>
+          <button onClick={onCancel} style={{ ...BTN.neutral, flex: 1 }}>취소</button>
           <button
             onClick={() => { if (label.trim()) onAdd(label.trim(), icon); }}
-            style={{
-              flex: 1, padding: "14px", border: "none",
-              borderRadius: "12px", fontSize: "14px", fontWeight: 700,
-              background: label.trim() ? "#1a1a1a" : "#E8E6E1",
-              color: label.trim() ? "#fff" : "#bbb",
-              cursor: label.trim() ? "pointer" : "default",
-              fontFamily: "inherit", transition: "all 0.15s",
-            }}
+            style={{ ...BTN.primary, flex: 1, ...(label.trim() ? {} : BTN.disabled) }}
           >추가</button>
         </div>
       </div>
@@ -425,29 +451,29 @@ function FullMapDialog({ days, onClose }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 2000,
-      background: "#fff", display: "flex", flexDirection: "column",
+      background: "var(--color-surface-container-lowest)", display: "flex", flexDirection: "column",
       animation: "fadeIn 0.2s ease",
       paddingTop: "env(safe-area-inset-top, 0px)",
     }}>
       {/* Header */}
       <div style={{
-        padding: "10px 16px", background: "#fff",
-        borderBottom: "1px solid #E8E6E1",
+        padding: "10px 16px", background: "var(--color-surface-container-lowest)",
+        borderBottom: "1px solid var(--color-outline-variant)",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexShrink: 0,
       }}>
-        <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}><Icon name="map" size={16} />여행 지도</h3>
+        <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "var(--color-on-surface)", display: "flex", alignItems: "center", gap: "6px" }}><Icon name="map" size={16} />여행 지도</h3>
         <button onClick={onClose} style={{
-          border: "none", background: "#F2F1ED", borderRadius: "50%",
+          border: "none", ...BTN.icon,
           width: "28px", height: "28px", cursor: "pointer",
-          fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "14px", color: "var(--color-on-surface-variant2)", display: "flex", alignItems: "center", justifyContent: "center",
         }}><Icon name="close" size={14} /></button>
       </div>
 
       {/* Day tabs */}
       <div style={{
-        display: "flex", background: "#fff", flexShrink: 0,
-        borderBottom: "1px solid #E8E6E1", overflowX: "auto",
+        display: "flex", background: "var(--color-surface-container-lowest)", flexShrink: 0,
+        borderBottom: "1px solid var(--color-outline-variant)", overflowX: "auto",
       }}>
         {days.map((d, i) => {
           const active = selectedDay === i;
@@ -456,7 +482,7 @@ function FullMapDialog({ days, onClose }) {
               flex: "none", padding: "8px 14px", border: "none",
               background: "none", cursor: "pointer",
               borderBottom: active ? `2.5px solid ${d.color}` : "2.5px solid transparent",
-              color: active ? d.color : "#bbb",
+              color: active ? d.color : "var(--color-on-surface-variant2)",
               fontWeight: active ? 700 : 400,
               fontSize: "11px", fontFamily: "inherit",
               transition: "all 0.15s", whiteSpace: "nowrap",
@@ -501,14 +527,14 @@ function FullMapDialog({ days, onClose }) {
                 <div style={{ fontSize: "12px", fontFamily: "-apple-system,BlinkMacSystemFont,sans-serif", minWidth: "140px" }}>
                   <strong style={{ fontSize: "13px" }}>{pin.label}</strong>
                   {pin.descs.map((d, di) => (
-                    <div key={di} style={{ color: "#48464d", marginTop: "3px" }}>
-                      <span style={{ color: "#78767e" }}>{d.time}</span> {d.desc}
+                    <div key={di} style={{ color: "var(--color-on-surface-variant)", marginTop: "3px" }}>
+                      <span style={{ color: "var(--color-on-surface-variant2)" }}>{d.time}</span> {d.desc}
                     </div>
                   ))}
                   {pin._detail && (
                     <button onClick={(e) => { e.stopPropagation(); setMapDetail(pin._detail); }} style={{
-                      marginTop: "8px", width: "100%", padding: "6px 0", border: "1px solid #E8E6E1",
-                      borderRadius: "6px", background: "#FAFAF8", cursor: "pointer",
+                      marginTop: "8px", width: "100%", padding: "6px 0", border: "1px solid var(--color-outline-variant)",
+                      borderRadius: "6px", background: "var(--color-surface-container-low)", cursor: "pointer",
                       fontSize: "11px", fontWeight: 600, color: pin.color, fontFamily: "inherit",
                     }}>상세보기</button>
                   )}
@@ -529,7 +555,7 @@ function FullMapDialog({ days, onClose }) {
 
       {/* Bottom itinerary card */}
       <div style={{
-        background: "#fff", borderTop: "1px solid #E8E6E1", flexShrink: 0,
+        background: "var(--color-surface-container-lowest)", borderTop: "1px solid var(--color-outline-variant)", flexShrink: 0,
         maxHeight: cardExpanded ? "35vh" : "44px", transition: "max-height 0.25s ease",
         overflow: "hidden", display: "flex", flexDirection: "column",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -543,7 +569,7 @@ function FullMapDialog({ days, onClose }) {
           <span style={{ fontSize: "12px", fontWeight: 700, color: day?.color || "#333" }}>
             Day {day?.day} — {day?.label}
           </span>
-          <span style={{ fontSize: "11px", color: "#bbb" }}>
+          <span style={{ fontSize: "11px", color: "var(--color-on-surface-variant2)" }}>
             {dayPins.length}곳 · {cardExpanded ? "▾" : "▴"}
           </span>
         </button>
@@ -561,7 +587,7 @@ function FullMapDialog({ days, onClose }) {
                 background: selectedPin && selectedPin.orders && selectedPin.orders.includes(item.pinOrder) ? `${day.color}12` : "transparent",
                 transition: "background 0.15s",
               }}
-              onMouseEnter={(e) => { if (item.hasPin) e.currentTarget.style.background = "#F5F5F2"; }}
+              onMouseEnter={(e) => { if (item.hasPin) e.currentTarget.style.background = "var(--color-surface-container-low)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = selectedPin && selectedPin.orders && selectedPin.orders.includes(item.pinOrder) ? `${day.color}12` : "transparent"; }}
             >
               {/* Pin number (first occurrence only) or dot */}
@@ -580,17 +606,17 @@ function FullMapDialog({ days, onClose }) {
                     width: item.hasPin ? "6px" : "4px",
                     height: item.hasPin ? "6px" : "4px",
                     borderRadius: "50%",
-                    background: item.hasPin ? day.color + "60" : "#ddd",
+                    background: item.hasPin ? day.color + "60" : "var(--color-outline-variant)",
                   }} />
                 </div>
               )}
               <span style={{
-                fontSize: "10px", fontWeight: 600, color: "#999",
+                fontSize: "10px", fontWeight: 600, color: "var(--color-on-surface-variant2)",
                 width: "36px", flexShrink: 0, textAlign: "right",
                 fontVariantNumeric: "tabular-nums",
               }}>{item.time}</span>
               <span style={{
-                fontSize: "11px", color: item.hasPin ? "#333" : "#aaa",
+                fontSize: "11px", color: item.hasPin ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
                 fontWeight: item.hasPin ? 500 : 400,
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
               }}>{item.desc}</span>
@@ -1726,13 +1752,13 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
     <BottomSheet onClose={onClose} maxHeight="75vh">
         {/* Header with tabs */}
         <div style={{
-          display: "flex", borderBottom: "1px solid #EEECE6", flexShrink: 0,
+          display: "flex", borderBottom: "1px solid var(--color-outline-variant)", flexShrink: 0,
         }}>
           {["meals", "stay"].map((t) => (
             <button key={t} onClick={() => setActiveTab(t)} style={{
               flex: 1, padding: "14px 0", border: "none", background: "none",
               borderBottom: activeTab === t ? `2.5px solid ${color}` : "2.5px solid transparent",
-              color: activeTab === t ? color : "#aaa",
+              color: activeTab === t ? color : "var(--color-on-surface-variant2)",
               fontSize: "13px", fontWeight: activeTab === t ? 700 : 400,
               cursor: "pointer", fontFamily: "inherit",
               transition: "all 0.15s",
@@ -1743,9 +1769,9 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
           ))}
           <button onClick={onClose} style={{
             position: "absolute", right: "24px", marginTop: "8px",
-            border: "none", background: "#F2F1ED", borderRadius: "50%",
+            border: "none", ...BTN.icon,
             width: "28px", height: "28px", cursor: "pointer",
-            fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "14px", color: "var(--color-on-surface-variant2)", display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "inherit",
           }}><Icon name="close" size={14} /></button>
         </div>
@@ -1757,7 +1783,7 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
           {activeTab === "meals" && (
             <>
               {mealSections.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "30px 0", color: "#bbb", fontSize: "13px" }}>
+                <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-on-surface-variant2)", fontSize: "13px" }}>
                   식사 정보가 없습니다
                 </div>
               ) : (
@@ -1773,22 +1799,22 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
                       }}>
                         {section.label}
                       </span>
-                      <div style={{ flex: 1, height: "1px", background: "#EEECE6" }} />
+                      <div style={{ flex: 1, height: "1px", background: "var(--color-surface-dim)" }} />
                     </div>
                     {section.items.map((meal, mi) => (
                       <div key={mi} style={{
-                        padding: "12px 14px", background: "#FAFAF8",
-                        borderRadius: "12px", border: "1px solid #EEECE6",
+                        padding: "12px 14px", background: "var(--color-surface-container-lowest)",
+                        borderRadius: "12px", border: "1px solid var(--color-outline-variant)",
                         marginBottom: "8px",
                       }}>
                         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ margin: 0, fontSize: "13px", fontWeight: 800, color: "#111" }}>{meal.name}</p>
-                            <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#666", lineHeight: 1.5 }}>{meal.note}</p>
+                            <p style={{ margin: 0, fontSize: "13px", fontWeight: 800, color: "var(--color-on-surface)" }}>{meal.name}</p>
+                            <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>{meal.note}</p>
                           </div>
                           <MapButton query={meal.mapQuery} />
                         </div>
-                        <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "10px", color: "#888" }}>
+                        <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "10px", color: "var(--color-on-surface-variant)" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Icon name="clock" size={12} />{meal.time}</span>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Icon name="pricetag" size={12} />{meal.price}</span>
                         </div>
@@ -1803,25 +1829,25 @@ function DayInfoDialog({ dayNum, tab, onClose, color }) {
           {/* 숙소 탭 */}
           {activeTab === "stay" && info.stay && (
             <div style={{
-              padding: "16px", background: "#FAFAF8",
-              borderRadius: "12px", border: "1px solid #EEECE6",
+              padding: "16px", background: "var(--color-surface-container-lowest)",
+              borderRadius: "12px", border: "1px solid var(--color-outline-variant)",
             }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "10px" }}>
-                <p style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#111" }}>{info.stay.name}</p>
+                <p style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "var(--color-on-surface)" }}>{info.stay.name}</p>
                 <MapButton query={info.stay.mapQuery} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pin" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{info.stay.address}</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{info.stay.address}</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="lock" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>체크인 {info.stay.checkin} / 체크아웃 {info.stay.checkout}</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>체크인 {info.stay.checkin} / 체크아웃 {info.stay.checkout}</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="bulb" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{info.stay.note}</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{info.stay.note}</span>
                 </div>
               </div>
             </div>
@@ -1928,17 +1954,17 @@ function GuideCard({ item }) {
   return (
     <div style={{
       marginBottom: "10px", padding: "14px",
-      background: "#FAFAF8", borderRadius: "12px",
-      border: "1px solid #EEECE6",
+      background: "var(--color-surface-container-lowest)", borderRadius: "12px",
+      border: "1px solid var(--color-outline-variant)",
     }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
         <div style={{ minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: "13px", fontWeight: 800, color: "#111" }}>{item.name}</p>
-          {item.sub && <p style={{ margin: 0, fontSize: "9px", color: "#aaa", marginTop: "1px" }}>{item.sub}</p>}
+          <p style={{ margin: 0, fontSize: "13px", fontWeight: 800, color: "var(--color-on-surface)" }}>{item.name}</p>
+          {item.sub && <p style={{ margin: 0, fontSize: "9px", color: "var(--color-on-surface-variant2)", marginTop: "1px" }}>{item.sub}</p>}
         </div>
         <MapButton query={item.mapQuery} />
       </div>
-      <p style={{ margin: "0 0 8px", fontSize: "11px", color: "#666", lineHeight: 1.5 }}>{item.desc}</p>
+      <p style={{ margin: "0 0 8px", fontSize: "11px", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>{item.desc}</p>
       {item.schedule && (
         <p style={{ margin: "0 0 8px", fontSize: "11px", color: "#C75D20", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}><Icon name="clock" size={12} />{item.schedule}</p>
       )}
@@ -1946,8 +1972,8 @@ function GuideCard({ item }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "8px" }}>
           {item.details.map((d, j) => (
             <div key={j} style={{ display: "flex", gap: "6px", alignItems: "flex-start" }}>
-              <span style={{ color: "#ccc", fontSize: "8px", marginTop: "5px", flexShrink: 0 }}>●</span>
-              <span style={{ fontSize: "11px", color: "#555", lineHeight: 1.5 }}>{d}</span>
+              <span style={{ color: "var(--color-on-surface-variant2)", fontSize: "8px", marginTop: "5px", flexShrink: 0 }}>●</span>
+              <span style={{ fontSize: "11px", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>{d}</span>
             </div>
           ))}
         </div>
@@ -1976,13 +2002,13 @@ function ShoppingGuideDialog({ onClose }) {
         <div style={{
           padding: "6px 16px 0 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "var(--color-on-surface)", display: "flex", alignItems: "center", gap: "6px" }}>
             <Icon name="bookOpen" size={16} />여행 가이드
           </h3>
           <button onClick={onClose} style={{
-            border: "none", background: "#F2F1ED", borderRadius: "50%",
+            border: "none", ...BTN.icon,
             width: "28px", height: "28px", cursor: "pointer",
-            fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "14px", color: "var(--color-on-surface-variant2)", display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "inherit",
           }}><Icon name="close" size={14} /></button>
         </div>
@@ -1990,13 +2016,13 @@ function ShoppingGuideDialog({ onClose }) {
         {/* Region Tabs */}
         <div style={{
           display: "flex", gap: 0, padding: "12px 20px 0",
-          borderBottom: "1px solid #EEECE6",
+          borderBottom: "1px solid var(--color-outline-variant)",
         }}>
           {GUIDE_DATA.map((r, i) => (
             <button key={i} onClick={() => { setRegionIdx(i); setChipIdx(0); }} style={{
               flex: 1, padding: "9px 0", border: "none", background: "none",
               borderBottom: regionIdx === i ? `2.5px solid ${r.color}` : "2.5px solid transparent",
-              color: regionIdx === i ? r.color : "#aaa",
+              color: regionIdx === i ? r.color : "var(--color-on-surface-variant2)",
               fontSize: "13px", fontWeight: regionIdx === i ? 700 : 400,
               cursor: "pointer", fontFamily: "inherit",
               transition: "all 0.15s",
@@ -2014,9 +2040,9 @@ function ShoppingGuideDialog({ onClose }) {
           {region.chips.map((c, i) => (
             <button key={c} onClick={() => setChipIdx(i)} style={{
               flex: "none", padding: "5px 12px", borderRadius: "20px",
-              border: chipIdx === i ? `1.5px solid ${region.color}` : "1.5px solid #E8E6E1",
-              background: chipIdx === i ? region.color : "#fff",
-              color: chipIdx === i ? "#fff" : "#777",
+              border: chipIdx === i ? `1.5px solid ${region.color}` : "1.5px solid var(--color-outline-variant)",
+              background: chipIdx === i ? region.color : "var(--color-surface-container-lowest)",
+              color: chipIdx === i ? "var(--color-surface-container-lowest)" : "var(--color-on-surface-variant)",
               fontSize: "11px", fontWeight: chipIdx === i ? 700 : 500,
               cursor: "pointer", fontFamily: "inherit",
               transition: "all 0.15s", whiteSpace: "nowrap",
@@ -2032,7 +2058,7 @@ function ShoppingGuideDialog({ onClose }) {
             <GuideCard key={`${regionIdx}-${chipIdx}-${i}`} item={item} />
           ))}
           {filtered.length === 0 && (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#bbb", fontSize: "13px" }}>
+            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-on-surface-variant2)", fontSize: "13px" }}>
               항목이 없습니다
             </div>
           )}
@@ -2056,13 +2082,13 @@ function DocumentDialog({ onClose }) {
         <div style={{
           padding: "6px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "var(--color-on-surface)", display: "flex", alignItems: "center", gap: "6px" }}>
             <Icon name="file" size={16} />여행 서류
           </h3>
           <button onClick={onClose} style={{
-            border: "none", background: "#F2F1ED", borderRadius: "50%",
+            border: "none", ...BTN.icon,
             width: "28px", height: "28px", cursor: "pointer",
-            fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "14px", color: "var(--color-on-surface-variant2)", display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "inherit",
           }}><Icon name="close" size={14} /></button>
         </div>
@@ -2074,8 +2100,8 @@ function DocumentDialog({ onClose }) {
           {tabs.map((t, i) => (
             <button key={i} onClick={() => setTab(i)} style={{
               flex: 1, padding: "9px 0", border: "none", borderRadius: "10px",
-              background: tab === i ? "#1a1a1a" : "#F2F1ED",
-              color: tab === i ? "#fff" : "#777",
+              background: tab === i ? "var(--color-inverse-surface)" : "var(--color-surface-container-low)",
+              color: tab === i ? "var(--color-on-inverse-surface)" : "var(--color-on-surface-variant)",
               fontSize: "12px", fontWeight: tab === i ? 700 : 500,
               cursor: "pointer", fontFamily: "inherit",
               transition: "all 0.15s",
@@ -2090,7 +2116,7 @@ function DocumentDialog({ onClose }) {
         <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px 20px" }}>
           {/* Caption */}
           <p style={{
-            margin: "0 0 12px", fontSize: "11px", color: "#888",
+            margin: "0 0 12px", fontSize: "11px", color: "var(--color-on-surface-variant)",
             lineHeight: 1.5, textAlign: "center",
           }}>
             {current.caption}
@@ -2102,8 +2128,8 @@ function DocumentDialog({ onClose }) {
               onClick={() => setViewImage(current.image)}
               style={{
                 borderRadius: "12px", overflow: "hidden",
-                border: "1px solid #EEECE6",
-                background: "#F9F9F7",
+                border: "1px solid var(--color-outline-variant)",
+                background: "var(--color-surface-container-low)",
                 aspectRatio: "595 / 842",
                 width: "100%",
                 cursor: "zoom-in",
@@ -2120,18 +2146,18 @@ function DocumentDialog({ onClose }) {
             </div>
           ) : (
             <div style={{
-              borderRadius: "12px", border: "2px dashed #DDD8CB",
+              borderRadius: "12px", border: "2px dashed var(--color-outline-variant)",
               padding: "40px 20px", textAlign: "center",
-              background: "#FDFCF8",
+              background: "var(--color-surface-container-low)",
             }}>
               <Icon name="pricetag" size={32} />
               <p style={{
-                margin: "10px 0 4px", fontSize: "13px", fontWeight: 600, color: "#999",
+                margin: "10px 0 4px", fontSize: "13px", fontWeight: 600, color: "var(--color-on-surface-variant2)",
               }}>
                 이미지 준비 중
               </p>
               <p style={{
-                margin: 0, fontSize: "11px", color: "#bbb", lineHeight: 1.5,
+                margin: 0, fontSize: "11px", color: "var(--color-on-surface-variant2)", lineHeight: 1.5,
               }}>
                 public/images/ 폴더에<br />JR패스 이미지를 추가해주세요
               </p>
@@ -2142,29 +2168,29 @@ function DocumentDialog({ onClose }) {
           {tab === 1 && (
             <div style={{
               marginTop: "14px", padding: "14px",
-              background: "#FAFAF8", borderRadius: "12px",
-              border: "1px solid #EEECE6",
+              background: "var(--color-surface-container-lowest)", borderRadius: "12px",
+              border: "1px solid var(--color-outline-variant)",
             }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pricetag" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>JR 북큐슈 5일권 (17,000엔/인)</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>JR 북큐슈 5일권 (17,000엔/인)</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="calendar" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>Day2~6 커버 (2/20~2/24)</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>Day2~6 커버 (2/20~2/24)</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="bookmark" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>예약번호: FGY393247 (성인 2매)</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>예약번호: FGY393247 (성인 2매)</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="bulb" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>하카타역 みどりの窓口에서 바우처→실물 교환<br/>여권 + Klook 바우처 바코드 필요</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>하카타역 みどりの窓口에서 바우처→실물 교환<br/>여권 + Klook 바우처 바코드 필요</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="car" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>신칸센 자유석 무제한 · 지정석 6회</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>신칸센 자유석 무제한 · 지정석 6회</span>
                 </div>
               </div>
             </div>
@@ -2174,21 +2200,21 @@ function DocumentDialog({ onClose }) {
           {tab === 0 && (
             <div style={{
               marginTop: "14px", padding: "14px",
-              background: "#FAFAF8", borderRadius: "12px",
-              border: "1px solid #EEECE6",
+              background: "var(--color-surface-container-lowest)", borderRadius: "12px",
+              border: "1px solid var(--color-outline-variant)",
             }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="navigation" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}><b>가는편</b> KE8795 · 인천 15:30 → 후쿠오카 17:10</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}><b>가는편</b> KE8795 · 인천 15:30 → 후쿠오카 17:10</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="navigation" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}><b>오는편</b> KE788 · 후쿠오카 10:30 → 인천 12:00</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}><b>오는편</b> KE788 · 후쿠오카 10:30 → 인천 12:00</span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                   <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="briefcase" size={14} /></div>
-                  <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>수하물 1pc 포함</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>수하물 1pc 포함</span>
                 </div>
               </div>
             </div>
@@ -2238,20 +2264,20 @@ function ImageViewer({ src, alt, onClose }) {
 function DetailDialog({ detail, onClose, dayColor }) {
   if (!detail) return null;
   const [viewImage, setViewImage] = useState(null);
-  const cat = CATEGORY_COLORS[detail.category] || { bg: "#f5f5f5", color: "#555", border: "#ddd" };
+  const cat = CATEGORY_COLORS[detail.category] || { bg: "var(--color-surface-container-low)", color: "var(--color-on-surface-variant)", border: "var(--color-outline-variant)" };
 
   return (
     <BottomSheet onClose={onClose} maxHeight="80vh">
         {/* Header */}
         <div style={{
           padding: "6px 16px 12px 20px", flexShrink: 0,
-          borderBottom: "1px solid #EEECE6",
+          borderBottom: "1px solid var(--color-outline-variant)",
           display: "flex", alignItems: "center", gap: "10px",
         }}>
           <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "8px" }}>
             <h3 style={{
               margin: 0, fontSize: "16px", fontWeight: 800,
-              color: "#111", letterSpacing: "-0.3px",
+              color: "var(--color-on-surface)", letterSpacing: "-0.3px",
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
             }}>
               {detail.name}
@@ -2266,9 +2292,9 @@ function DetailDialog({ detail, onClose, dayColor }) {
             </span>
           </div>
           <button onClick={onClose} style={{
-            border: "none", background: "#F2F1ED", borderRadius: "50%",
+            border: "none", ...BTN.icon,
             width: "28px", height: "28px", cursor: "pointer",
-            fontSize: "14px", color: "#999", flexShrink: 0,
+            fontSize: "14px", color: "var(--color-on-surface-variant2)", flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "inherit",
           }}><Icon name="close" size={14} /></button>
@@ -2300,32 +2326,32 @@ function DetailDialog({ detail, onClose, dayColor }) {
           {/* Info rows */}
           <div style={{
             display: "flex", flexDirection: "column", gap: "10px",
-            padding: "14px", background: "#FAFAF8", borderRadius: "12px",
-            border: "1px solid #EEECE6", marginBottom: "14px",
+            padding: "14px", background: "var(--color-surface-container-lowest)", borderRadius: "12px",
+            border: "1px solid var(--color-outline-variant)", marginBottom: "14px",
           }}>
             {detail.address && (
               <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                 <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pin" size={14} /></div>
-                <span style={{ flex: 1, fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{detail.address}</span>
+                <span style={{ flex: 1, fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{detail.address}</span>
                 <MapButton query={detail.address} />
               </div>
             )}
             {detail.hours && (
               <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                 <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="clock" size={14} /></div>
-                <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{detail.hours}</span>
+                <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{detail.hours}</span>
               </div>
             )}
             {detail.price && (
               <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                 <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pricetag" size={14} /></div>
-                <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{detail.price}</span>
+                <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{detail.price}</span>
               </div>
             )}
             {detail.tip && (
               <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                 <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="bulb" size={14} /></div>
-                <span style={{ fontSize: "12px", color: "#48464d", lineHeight: "18px" }}>{detail.tip}</span>
+                <span style={{ fontSize: "12px", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{detail.tip}</span>
               </div>
             )}
           </div>
@@ -2335,20 +2361,20 @@ function DetailDialog({ detail, onClose, dayColor }) {
             <div style={{ marginBottom: "14px" }}>
               <p style={{
                 margin: "0 0 8px", fontSize: "11px", fontWeight: 700,
-                color: "#78767e", letterSpacing: "0.5px",
+                color: "var(--color-on-surface-variant2)", letterSpacing: "0.5px",
                 display: "flex", alignItems: "center", gap: "4px",
               }}>
                 <Icon name="car" size={14} />{detail.timetable.station} 발차 시간표 — {detail.timetable.direction}
               </p>
               <div style={{
                 borderRadius: "12px", overflow: "hidden",
-                border: "1px solid #E0DFDC",
+                border: "1px solid var(--color-outline-variant)",
               }}>
                 {/* Table header */}
                 <div style={{
                   display: "flex", padding: "8px 12px",
-                  background: "#F5F5F4", borderBottom: "1px solid #E0DFDC",
-                  fontSize: "10px", fontWeight: 700, color: "#888", letterSpacing: "0.3px",
+                  background: "var(--color-surface-container-low)", borderBottom: "1px solid var(--color-outline-variant)",
+                  fontSize: "10px", fontWeight: 700, color: "var(--color-on-surface-variant)", letterSpacing: "0.3px",
                 }}>
                   <span style={{ width: "52px", flexShrink: 0 }}>시각</span>
                   <span style={{ flex: 1 }}>열차명</span>
@@ -2359,8 +2385,8 @@ function DetailDialog({ detail, onClose, dayColor }) {
                   <div key={i} style={{
                     display: "flex", flexDirection: "column",
                     padding: t.picked ? "8px 12px 9px" : "7px 12px",
-                    background: t.picked ? "linear-gradient(90deg, #FFF9E0, #FFF4CC)" : (i % 2 === 0 ? "#fff" : "#FAFAF8"),
-                    borderBottom: i < detail.timetable.trains.length - 1 ? "1px solid #F0EEEA" : "none",
+                    background: t.picked ? "linear-gradient(90deg, #FFF9E0, #FFF4CC)" : (i % 2 === 0 ? "var(--color-surface-container-lowest)" : "var(--color-surface-container-low)"),
+                    borderBottom: i < detail.timetable.trains.length - 1 ? "1px solid var(--color-outline-variant)" : "none",
                     borderLeft: t.picked ? "3px solid #E6B800" : "3px solid transparent",
                   }}>
                     {t.picked && (
@@ -2378,7 +2404,7 @@ function DetailDialog({ detail, onClose, dayColor }) {
                         width: "52px", flexShrink: 0,
                         fontSize: t.picked ? "14px" : "12px",
                         fontWeight: t.picked ? 900 : 600,
-                        color: t.picked ? "#8B6914" : "#555",
+                        color: t.picked ? "#8B6914" : "var(--color-on-surface-variant)",
                         fontVariantNumeric: "tabular-nums",
                       }}>
                         {t.time}
@@ -2387,7 +2413,7 @@ function DetailDialog({ detail, onClose, dayColor }) {
                         flex: 1,
                         fontSize: t.picked ? "13px" : "11px",
                         fontWeight: t.picked ? 800 : 500,
-                        color: t.picked ? "#6B4F00" : "#444",
+                        color: t.picked ? "#6B4F00" : "var(--color-on-surface)",
                       }}>
                         {t.name}
                       </span>
@@ -2395,7 +2421,7 @@ function DetailDialog({ detail, onClose, dayColor }) {
                         flex: 1, textAlign: "right",
                         fontSize: "10px",
                         fontWeight: t.picked ? 700 : 400,
-                        color: t.picked ? "#8B6914" : "#999",
+                        color: t.picked ? "#8B6914" : "var(--color-on-surface-variant2)",
                         lineHeight: 1.4,
                       }}>
                         <span style={{ display: "block" }}>{t.dest}</span>
@@ -2413,7 +2439,7 @@ function DetailDialog({ detail, onClose, dayColor }) {
             <div>
               <p style={{
                 margin: "0 0 8px", fontSize: "11px", fontWeight: 700,
-                color: "#999", letterSpacing: "0.5px",
+                color: "var(--color-on-surface-variant2)", letterSpacing: "0.5px",
               }}>
                 포인트
               </p>
@@ -2426,7 +2452,7 @@ function DetailDialog({ detail, onClose, dayColor }) {
                       width: "5px", height: "5px", borderRadius: "50%",
                       background: dayColor, flexShrink: 0, marginTop: "6px",
                     }} />
-                    <span style={{ fontSize: "12px", color: "#444", lineHeight: 1.55 }}>
+                    <span style={{ fontSize: "12px", color: "var(--color-on-surface)", lineHeight: 1.55 }}>
                       {h}
                     </span>
                   </div>
@@ -2523,9 +2549,9 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
   };
 
   const fieldStyle = {
-    width: "100%", padding: "10px 12px", border: "1px solid #E0DFDC",
+    width: "100%", padding: "10px 12px", border: "1px solid var(--color-outline-variant)",
     borderRadius: "10px", fontSize: "13px", fontFamily: "inherit",
-    background: "#FAFAF8", outline: "none", boxSizing: "border-box",
+    background: "var(--color-surface-container-low)", outline: "none", boxSizing: "border-box",
   };
   const selectStyle = {
     ...fieldStyle, cursor: "pointer", paddingRight: "36px",
@@ -2534,7 +2560,7 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
     backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
     backgroundSize: "14px",
   };
-  const labelStyle = { margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#888" };
+  const labelStyle = { margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "var(--color-on-surface-variant)" };
 
   return (
     <BottomSheet
@@ -2544,16 +2570,16 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
         {/* Header */}
         <div style={{
           padding: "6px 16px 12px 20px", flexShrink: 0,
-          borderBottom: "1px solid #EEECE6",
+          borderBottom: "1px solid var(--color-outline-variant)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#1c1b21", display: "flex", alignItems: "center", gap: "6px" }}>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "var(--color-on-surface)", display: "flex", alignItems: "center", gap: "6px" }}>
             {isNew ? <><Icon name="plus" size={16} />일정 추가</> : <><Icon name="edit" size={16} />일정 수정</>}
           </h3>
           <button onClick={onClose} style={{
-            border: "none", background: "#F2F1ED", borderRadius: "50%",
+            border: "none", ...BTN.icon,
             width: "28px", height: "28px", cursor: "pointer",
-            fontSize: "14px", color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "14px", color: "var(--color-on-surface-variant2)", display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "inherit",
           }}><Icon name="close" size={14} /></button>
         </div>
@@ -2599,8 +2625,8 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
           </div>
 
           {/* Divider */}
-          <div style={{ borderTop: "1px solid #EEECE6", paddingTop: "10px" }}>
-            <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "#555" }}>상세 정보</p>
+          <div style={{ borderTop: "1px solid var(--color-outline-variant)", paddingTop: "10px" }}>
+            <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "var(--color-on-surface-variant)" }}>상세 정보</p>
           </div>
 
           {/* Detail name */}
@@ -2643,8 +2669,8 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
           {/* Timetable loader - only for move type */}
           {type === "move" && (
             <>
-              <div style={{ borderTop: "1px solid #EEECE6", paddingTop: "10px" }}>
-                <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "#48464d", display: "flex", alignItems: "center", gap: "4px" }}><Icon name="car" size={14} />시간표 불러오기</p>
+              <div style={{ borderTop: "1px solid var(--color-outline-variant)", paddingTop: "10px" }}>
+                <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, color: "var(--color-on-surface-variant)", display: "flex", alignItems: "center", gap: "4px" }}><Icon name="car" size={14} />시간표 불러오기</p>
               </div>
               <div>
                 <p style={labelStyle}>노선 선택</p>
@@ -2664,8 +2690,8 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
                 disabled={!selectedRoute}
                 style={{
                   padding: "10px", border: "none", borderRadius: "10px",
-                  background: selectedRoute ? "#EEF6FF" : "#F2F1ED",
-                  color: selectedRoute ? "#2B6CB0" : "#bbb",
+                  background: selectedRoute ? "#EEF6FF" : "var(--color-surface-container-low)",
+                  color: selectedRoute ? "#2B6CB0" : "var(--color-on-surface-variant2)",
                   fontSize: "12px", fontWeight: 700, cursor: selectedRoute ? "pointer" : "default",
                   fontFamily: "inherit", transition: "all 0.15s",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
@@ -2678,10 +2704,10 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
               {/* Preview loaded timetable */}
               {loadedTimetable && loadedTimetable.trains && (
                 <div style={{
-                  background: "#FAFAF8", borderRadius: "10px", border: "1px solid #E8E6E1",
+                  background: "var(--color-surface-container-low)", borderRadius: "10px", border: "1px solid var(--color-outline-variant)",
                   padding: "10px 12px", fontSize: "11px",
                 }}>
-                  <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#555" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "var(--color-on-surface-variant)" }}>
                     {loadedTimetable.station} → {loadedTimetable.direction}
                   </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -2692,8 +2718,8 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
                         background: t.picked ? "#FFF9DB" : "transparent",
                         fontWeight: t.picked ? 700 : 400,
                       }}>
-                        <span style={{ width: "38px", flexShrink: 0, color: t.picked ? "#B8860B" : "#777" }}>{t.time}</span>
-                        <span style={{ flex: 1, color: t.picked ? "#333" : "#666" }}>{t.name}</span>
+                        <span style={{ width: "38px", flexShrink: 0, color: t.picked ? "#B8860B" : "var(--color-on-surface-variant)" }}>{t.time}</span>
+                        <span style={{ flex: 1, color: t.picked ? "var(--color-on-surface)" : "var(--color-on-surface-variant)" }}>{t.name}</span>
                         {t.picked && <span style={{
                           fontSize: "9px", background: "#FFE066", color: "#7C6A0A",
                           padding: "1px 5px", borderRadius: "4px", fontWeight: 700,
@@ -2712,16 +2738,15 @@ function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, o
           {!isNew && onDelete && (
             <button onClick={() => onDelete(dayIdx, sectionIdx, itemIdx)} style={{
               padding: "12px", border: "none", borderRadius: "12px",
-              background: "#FFF0F0", color: "#D94F3B", fontSize: "13px", fontWeight: 600,
+              background: "var(--color-error-container)", color: "var(--color-error)", fontSize: "13px", fontWeight: 600,
               cursor: "pointer", fontFamily: "inherit",
             }}>
               삭제
             </button>
           )}
           <button onClick={handleSave} style={{
-            flex: 1, padding: "12px", border: "none", borderRadius: "12px",
-            background: color || "#1a1a1a", color: "#fff", fontSize: "13px", fontWeight: 700,
-            cursor: "pointer", fontFamily: "inherit",
+            ...BTN.cta, flex: 1, padding: "12px", fontSize: "13px",
+            background: color || "var(--color-primary)",
             opacity: (time.trim() && desc.trim()) ? 1 : 0.4,
           }}>
             {isNew ? "추가" : "저장"}
@@ -2838,7 +2863,7 @@ export default function TravelPlanner() {
       title: "날짜 삭제",
       message: "이 날짜와 포함된 모든 일정이 삭제됩니다.\n정말 삭제하시겠습니까?",
       confirmLabel: "삭제",
-      confirmColor: "#D94F3B",
+      confirmColor: "var(--color-error)",
       onConfirm: () => {
         setCustomData((prev) => {
           const next = { ...prev };
@@ -2886,7 +2911,7 @@ export default function TravelPlanner() {
       title: "일정 삭제",
       message: "이 일정을 삭제하시겠습니까?",
       confirmLabel: "삭제",
-      confirmColor: "#D94F3B",
+      confirmColor: "var(--color-error)",
       onConfirm: () => {
         setCustomData((prev) => {
           const next = { ...prev };
@@ -2911,14 +2936,14 @@ export default function TravelPlanner() {
   return (
     <div style={{
       width: "100%", height: "100vh", display: "flex", flexDirection: "column",
-      fontFamily: "'Noto Sans KR', sans-serif", background: "#F5F4F0", overflow: "hidden",
+      fontFamily: "'Noto Sans KR', sans-serif", background: "var(--color-surface)", overflow: "hidden",
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
       {/* Header */}
       <div style={{
-        padding: "14px 20px", background: "#fff",
-        borderBottom: "1px solid #E8E6E1",
+        padding: "14px 20px", background: "var(--color-surface-container-lowest)",
+        borderBottom: "1px solid var(--color-outline-variant)",
         display: "flex", alignItems: "center", gap: "10px", flexShrink: 0,
       }}>
         <div style={{
@@ -2927,10 +2952,10 @@ export default function TravelPlanner() {
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px",
         }}>🇯🇵</div>
         <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.5px" }}>
+          <h1 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "var(--color-on-surface)", letterSpacing: "-0.5px" }}>
             후쿠오카 · 구마모토 · 유후인
           </h1>
-          <p style={{ margin: 0, fontSize: "11px", color: "#999" }}>
+          <p style={{ margin: 0, fontSize: "11px", color: "var(--color-on-surface-variant2)" }}>
             2026.02.19 — 02.24 · 5박 6일
           </p>
         </div>
@@ -2938,7 +2963,7 @@ export default function TravelPlanner() {
           onClick={() => setShowGuide(true)}
           style={{
             width: "36px", height: "36px", borderRadius: "10px",
-            border: "1px solid #E8E6E1", background: "#FAFAF8",
+            border: "1px solid var(--color-outline-variant)", background: "var(--color-surface-container-low)",
             display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", fontSize: "16px", flexShrink: 0,
             transition: "background 0.15s",
@@ -2951,7 +2976,7 @@ export default function TravelPlanner() {
           onClick={() => setShowDocs(true)}
           style={{
             width: "36px", height: "36px", borderRadius: "10px",
-            border: "1px solid #E8E6E1", background: "#FAFAF8",
+            border: "1px solid var(--color-outline-variant)", background: "var(--color-surface-container-low)",
             display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", fontSize: "16px", flexShrink: 0,
             transition: "background 0.15s",
@@ -2965,7 +2990,7 @@ export default function TravelPlanner() {
       {/* Day tabs */}
       <div style={{
         display: "flex", gap: 0, padding: "0 12px",
-        background: "#fff", borderBottom: "1px solid #E8E6E1",
+        background: "var(--color-surface-container-lowest)", borderBottom: "1px solid var(--color-outline-variant)",
         flexShrink: 0, alignItems: "center",
       }}>
         <div style={{ display: "flex", flex: 1, overflowX: "auto", alignItems: "center", position: "relative", maskImage: "linear-gradient(to right, black calc(100% - 24px), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 24px), transparent 100%)" }}>
@@ -2976,7 +3001,7 @@ export default function TravelPlanner() {
                 flex: "none", padding: "12px 16px", border: "none",
                 background: "none", cursor: "pointer",
                 borderBottom: active ? `2.5px solid ${day.color}` : "2.5px solid transparent",
-                color: active ? day.color : "#aaa",
+                color: active ? day.color : "var(--color-on-surface-variant2)",
                 fontWeight: active ? 700 : 500,
                 fontSize: "13px", fontFamily: "inherit",
                 transition: "all 0.15s", whiteSpace: "nowrap",
@@ -2990,12 +3015,12 @@ export default function TravelPlanner() {
             flex: "none", padding: "6px 8px", border: "none",
             background: "none", cursor: "pointer",
             borderBottom: "2.5px solid transparent",
-            color: "#ccc", fontSize: "16px", fontWeight: 700,
+            color: "var(--color-on-surface-variant2)", fontSize: "16px", fontWeight: 700,
             fontFamily: "inherit", transition: "color 0.15s",
             marginLeft: "2px",
           }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#888"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#ccc"}
+            onMouseEnter={(e) => e.currentTarget.style.color = "var(--color-on-surface-variant)"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "var(--color-on-surface-variant2)"}
             title="날짜 추가"
           >
             +
@@ -3008,14 +3033,14 @@ export default function TravelPlanner() {
             onClick={() => setEditTarget({ dayIdx: selectedDay, sectionIdx: -1, itemIdx: null, item: null })}
             style={{
               padding: "6px 12px", borderRadius: "8px",
-              border: "1px solid #E8E6E1", background: "#FAFAF8",
+              border: "1px solid var(--color-outline-variant)", background: "var(--color-surface-container-low)",
               display: "flex", alignItems: "center", gap: "4px",
               cursor: "pointer", fontSize: "11px", fontWeight: 600,
               color: current.color, fontFamily: "inherit",
               whiteSpace: "nowrap", transition: "all 0.15s",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = current.color + "15"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "#FAFAF8"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--color-surface-container-low)"; }}
           >
             일정 추가 +
           </button>
@@ -3029,7 +3054,7 @@ export default function TravelPlanner() {
         <div style={{
           display: "flex", alignItems: "center", gap: "12px",
           marginBottom: "16px", padding: "14px 16px",
-          background: "#fff", borderRadius: "14px", border: "1px solid #E8E6E1",
+          background: "var(--color-surface-container-lowest)", borderRadius: "14px", border: "1px solid var(--color-outline-variant)",
         }}>
           <div style={{
             width: "40px", height: "40px", borderRadius: "12px",
@@ -3044,7 +3069,7 @@ export default function TravelPlanner() {
                 <h2
                   onClick={() => { setEditingDayIdx(selectedDay); setEditDayLabel(current.label); }}
                   style={{
-                    margin: 0, fontSize: "16px", fontWeight: 800, color: "#1a1a1a",
+                    margin: 0, fontSize: "16px", fontWeight: 800, color: "var(--color-on-surface)",
                     letterSpacing: "-0.3px", cursor: "pointer",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}
@@ -3056,7 +3081,7 @@ export default function TravelPlanner() {
                   onClick={() => { setEditingDayIdx(selectedDay); setEditDayLabel(current.label); }}
                   style={{
                     border: "none", background: "none", cursor: "pointer",
-                    fontSize: "10px", color: "#ccc", padding: "2px", flexShrink: 0,
+                    fontSize: "10px", color: "var(--color-on-surface-variant2)", padding: "2px", flexShrink: 0,
                   }}
                 ><Icon name="edit" size={14} /></button>
                 {selectedDay >= BASE_DAYS.length && (
@@ -3064,12 +3089,12 @@ export default function TravelPlanner() {
                     onClick={() => handleDeleteDay(selectedDay)}
                     style={{
                       border: "none", background: "none", cursor: "pointer",
-                      fontSize: "10px", color: "#dbb", padding: "2px", flexShrink: 0,
+                      fontSize: "10px", color: "var(--color-on-surface-variant2)", padding: "2px", flexShrink: 0,
                     }}
                   ><Icon name="trash" size={14} /></button>
                 )}
               </div>
-            <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#999" }}>
+            <p style={{ margin: "2px 0 0", fontSize: "11px", color: "var(--color-on-surface-variant2)" }}>
               {current.date} · {current.stay}
             </p>
           </div>
@@ -3112,8 +3137,8 @@ export default function TravelPlanner() {
             </div>
 
             <div style={{
-              background: "#fff", borderRadius: "14px",
-              border: "1px solid #E8E6E1", overflow: "hidden",
+              background: "var(--color-surface-container-lowest)", borderRadius: "14px",
+              border: "1px solid var(--color-outline-variant)", overflow: "hidden",
             }}>
               {section.items.map((item, ii) => {
                 const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
@@ -3136,12 +3161,12 @@ export default function TravelPlanner() {
                       cursor: hasDetail ? "pointer" : "default",
                       transition: "background 0.15s",
                     }}
-                    onMouseEnter={(e) => { if (hasDetail) e.currentTarget.style.background = "#FAFAF8"; }}
+                    onMouseEnter={(e) => { if (hasDetail) e.currentTarget.style.background = "var(--color-surface-container-low)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                   >
                     <span style={{
                       width: "44px", flexShrink: 0, textAlign: "right",
-                      fontSize: "11px", fontWeight: 700, color: cfg.text,
+                      fontSize: "11px", fontWeight: 700, color: "var(--color-on-surface-variant2)",
                       fontVariantNumeric: "tabular-nums",
                       lineHeight: "20px", whiteSpace: "nowrap",
                     }}>
@@ -3151,18 +3176,18 @@ export default function TravelPlanner() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", minHeight: "20px" }}>
                         <p style={{
-                          margin: 0, fontSize: "13px", fontWeight: 500, color: "#1c1b21", lineHeight: "20px",
+                          margin: 0, fontSize: "13px", fontWeight: 500, color: "var(--color-on-surface)", lineHeight: "20px",
                         }}>
                           {item.desc}
                         </p>
                         {hasDetail && (
                           <span style={{
-                            fontSize: "10px", color: "#bbb", flexShrink: 0,
+                            fontSize: "10px", color: "var(--color-on-surface-variant2)", flexShrink: 0,
                           }}>›</span>
                         )}
                       </div>
                       {item.sub && (
-                        <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#78767e", lineHeight: 1.4 }}>
+                        <p style={{ margin: "2px 0 0", fontSize: "11px", color: "var(--color-on-surface-variant2)", lineHeight: 1.4 }}>
                           {item.sub}
                         </p>
                       )}
@@ -3178,7 +3203,7 @@ export default function TravelPlanner() {
                     >
                       <button onClick={() => setEditTarget({ item, sectionIdx: si, itemIdx: ii, dayIdx: selectedDay })} style={{
                         width: "24px", height: "24px", border: "none", borderRadius: "6px",
-                        background: "#F2F1ED", cursor: "pointer", fontSize: "10px",
+                        background: "var(--color-surface-container-low)", cursor: "pointer", fontSize: "10px",
                         display: "flex", alignItems: "center", justifyContent: "center",
                       }}><Icon name="edit" size={14} /></button>
                       <button onClick={() => handleDeleteItem(selectedDay, si, ii)} style={{
@@ -3198,9 +3223,9 @@ export default function TravelPlanner() {
         {current.notes && (
           <div style={{
             marginTop: "4px", padding: "11px 14px",
-            background: "#FDFCF8", borderRadius: "12px", border: "1px dashed #DDD8CB",
+            background: "var(--color-surface-container-low)", borderRadius: "12px", border: "1px dashed var(--color-outline-variant)",
           }}>
-            <p style={{ margin: 0, fontSize: "11px", color: "#78767e", lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: "6px" }}>
+            <p style={{ margin: 0, fontSize: "11px", color: "var(--color-on-surface-variant2)", lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: "6px" }}>
               <Icon name="pin" size={12} style={{ marginTop: "2px" }} /><span>{current.notes}</span>
             </p>
           </div>
@@ -3244,7 +3269,7 @@ export default function TravelPlanner() {
         style={{
           position: "fixed", bottom: "24px", right: "24px", zIndex: 900,
           width: "52px", height: "52px", borderRadius: "50%",
-          border: "none", background: "#1a1a1a", color: "#fff",
+          border: "none", background: "var(--color-inverse-surface)", color: "var(--color-on-inverse-surface)",
           fontSize: "22px", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
           boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
@@ -3276,7 +3301,7 @@ export default function TravelPlanner() {
       {editingDayIdx !== null && (
         <BottomSheet onClose={() => setEditingDayIdx(null)} maxHeight="auto" zIndex={3000}>
           <div style={{ padding: "8px 24px 24px" }}>
-            <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: 800, color: "#1a1a1a", display: "flex", alignItems: "center", gap: "6px" }}>
+            <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: 800, color: "var(--color-on-surface)", display: "flex", alignItems: "center", gap: "6px" }}>
               <Icon name="edit" size={16} />이름 수정
             </h3>
             <input
@@ -3289,31 +3314,24 @@ export default function TravelPlanner() {
               placeholder="이름을 입력하세요"
               style={{
                 width: "100%", padding: "12px 14px",
-                border: "1.5px solid #E8E6E1", borderRadius: "12px",
+                border: "1.5px solid var(--color-outline-variant)", borderRadius: "12px",
                 fontSize: "14px", fontWeight: 600,
                 fontFamily: "inherit", outline: "none",
-                background: "#FAFAF8", boxSizing: "border-box",
+                background: "var(--color-surface-container-low)", boxSizing: "border-box",
                 transition: "border-color 0.15s",
                 marginBottom: "20px",
               }}
-              onFocus={(e) => { e.target.style.borderColor = DAYS[editingDayIdx]?.color || "#8b7bff"; }}
-              onBlur={(e) => { e.target.style.borderColor = "#E8E6E1"; }}
+              onFocus={(e) => { e.target.style.borderColor = DAYS[editingDayIdx]?.color || "var(--color-primary)"; }}
+              onBlur={(e) => { e.target.style.borderColor = "var(--color-outline-variant)"; }}
             />
             <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={() => setEditingDayIdx(null)} style={{
-                flex: 1, padding: "14px", border: "1px solid #E8E6E1", background: "#fff",
-                borderRadius: "12px", fontSize: "14px", fontWeight: 600, color: "#888",
-                cursor: "pointer", fontFamily: "inherit",
-              }}>취소</button>
+              <button onClick={() => setEditingDayIdx(null)} style={{ ...BTN.neutral, flex: 1 }}>취소</button>
               <button
                 onClick={() => { if (editDayLabel.trim()) handleEditDayLabel(editingDayIdx, editDayLabel); }}
                 style={{
-                  flex: 1, padding: "14px", border: "none",
-                  borderRadius: "12px", fontSize: "14px", fontWeight: 700,
-                  background: editDayLabel.trim() ? (DAYS[editingDayIdx]?.color || "#8b7bff") : "#E8E6E1",
-                  color: editDayLabel.trim() ? "#fff" : "#bbb",
-                  cursor: editDayLabel.trim() ? "pointer" : "default",
-                  fontFamily: "inherit", transition: "all 0.15s",
+                  ...BTN.cta, flex: 1,
+                  background: editDayLabel.trim() ? (DAYS[editingDayIdx]?.color || "var(--color-primary)") : undefined,
+                  ...(editDayLabel.trim() ? {} : BTN.disabled),
                 }}
               >저장</button>
             </div>
