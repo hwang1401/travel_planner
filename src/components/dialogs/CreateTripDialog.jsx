@@ -312,17 +312,10 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
       </div>
 
       {/* Form */}
-      <div ref={previewScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div ref={previewScrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0' }}>
 
-        {/* ── Cover Image ── */}
-        <section>
-          <p style={{
-            margin: '0 0 10px', fontSize: 'var(--typo-caption-1-bold-size)',
-            fontWeight: 'var(--typo-caption-1-bold-weight)', color: 'var(--color-primary)',
-            display: 'flex', alignItems: 'center', gap: '6px',
-          }}>
-            커버 이미지
-          </p>
+        {/* ── Cover Image (full width, no padding) ── */}
+        <div style={{ marginBottom: '20px' }}>
           <ImagePicker
             value={coverImage}
             onChange={handleCoverFile}
@@ -331,7 +324,9 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             aspect="cover"
             uploading={coverUploading}
           />
-        </section>
+        </div>
+
+        <div style={{ padding: '0 20px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
         {/* ── Section: 여행 정보 ── */}
         <section>
@@ -473,19 +468,10 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             <p style={{
               margin: '8px 0 0', fontSize: 'var(--typo-caption-2-medium-size)',
               fontWeight: 'var(--typo-caption-2-medium-weight)', color: 'var(--color-on-surface-variant)',
-              display: 'flex', alignItems: 'center', gap: '4px',
             }}>
-              <Icon name="calendar" size={12} />
               {duration - 1}박 {duration}일
             </p>
           )}
-
-          <p style={{
-            margin: '6px 0 0', fontSize: 'var(--typo-caption-3-regular-size)',
-            color: 'var(--color-on-surface-variant2)',
-          }}>
-            여행을 만든 후 초대 링크로 멤버를 추가할 수 있습니다.
-          </p>
         </section>
 
         {/* ── Section: AI 일정 자동 생성 (only for new trips) ── */}
@@ -494,9 +480,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             <p style={{
               margin: '0 0 12px', fontSize: 'var(--typo-caption-1-bold-size)',
               fontWeight: 'var(--typo-caption-1-bold-weight)', color: 'var(--color-primary)',
-              display: 'flex', alignItems: 'center', gap: '6px',
             }}>
-              <Icon name="flash" size={14} />
               AI 일정 자동 생성
             </p>
 
@@ -740,6 +724,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             <style>{`@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }`}</style>
           </section>
         )}
+        </div>
       </div>
 
       {/* Submit */}
@@ -766,6 +751,15 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             ? (isEdit ? '저장 중...' : '생성 중...')
             : (isEdit ? '저장' : (aiPreview?.days?.length > 0 ? '빈 여행으로 만들기' : '여행 만들기'))}
         </Button>
+        {!isEdit && (
+          <p style={{
+            margin: '2px 0 0', textAlign: 'center',
+            fontSize: 'var(--typo-caption-3-regular-size)',
+            color: 'var(--color-on-surface-variant2)',
+          }}>
+            여행을 만든 후 초대 링크로 멤버를 추가할 수 있습니다.
+          </p>
+        )}
       </div>
 
       {/* Date Picker */}
