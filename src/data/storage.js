@@ -14,91 +14,100 @@ function timeToMin(t) {
 
 /* smartTimeMin removed — 새벽 시간은 해당 일자의 시작으로 처리 */
 
-export function mergeData(base, custom) {
-  const merged = base.map((day, di) => {
-    const dayCustom = custom[di];
-    const overrides = custom._dayOverrides?.[di];
-    let d = day;
-    if (overrides) d = { ...d, ...overrides };
-    if (!dayCustom) return d;
-    const newSections = d.sections.map((sec, si) => {
-      const secCustom = dayCustom.sections?.[si];
-      if (!secCustom) return sec;
-      return { ...sec, items: secCustom.items || sec.items };
-    });
-    // Merge extra items into existing sections by timestamp
-    if (dayCustom.extraItems && dayCustom.extraItems.length > 0) {
-      const extras = [...dayCustom.extraItems];
-      extras.forEach((extraItem) => {
-        const extraMin = timeToMin(extraItem.time);
-        let bestSec = -1;
-        let bestPos = -1;
+/* ── Helper: apply customData (section overrides + extraItems) to a day ── */
+function applyDayCustom(day, dayCustom, overrides) {
+  let d = day;
+  if (overrides) d = { ...d, ...overrides };
+  if (!dayCustom) return d;
 
-        // Find the best section and position for this item
-        for (let si = 0; si < newSections.length; si++) {
-          const items = newSections[si].items;
-          if (!items || items.length === 0) continue;
+  const newSections = d.sections.map((sec, si) => {
+    const secCustom = dayCustom.sections?.[si];
+    if (!secCustom) return sec;
+    return { ...sec, items: secCustom.items || sec.items };
+  });
 
-          const firstMin = timeToMin(items[0]?.time);
-          const lastMin = timeToMin(items[items.length - 1]?.time);
+  // Merge extra items into existing sections by timestamp
+  if (dayCustom.extraItems && dayCustom.extraItems.length > 0) {
+    const extras = [...dayCustom.extraItems];
+    extras.forEach((extraItem) => {
+      const extraMin = timeToMin(extraItem.time);
+      let bestSec = -1;
+      let bestPos = -1;
 
-          // If extra item time falls within this section's range (or close)
-          if (extraMin >= firstMin && extraMin <= lastMin + 30) {
-            // Find exact insertion position
-            let pos = items.length;
-            for (let ii = 0; ii < items.length; ii++) {
-              if (timeToMin(items[ii].time) > extraMin) {
-                pos = ii;
-                break;
-              }
-            }
-            bestSec = si;
-            bestPos = pos;
-            break;
-          }
+      // Find the best section and position for this item
+      for (let si = 0; si < newSections.length; si++) {
+        const items = newSections[si].items;
+        if (!items || items.length === 0) continue;
 
-          // If extra item time is before first section item
-          if (si === 0 && extraMin < firstMin) {
-            bestSec = 0;
-            bestPos = 0;
-            break;
-          }
-        }
+        const firstMin = timeToMin(items[0]?.time);
+        const lastMin = timeToMin(items[items.length - 1]?.time);
 
-        // If no good fit, find the closest section by checking gaps between sections
-        if (bestSec === -1) {
-          // Default: find the last section whose last item time is <= extraMin
-          for (let si = newSections.length - 1; si >= 0; si--) {
-            const items = newSections[si].items;
-            if (!items || items.length === 0) continue;
-            const lastMin = timeToMin(items[items.length - 1]?.time);
-            if (lastMin <= extraMin) {
-              bestSec = si;
-              bestPos = items.length;
+        if (extraMin >= firstMin && extraMin <= lastMin + 30) {
+          let pos = items.length;
+          for (let ii = 0; ii < items.length; ii++) {
+            if (timeToMin(items[ii].time) > extraMin) {
+              pos = ii;
               break;
             }
           }
+          bestSec = si;
+          bestPos = pos;
+          break;
         }
 
-        // Fallback: append to last section
-        if (bestSec === -1) {
-          bestSec = newSections.length - 1;
-          bestPos = newSections[bestSec]?.items?.length || 0;
+        if (si === 0 && extraMin < firstMin) {
+          bestSec = 0;
+          bestPos = 0;
+          break;
         }
+      }
 
-        // Insert the item (mark as _extra for identification)
-        const sec = newSections[bestSec];
+      if (bestSec === -1) {
+        for (let si = newSections.length - 1; si >= 0; si--) {
+          const items = newSections[si].items;
+          if (!items || items.length === 0) continue;
+          const lastMin = timeToMin(items[items.length - 1]?.time);
+          if (lastMin <= extraMin) {
+            bestSec = si;
+            bestPos = items.length;
+            break;
+          }
+        }
+      }
+
+      // Fallback: append to last section (or first if all empty)
+      if (bestSec === -1) {
+        bestSec = newSections.length - 1;
+        if (bestSec < 0) bestSec = 0;
+        bestPos = newSections[bestSec]?.items?.length || 0;
+      }
+
+      const sec = newSections[bestSec];
+      if (sec) {
         const newItems = [...(sec.items || [])];
         newItems.splice(bestPos, 0, { ...extraItem, _extra: true });
         newSections[bestSec] = { ...sec, items: newItems };
-      });
-    }
-    return { ...d, sections: newSections };
-  });
-  // Append custom-added days
-  if (custom._extraDays) {
-    custom._extraDays.forEach((d) => merged.push(d));
+      }
+    });
   }
+  return { ...d, sections: newSections };
+}
+
+export function mergeData(base, custom) {
+  const merged = base.map((day, di) => {
+    return applyDayCustom(day, custom[di], custom._dayOverrides?.[di]);
+  });
+
+  // Append custom-added days (also apply per-day customizations)
+  if (custom._extraDays) {
+    custom._extraDays.forEach((d, i) => {
+      const dayIdx = base.length + i;
+      const dayCustom = custom[dayIdx];
+      const overrides = custom._dayOverrides?.[dayIdx];
+      merged.push(applyDayCustom(d, dayCustom, overrides));
+    });
+  }
+
   // Apply day reorder if present
   if (custom._dayOrder && custom._dayOrder.length === merged.length) {
     return custom._dayOrder.map((origIdx) => merged[origIdx]);
