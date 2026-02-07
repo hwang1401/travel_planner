@@ -408,8 +408,11 @@ export default function TravelPlanner() {
         if (!next[dayIdx]) next[dayIdx] = {};
         if (!next[dayIdx].sections) next[dayIdx].sections = {};
         if (!next[dayIdx].sections[sectionIdx]) {
-          const baseSec = (baseLen > 0 ? BASE_DAYS : [])[dayIdx]?.sections?.[sectionIdx];
-          next[dayIdx].sections[sectionIdx] = { items: [...(baseSec?.items || [])] };
+          // Get current items: from BASE_DAYS for legacy, from _extraDays for standalone
+          const sourceSec = baseLen > 0
+            ? BASE_DAYS[dayIdx]?.sections?.[sectionIdx]
+            : next._extraDays?.[dayIdx - baseLen]?.sections?.[sectionIdx];
+          next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec?.items || [])] };
         }
         if (itemIdx !== undefined && itemIdx !== null) {
           next[dayIdx].sections[sectionIdx].items[itemIdx] = newItem;
@@ -456,8 +459,10 @@ export default function TravelPlanner() {
             if (!next[dayIdx]) next[dayIdx] = {};
             if (!next[dayIdx].sections) next[dayIdx].sections = {};
             if (!next[dayIdx].sections[sectionIdx]) {
-              const baseSec2 = (baseLen > 0 ? BASE_DAYS : [])[dayIdx]?.sections?.[sectionIdx];
-              next[dayIdx].sections[sectionIdx] = { items: [...(baseSec2?.items || [])] };
+              const sourceSec2 = baseLen > 0
+                ? BASE_DAYS[dayIdx]?.sections?.[sectionIdx]
+                : next._extraDays?.[dayIdx - baseLen]?.sections?.[sectionIdx];
+              next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec2?.items || [])] };
             } else {
               next[dayIdx].sections[sectionIdx] = { ...next[dayIdx].sections[sectionIdx], items: [...next[dayIdx].sections[sectionIdx].items] };
             }
