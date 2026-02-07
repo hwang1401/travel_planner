@@ -1,14 +1,17 @@
+import { createPortal } from 'react-dom';
 import Button from './Button';
 
-/* ── Image Viewer (fullscreen lightbox) ── */
+/* ── Image Viewer (fullscreen lightbox via Portal) ── */
 export default function ImageViewer({ src, alt, onClose }) {
   if (!src) return null;
-  return (
+
+  // Render via Portal so it escapes any parent overflow:hidden / z-index stacking
+  return createPortal(
     <div
       onClick={onClose}
       style={{
-        position: "fixed", inset: 0, zIndex: 2000,
-        background: "color-mix(in srgb, var(--color-scrim) 90%, transparent)",
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.92)",
         display: "flex", alignItems: "center", justifyContent: "center",
         animation: "fadeIn 0.15s ease",
         cursor: "zoom-out",
@@ -16,8 +19,8 @@ export default function ImageViewer({ src, alt, onClose }) {
     >
       <Button variant="ghost-neutral" size="lg" iconOnly="close" onClick={onClose}
         style={{
-          position: "absolute", top: "16px", right: "16px", zIndex: 2001,
-          background: "color-mix(in srgb, var(--color-surface-container-lowest) 15%, transparent)", backdropFilter: "blur(4px)",
+          position: "absolute", top: "16px", right: "16px", zIndex: 10000,
+          background: "rgba(255,255,255,0.12)", backdropFilter: "blur(4px)",
           width: "36px", height: "36px",
         }} />
       <img
@@ -30,6 +33,7 @@ export default function ImageViewer({ src, alt, onClose }) {
           cursor: "default",
         }}
       />
-    </div>
+    </div>,
+    document.body
   );
 }

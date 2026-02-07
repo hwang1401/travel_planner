@@ -53,14 +53,17 @@ export default function DetailDialog({ detail, onClose, dayColor }) {
         {sortedImages.length === 1 && (
           <div
             onClick={() => setViewImage(sortedImages[0])}
-            style={{ flexShrink: 0, overflow: "hidden", cursor: "zoom-in" }}
+            style={{
+              flexShrink: 0, overflow: "hidden", cursor: "zoom-in",
+              background: "var(--color-surface-container-low)",
+            }}
           >
             <img
               src={sortedImages[0]}
               alt={detail.name}
               style={{
                 width: "100%", display: "block",
-                maxHeight: "200px", objectFit: "cover",
+                maxHeight: "240px", objectFit: "contain",
               }}
             />
           </div>
@@ -80,14 +83,15 @@ export default function DetailDialog({ detail, onClose, dayColor }) {
                   flexShrink: 0, width: "75%", scrollSnapAlign: "start",
                   borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
                   cursor: "zoom-in",
+                  background: "var(--color-surface-container-low)",
                 }}
               >
                 <img
                   src={img}
                   alt={`${detail.name} ${i + 1}`}
                   style={{
-                    width: "100%", height: "160px",
-                    objectFit: "cover", display: "block",
+                    width: "100%", height: "180px",
+                    objectFit: "contain", display: "block",
                   }}
                 />
               </div>
