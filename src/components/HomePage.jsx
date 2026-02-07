@@ -158,7 +158,17 @@ export default function HomePage() {
   const [toast, setToast] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [moreMenu, setMoreMenu] = useState(null);
-  const [legacyHidden, setLegacyHidden] = useState(() => localStorage.getItem('legacy_trip_hidden') === 'true');
+  const [legacyHidden, setLegacyHidden] = useState(() => {
+    // One-time reset: restore legacy card if it was hidden before duplication was available
+    const hidden = localStorage.getItem('legacy_trip_hidden') === 'true';
+    const alreadyReset = localStorage.getItem('legacy_hidden_reset_v1') === 'true';
+    if (hidden && !alreadyReset) {
+      localStorage.removeItem('legacy_trip_hidden');
+      localStorage.setItem('legacy_hidden_reset_v1', 'true');
+      return false;
+    }
+    return hidden;
+  });
 
   /* ── Total trip count ── */
   const totalTrips = trips.length + (legacyHidden ? 0 : 1);
