@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Button from '../common/Button';
 import Field from '../common/Field';
 import Icon from '../common/Icon';
@@ -6,6 +6,7 @@ import AddressSearch from '../common/AddressSearch';
 import BottomSheet from '../common/BottomSheet';
 import ImagePicker from '../common/ImagePicker';
 import { uploadImage, generateImagePath } from '../../services/imageService';
+import { generateFullTripSchedule } from '../../services/geminiService';
 
 /*
  * ── Create Trip Dialog ──
@@ -219,20 +220,69 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     setCoverImage('');
   }, []);
 
+  /* ── AI schedule generation ── */
+  const [aiPreferences, setAiPreferences] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiPreview, setAiPreview] = useState(null); // { days: [...] }
+  const [aiError, setAiError] = useState('');
+  const previewScrollRef = useRef(null);
+
+  const canGenerateAi = destinations.length > 0 && startDate && !aiGenerating && !submitting;
+
+  const handleGenerateAi = useCallback(async () => {
+    if (!canGenerateAi) return;
+    setAiGenerating(true);
+    setAiError('');
+    setAiPreview(null);
+
+    const dur = duration || 1;
+    const { days, error } = await generateFullTripSchedule({
+      destinations: destinations.map((d) => d.name),
+      duration: dur,
+      startDate,
+      preferences: aiPreferences,
+    });
+
+    setAiGenerating(false);
+    if (error) {
+      setAiError(error);
+      return;
+    }
+    if (days.length === 0) {
+      setAiError('AI가 일정을 생성하지 못했습니다. 다시 시도해주세요.');
+      return;
+    }
+    setAiPreview({ days });
+
+    setTimeout(() => {
+      previewScrollRef.current?.scrollTo({ top: previewScrollRef.current.scrollHeight, behavior: 'smooth' });
+    }, 200);
+  }, [canGenerateAi, destinations, startDate, duration, aiPreferences]);
+
   /* ── Submit ── */
   const [submitting, setSubmitting] = useState(false);
-  const canSubmit = name.trim() && startDate && !submitting && !coverUploading;
+  const canSubmit = name.trim() && startDate && !submitting && !coverUploading && !aiGenerating;
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (withAi = false) => {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
+      // Build schedule data from AI preview if requested
+      let scheduleData = null;
+      if (withAi && aiPreview?.days) {
+        scheduleData = {
+          _standalone: true,
+          _extraDays: aiPreview.days,
+        };
+      }
+
       await onCreate({
         name: name.trim(),
         destinations: destinations.map((d) => d.name),
         startDate,
         endDate: endDate || startDate,
         coverImage: coverImage || '',
+        scheduleData,
         ...(isEdit ? { tripId: editTrip.id } : {}),
       });
     } catch (err) {
@@ -436,12 +486,212 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             여행을 만든 후 초대 링크로 멤버를 추가할 수 있습니다.
           </p>
         </section>
+
+        {/* ── Section: AI 일정 자동 생성 (only for new trips) ── */}
+        {!isEdit && (
+          <section>
+            <p style={{
+              margin: '0 0 12px', fontSize: 'var(--typo-caption-1-bold-size)',
+              fontWeight: 'var(--typo-caption-1-bold-weight)', color: 'var(--color-primary)',
+              display: 'flex', alignItems: 'center', gap: '6px',
+            }}>
+              <Icon name="flash" size={14} />
+              AI 일정 자동 생성
+            </p>
+
+            <Field as="textarea" label="여행 스타일 / 요청사항" size="lg" variant="outlined"
+              value={aiPreferences}
+              onChange={(e) => setAiPreferences(e.target.value)}
+              placeholder="예: 맛집 위주로, 쇼핑도 좀, 너무 빡빡하지 않게"
+              rows={2}
+            />
+
+            {/* Quick preference chips */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+              {['맛집 위주', '관광 중심', '쇼핑 많이', '여유롭게', '알차게'].map((chip) => (
+                <button
+                  key={chip}
+                  onClick={() => setAiPreferences((prev) => prev ? `${prev}, ${chip}` : chip)}
+                  style={{
+                    padding: '5px 12px', borderRadius: '100px',
+                    border: '1px solid var(--color-outline-variant)',
+                    background: 'var(--color-surface-container-low)',
+                    fontSize: 'var(--typo-caption-2-regular-size)',
+                    color: 'var(--color-on-surface-variant)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--color-primary-container)';
+                    e.currentTarget.style.borderColor = 'var(--color-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'var(--color-surface-container-low)';
+                    e.currentTarget.style.borderColor = 'var(--color-outline-variant)';
+                  }}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            {/* Generate button */}
+            <Button
+              variant="neutral" size="lg" fullWidth
+              iconLeft="flash"
+              onClick={handleGenerateAi}
+              disabled={!canGenerateAi}
+              style={{ marginTop: '12px' }}
+            >
+              {aiGenerating ? 'AI가 일정을 만들고 있어요...' : 'AI 일정 미리보기'}
+            </Button>
+
+            {/* AI Loading */}
+            {aiGenerating && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '12px', marginTop: '10px',
+                background: 'var(--color-primary-container)',
+                borderRadius: 'var(--radius-md, 8px)',
+              }}>
+                <div style={{ display: 'flex', gap: '3px' }}>
+                  {[0, 1, 2].map((d) => (
+                    <div key={d} style={{
+                      width: '5px', height: '5px', borderRadius: '50%',
+                      background: 'var(--color-primary)',
+                      animation: `bounce 1.2s infinite ${d * 0.2}s`,
+                    }} />
+                  ))}
+                </div>
+                <span style={{
+                  fontSize: 'var(--typo-caption-2-regular-size)',
+                  color: 'var(--color-on-primary-container)',
+                }}>
+                  {destinations.map((d) => d.name).join(', ')} {duration || 1}일 일정을 생성하고 있습니다...
+                </span>
+              </div>
+            )}
+
+            {/* AI Error */}
+            {aiError && (
+              <p style={{
+                margin: '10px 0 0', padding: '10px 12px',
+                background: 'var(--color-error-container, #FEE2E2)',
+                borderRadius: 'var(--radius-md, 8px)',
+                fontSize: 'var(--typo-caption-2-regular-size)',
+                color: 'var(--color-error)',
+              }}>
+                {aiError}
+              </p>
+            )}
+
+            {/* AI Preview */}
+            {aiPreview && aiPreview.days.length > 0 && (
+              <div ref={previewScrollRef} style={{
+                marginTop: '12px',
+                border: '1px solid var(--color-outline-variant)',
+                borderRadius: 'var(--radius-md, 8px)',
+                overflow: 'hidden',
+              }}>
+                {/* Preview header */}
+                <div style={{
+                  padding: '10px 14px',
+                  background: 'var(--color-primary-container)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <span style={{
+                    fontSize: 'var(--typo-caption-1-bold-size)',
+                    fontWeight: 'var(--typo-caption-1-bold-weight)',
+                    color: 'var(--color-on-primary-container)',
+                  }}>
+                    <Icon name="flash" size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                    AI 추천 일정 ({aiPreview.days.length}일)
+                  </span>
+                  <button
+                    onClick={() => setAiPreview(null)}
+                    style={{
+                      border: 'none', background: 'none', cursor: 'pointer',
+                      padding: '2px', display: 'flex',
+                    }}
+                  >
+                    <Icon name="close" size={14} style={{ opacity: 0.6 }} />
+                  </button>
+                </div>
+
+                {/* Day list */}
+                <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                  {aiPreview.days.map((day, di) => {
+                    const totalItems = day.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
+                    return (
+                      <div key={di} style={{
+                        padding: '10px 14px',
+                        borderBottom: di < aiPreview.days.length - 1 ? '1px solid var(--color-outline-variant)' : 'none',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span style={{
+                            fontSize: 'var(--typo-caption-1-bold-size)',
+                            fontWeight: 'var(--typo-caption-1-bold-weight)',
+                            color: 'var(--color-on-surface)',
+                          }}>
+                            Day {day.day} — {day.label}
+                          </span>
+                          <span style={{
+                            fontSize: 'var(--typo-caption-3-regular-size)',
+                            color: 'var(--color-on-surface-variant2)',
+                          }}>
+                            {totalItems}개 일정
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {day.sections?.flatMap((s) => s.items || []).slice(0, 4).map((it, j) => (
+                            <span key={j} style={{
+                              padding: '2px 8px', borderRadius: '4px',
+                              background: 'var(--color-surface-container-low)',
+                              fontSize: 'var(--typo-caption-3-regular-size)',
+                              color: 'var(--color-on-surface-variant)',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {it.time ? `${it.time} ` : ''}{it.desc}
+                            </span>
+                          ))}
+                          {(day.sections?.flatMap((s) => s.items || []).length || 0) > 4 && (
+                            <span style={{
+                              padding: '2px 8px', borderRadius: '4px',
+                              fontSize: 'var(--typo-caption-3-regular-size)',
+                              color: 'var(--color-on-surface-variant2)',
+                            }}>
+                              +{(day.sections?.flatMap((s) => s.items || []).length || 0) - 4}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <style>{`@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }`}</style>
+          </section>
+        )}
       </div>
 
       {/* Submit */}
-      <div style={{ padding: '0 20px 20px', flexShrink: 0 }}>
-        <Button variant="primary" size="xlg" fullWidth onClick={handleSubmit} disabled={!canSubmit}>
-          {submitting ? (isEdit ? '저장 중...' : '생성 중...') : (isEdit ? '저장' : '여행 만들기')}
+      <div style={{ padding: '0 20px 20px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* AI trip create button (only when preview is ready) */}
+        {!isEdit && aiPreview?.days?.length > 0 && (
+          <Button variant="primary" size="xlg" fullWidth iconLeft="flash"
+            onClick={() => handleSubmit(true)} disabled={!canSubmit}>
+            {submitting ? 'AI 일정으로 생성 중...' : `AI 일정으로 여행 만들기 (${aiPreview.days.length}일)`}
+          </Button>
+        )}
+        <Button
+          variant={aiPreview?.days?.length > 0 ? 'neutral' : 'primary'}
+          size="xlg" fullWidth
+          onClick={() => handleSubmit(false)} disabled={!canSubmit}
+        >
+          {submitting
+            ? (isEdit ? '저장 중...' : '생성 중...')
+            : (isEdit ? '저장' : (aiPreview?.days?.length > 0 ? '빈 여행으로 만들기' : '여행 만들기'))}
         </Button>
       </div>
 

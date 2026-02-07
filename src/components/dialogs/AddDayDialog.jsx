@@ -7,10 +7,8 @@ import ConfirmDialog from '../common/ConfirmDialog';
 /* ── Add Day Dialog (Bottom Sheet) ── */
 export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
   const [label, setLabel] = useState("");
-  const [icon, setIcon] = useState("pin");
   const [dayNum, setDayNum] = useState("");
   const [showOverwrite, setShowOverwrite] = useState(false);
-  const icons = ["pin", "navigation", "car", "compass", "shopping", "flag", "home", "fire", "star", "bookmark"];
 
   const existingNums = useMemo(() => existingDays.map((d) => d.day), [existingDays]);
 
@@ -38,13 +36,13 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
     if (isDuplicate) {
       setShowOverwrite(true);
     } else {
-      onAdd(label.trim(), icon, parseInt(dayNum, 10));
+      onAdd(label.trim(), "pin", parseInt(dayNum, 10));
     }
   };
 
   const handleOverwriteConfirm = () => {
     setShowOverwrite(false);
-    onAdd(label.trim(), icon, parseInt(dayNum, 10), true /* overwrite */);
+    onAdd(label.trim(), "pin", parseInt(dayNum, 10), true /* overwrite */);
   };
 
   return (
@@ -64,22 +62,6 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </Field>
-          </div>
-
-          {/* Icon picker */}
-          <div style={{ marginBottom: "16px" }}>
-            <p style={{ margin: "0 0 8px", fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant)" }}>아이콘</p>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {icons.map((ic) => (
-                <Button key={ic} variant={icon === ic ? "neutral" : "ghost-neutral"} size="xlg" iconOnly={ic}
-                  onClick={() => setIcon(ic)}
-                  style={{
-                    width: "40px", height: "40px", borderRadius: "var(--radius-md, 8px)",
-                    border: icon === ic ? "2px solid var(--color-on-surface)" : "1px solid var(--color-outline-variant)",
-                    background: icon === ic ? "var(--color-surface-container-low)" : "var(--color-surface-container-lowest)",
-                  }} />
-              ))}
-            </div>
           </div>
 
           {/* Day name */}

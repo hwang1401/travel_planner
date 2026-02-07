@@ -182,9 +182,14 @@ export default function HomePage() {
   /* ── Create trip ── */
   const handleCreate = useCallback(async (data) => {
     try {
-      const newTrip = await createTrip({ ...data, coverImage: data.coverImage });
+      const newTrip = await createTrip({
+        ...data,
+        coverImage: data.coverImage,
+        scheduleData: data.scheduleData || null,
+      });
       setShowCreate(false);
-      setToast({ message: `"${newTrip.name}" 여행이 생성되었습니다`, icon: 'check' });
+      const aiMsg = data.scheduleData ? ' (AI 일정 포함)' : '';
+      setToast({ message: `"${newTrip.name}" 여행이 생성되었습니다${aiMsg}`, icon: 'check' });
       await fetchTrips();
       navigate(`/trip/${newTrip.id}`);
     } catch (err) {

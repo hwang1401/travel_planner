@@ -7,10 +7,6 @@ import { usePresence } from "../hooks/usePresence";
 import { BASE_DAYS } from "../data/days";
 import { loadCustomData, mergeData, generateDaySummary } from "../data/storage";
 import { TYPE_CONFIG } from "../data/guides";
-import { readFileAsText, detectConflicts } from "../utils/scheduleParser";
-import { analyzeScheduleWithAI } from "../services/geminiService";
-import ImportPreviewDialog from "./dialogs/ImportPreviewDialog";
-
 /* Service imports */
 import { getTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
 import { loadSchedule, subscribeToSchedule, createDebouncedSave } from "../services/scheduleService";
@@ -61,6 +57,7 @@ export default function TravelPlanner() {
   const [showGuide, setShowGuide] = useState(false);
   const [dayInfoTab, setDayInfoTab] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  const [openAiTab, setOpenAiTab] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [editingDayIdx, setEditingDayIdx] = useState(null);
   const [editDayLabel, setEditDayLabel] = useState("");
@@ -71,10 +68,6 @@ export default function TravelPlanner() {
   const [shareCode, setShareCode] = useState(null);
   const [showReorder, setShowReorder] = useState(false);
   const [reorderList, setReorderList] = useState([]);
-
-  /* ── File import ── */
-  const fileImportRef = useRef(null);
-  const [importPreview, setImportPreview] = useState(null); // { items, errors, conflicts }
 
   /* ── Debounced save ref ── */
   const debouncedSaveRef = useRef(null);
@@ -484,89 +477,39 @@ export default function TravelPlanner() {
     });
   }, [updateCustomData, editTarget]);
 
-  /* ── File Import: parse file and show preview dialog ── */
-  const [aiLoading, setAiLoading] = useState(false);
-
-  const handleFileImport = useCallback(async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-
-    try {
-      const content = await readFileAsText(file);
-      if (!content.trim()) {
-        setToast({ message: "파일 내용이 비어있습니다", icon: "info" });
-        return;
-      }
-
-      // AI analysis
-      setAiLoading(true);
-      setToast({ message: "AI가 문서를 분석하고 있습니다...", icon: "flash" });
-      const dayContext = current?.label || `Day ${selectedDay + 1}`;
-      const { items, error } = await analyzeScheduleWithAI(content, dayContext);
-      setAiLoading(false);
-
-      if (error) {
-        setToast({ message: `AI 분석 실패: ${error}`, icon: "info" });
-        return;
-      }
-
-      if (items.length === 0) {
-        setToast({ message: "문서에서 일정을 추출할 수 없습니다", icon: "info" });
-        return;
-      }
-
-      const conflicts = detectConflicts(items, current);
-      setImportPreview({ items, errors: [], conflicts });
-      setToast(null);
-    } catch (err) {
-      console.error("[FileImport] Error:", err);
-      setAiLoading(false);
-      setToast({ message: "파일을 읽는 중 오류가 발생했습니다", icon: "info" });
+  /* ── Bulk Import: replace or append ── */
+  const handleBulkImport = useCallback((items, mode) => {
+    if (!items || items.length === 0) return;
+    const dayIdx = toOrigIdx(selectedDay);
+    if (mode === "replace") {
+      updateCustomData((prev) => {
+        const next = { ...prev };
+        if (next[dayIdx]) {
+          delete next[dayIdx].sections;
+          delete next[dayIdx].extraItems;
+        }
+        if (baseLen === 0 && next._extraDays?.[dayIdx - baseLen]) {
+          next._extraDays = [...next._extraDays];
+          const extraDay = { ...next._extraDays[dayIdx - baseLen] };
+          extraDay.sections = extraDay.sections.map((sec) => ({ ...sec, items: [] }));
+          next._extraDays[dayIdx - baseLen] = extraDay;
+        }
+        if (!next[dayIdx]) next[dayIdx] = {};
+        next[dayIdx].extraItems = [...items];
+        return { ...next };
+      });
+      setToast({ message: `${items.length}개 일정으로 교체되었습니다`, icon: "check" });
+    } else {
+      updateCustomData((prev) => {
+        const next = { ...prev };
+        if (!next[dayIdx]) next[dayIdx] = {};
+        if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
+        next[dayIdx].extraItems = [...next[dayIdx].extraItems, ...items];
+        return { ...next };
+      });
+      setToast({ message: `${items.length}개 일정이 추가되었습니다`, icon: "check" });
     }
-  }, [current, selectedDay]);
-
-  /* ── Import: replace entire day ── */
-  const handleImportReplace = useCallback(() => {
-    if (!importPreview) return;
-    const dayIdx = toOrigIdx(selectedDay);
-    updateCustomData((prev) => {
-      const next = { ...prev };
-      // Clear existing section overrides for this day
-      if (next[dayIdx]) {
-        delete next[dayIdx].sections;
-        delete next[dayIdx].extraItems;
-      }
-      // For standalone extra days, reset their sections to empty
-      if (baseLen === 0 && next._extraDays?.[dayIdx - baseLen]) {
-        next._extraDays = [...next._extraDays];
-        const extraDay = { ...next._extraDays[dayIdx - baseLen] };
-        extraDay.sections = extraDay.sections.map((sec) => ({ ...sec, items: [] }));
-        next._extraDays[dayIdx - baseLen] = extraDay;
-      }
-      // Add all imported items as extraItems
-      if (!next[dayIdx]) next[dayIdx] = {};
-      next[dayIdx].extraItems = [...importPreview.items];
-      return { ...next };
-    });
-    setImportPreview(null);
-    setToast({ message: `${importPreview.items.length}개 일정으로 교체되었습니다`, icon: "check" });
-  }, [importPreview, updateCustomData, toOrigIdx, selectedDay, baseLen]);
-
-  /* ── Import: append to existing ── */
-  const handleImportAppend = useCallback(() => {
-    if (!importPreview) return;
-    const dayIdx = toOrigIdx(selectedDay);
-    updateCustomData((prev) => {
-      const next = { ...prev };
-      if (!next[dayIdx]) next[dayIdx] = {};
-      if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
-      next[dayIdx].extraItems = [...next[dayIdx].extraItems, ...importPreview.items];
-      return { ...next };
-    });
-    setImportPreview(null);
-    setToast({ message: `${importPreview.items.length}개 일정이 추가되었습니다`, icon: "check" });
-  }, [importPreview, updateCustomData, toOrigIdx, selectedDay]);
+  }, [updateCustomData, toOrigIdx, selectedDay, baseLen]);
 
   /* ── Share link copy ── */
   const handleCopyShareLink = useCallback(async () => {
@@ -812,14 +755,6 @@ export default function TravelPlanner() {
           marginBottom: "16px", padding: "14px 16px",
           background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px)", border: "1px solid var(--color-outline-variant)",
         }}>
-          <div style={{
-            width: "40px", height: "40px", borderRadius: "var(--radius-md, 8px)",
-            background: "var(--color-primary)", display: "flex",
-            alignItems: "center", justifyContent: "center",
-            flexShrink: 0,
-          }}>
-            <Icon name={current.icon} size={20} style={{ filter: "brightness(0) invert(1)" }} />
-          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <h2
@@ -849,12 +784,7 @@ export default function TravelPlanner() {
             </p>
           </div>
           {canEdit && (
-            <div style={{ flexShrink: 0, display: "flex", gap: "6px", alignItems: "center" }}>
-              <Button variant="neutral" size="sm" iconOnly="file"
-                onClick={() => !aiLoading && fileImportRef.current?.click()}
-                title="AI로 문서 분석하여 일정 추가"
-                disabled={aiLoading}
-                style={{ width: "32px", height: "32px", opacity: aiLoading ? 0.5 : 1 }} />
+            <div style={{ flexShrink: 0 }}>
               <Button variant="primary" size="sm" iconLeft="plus"
                 onClick={() => setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null })}>
                 일정 추가
@@ -893,10 +823,16 @@ export default function TravelPlanner() {
                 : "아직 추가된 일정이 없습니다"}
             </p>
             {canEdit && (
-              <Button variant="primary" size="md" iconLeft="plus"
-                onClick={() => setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null })}>
-                일정 추가
-              </Button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <Button variant="primary" size="md" iconLeft="plus"
+                  onClick={() => setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null })}>
+                  일정 추가
+                </Button>
+                <Button variant="neutral" size="md" iconLeft="flash"
+                  onClick={() => { setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null }); setOpenAiTab(true); }}>
+                  AI 추천
+                </Button>
+              </div>
             )}
           </div>
         ) : (
@@ -1053,9 +989,12 @@ export default function TravelPlanner() {
           dayIdx={editTarget.dayIdx}
           onSave={handleSaveItem}
           onDelete={editTarget.item?._custom ? handleDeleteItem : null}
-          onClose={() => setEditTarget(null)}
+          onClose={() => { setEditTarget(null); setOpenAiTab(false); }}
           color="var(--color-primary)"
           tripId={isLegacy ? null : tripId}
+          currentDay={current}
+          onBulkImport={handleBulkImport}
+          initialTab={openAiTab ? 2 : 0}
         />
       )}
 
@@ -1372,29 +1311,6 @@ export default function TravelPlanner() {
             </div>
           </div>
         </BottomSheet>
-      )}
-
-      {/* Hidden file input for schedule import */}
-      <input
-        ref={fileImportRef}
-        type="file"
-        accept=".txt,.md,.text,text/plain,text/markdown"
-        style={{ display: "none" }}
-        onChange={handleFileImport}
-      />
-
-      {/* Import Preview Dialog */}
-      {importPreview && (
-        <ImportPreviewDialog
-          items={importPreview.items}
-          errors={importPreview.errors}
-          conflicts={importPreview.conflicts}
-          dayLabel={current?.label || `Day ${selectedDay + 1}`}
-          existingCount={current?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0}
-          onReplace={handleImportReplace}
-          onAppend={handleImportAppend}
-          onCancel={() => setImportPreview(null)}
-        />
       )}
 
       {/* Toast */}

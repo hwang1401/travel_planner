@@ -79,7 +79,7 @@ export async function getTrip(tripId) {
  * Create a new trip.
  * Automatically adds the current user as owner in trip_members.
  */
-export async function createTrip({ name, destinations = [], startDate, endDate, members = [], coverImage = '' }) {
+export async function createTrip({ name, destinations = [], startDate, endDate, members = [], coverImage = '', scheduleData = null }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
@@ -116,10 +116,11 @@ export async function createTrip({ name, destinations = [], startDate, endDate, 
     .from('trip_members')
     .insert({ trip_id: trip.id, user_id: user.id, role: 'owner' });
 
-  // Create empty schedule (standalone = not legacy-based)
+  // Create schedule (empty or with AI-generated data)
+  const initialData = scheduleData || { _standalone: true };
   await supabase
     .from('trip_schedules')
-    .insert({ trip_id: trip.id, data: { _standalone: true }, updated_by: user.id });
+    .insert({ trip_id: trip.id, data: initialData, updated_by: user.id });
 
   return formatTrip(trip);
 }
