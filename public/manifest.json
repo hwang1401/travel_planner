@@ -4,7 +4,7 @@
   "description": "후쿠오카, 구마모토, 유후인 여행 일정 관리 앱",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fbf8ff",
+  "background_color": "#ffffff",
   "theme_color": "#8b7bff",
   "orientation": "portrait",
   "icons": [
