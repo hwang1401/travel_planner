@@ -220,12 +220,21 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     setCoverImage('');
   }, []);
 
+  /* ── Submit ── */
+  const [submitting, setSubmitting] = useState(false);
+  const canSubmit = name.trim() && startDate && !submitting && !coverUploading;
+
   /* ── AI schedule generation ── */
   const [aiPreferences, setAiPreferences] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiPreview, setAiPreview] = useState(null); // { days: [...] }
   const [aiError, setAiError] = useState('');
   const previewScrollRef = useRef(null);
+
+  /* ── Duration calc ── */
+  const duration = startDate && endDate
+    ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1)
+    : null;
 
   const canGenerateAi = destinations.length > 0 && startDate && !aiGenerating && !submitting;
 
@@ -259,10 +268,6 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     }, 200);
   }, [canGenerateAi, destinations, startDate, duration, aiPreferences]);
 
-  /* ── Submit ── */
-  const [submitting, setSubmitting] = useState(false);
-  const canSubmit = name.trim() && startDate && !submitting && !coverUploading && !aiGenerating;
-
   const handleSubmit = async (withAi = false) => {
     if (!canSubmit) return;
     setSubmitting(true);
@@ -290,11 +295,6 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
       setSubmitting(false);
     }
   };
-
-  /* ── Duration calc ── */
-  const duration = startDate && endDate
-    ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1)
-    : null;
 
   return (
     <BottomSheet onClose={onClose} maxHeight="92vh">
