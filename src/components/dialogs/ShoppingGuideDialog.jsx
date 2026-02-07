@@ -4,7 +4,7 @@ import Button from '../common/Button';
 import Tab from '../common/Tab';
 import BottomSheet from '../common/BottomSheet';
 import MapButton from '../map/MapButton';
-import { GUIDE_DATA } from '../../data/guides';
+import { GUIDE_DATA, getGuidesForDestinations } from '../../data/guides';
 
 /* ── Guide Card ── */
 function GuideCard({ item }) {
@@ -48,10 +48,12 @@ function GuideCard({ item }) {
 }
 
 /* ── Shopping Guide Dialog ── */
-export default function ShoppingGuideDialog({ onClose }) {
+export default function ShoppingGuideDialog({ onClose, destinations }) {
+  // Filter guides based on trip destinations
+  const guides = destinations ? getGuidesForDestinations(destinations) : GUIDE_DATA;
   const [regionIdx, setRegionIdx] = useState(0);
   const [chipIdx, setChipIdx] = useState(0);
-  const region = GUIDE_DATA[regionIdx];
+  const region = guides[regionIdx];
   const filtered = chipIdx === 0 ? region.items : region.items.filter((it) => it.chip === region.chips[chipIdx]);
 
   return (
@@ -69,7 +71,7 @@ export default function ShoppingGuideDialog({ onClose }) {
         {/* Region Tabs */}
         <div style={{ padding: "0 20px" }}>
           <Tab
-            items={GUIDE_DATA.map((r, i) => ({ label: r.region, value: i }))}
+            items={guides.map((r, i) => ({ label: r.region, value: i }))}
             value={regionIdx}
             onChange={(v) => { setRegionIdx(v); setChipIdx(0); }}
             size="md"

@@ -885,7 +885,7 @@ export default function TravelPlanner() {
       {showDocs && <DocumentDialog onClose={() => setShowDocs(false)} tripId={isLegacy ? null : tripId} isLegacy={isLegacy} />}
 
       {/* Shopping Guide Dialog */}
-      {showGuide && <ShoppingGuideDialog onClose={() => setShowGuide(false)} />}
+      {showGuide && <ShoppingGuideDialog onClose={() => setShowGuide(false)} destinations={tripMeta?.destinations} />}
 
       {/* Day Info Dialog */}
       {dayInfoTab && <DayInfoDialog dayNum={current.day} tab={dayInfoTab} onClose={() => setDayInfoTab(null)} color="var(--color-primary)" />}

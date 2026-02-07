@@ -16,9 +16,46 @@ export const CATEGORY_COLORS = {
   "교통": { bg: "#FFFDE8", color: "#8A7E22", border: "#F0EAAC" },
 };
 
+/**
+ * Filter GUIDE_DATA by trip destinations.
+ * Returns matching guides, or all guides if no destinations or no matches.
+ * @param {string[]} destinations - trip destination names
+ * @returns {Array} filtered guide entries
+ */
+export function getGuidesForDestinations(destinations = []) {
+  if (!destinations || destinations.length === 0) return GUIDE_DATA;
+
+  const destLower = destinations.map((d) =>
+    (typeof d === 'string' ? d : d?.name || '').toLowerCase()
+  );
+
+  const matched = GUIDE_DATA.filter((guide) =>
+    guide.keywords?.some((kw) =>
+      destLower.some((dest) => dest.includes(kw.toLowerCase()) || kw.toLowerCase().includes(dest))
+    )
+  );
+
+  // If no matches, show all guides as fallback
+  return matched.length > 0 ? matched : GUIDE_DATA;
+}
+
+/*
+ * ── Guide Data Registry ──
+ * Each entry has:
+ *   region   — display name for the tab
+ *   keywords — destination strings that match this guide (여행지 이름 매칭)
+ *   color    — accent color
+ *   chips    — filter chip labels
+ *   items    — guide items
+ *
+ * To add a new region guide:
+ *   1. Add an entry here with relevant keywords
+ *   2. The ShoppingGuideDialog will auto-show it if the trip's destinations match
+ */
 export const GUIDE_DATA = [
   {
     region: "하카타",
+    keywords: ["후쿠오카", "하카타", "福岡", "博多", "fukuoka", "hakata"],
     color: "#E8594F",
     chips: ["전체", "쇼핑", "먹거리", "구경거리"],
     items: [
@@ -33,6 +70,7 @@ export const GUIDE_DATA = [
   },
   {
     region: "구마모토",
+    keywords: ["구마모토", "熊本", "kumamoto"],
     color: "#2A7D4F",
     chips: ["전체", "구경거리", "먹거리", "굿즈", "쇼핑스팟"],
     items: [
@@ -57,6 +95,7 @@ export const GUIDE_DATA = [
   },
   {
     region: "유후인",
+    keywords: ["유후인", "由布院", "湯布院", "yufuin"],
     color: "#6B46C1",
     chips: ["전체", "구경거리", "먹거리", "쇼핑"],
     items: [
