@@ -7,7 +7,8 @@ import { usePresence } from "../hooks/usePresence";
 import { BASE_DAYS } from "../data/days";
 import { loadCustomData, mergeData, generateDaySummary } from "../data/storage";
 import { TYPE_CONFIG } from "../data/guides";
-import { parseScheduleFile, readFileAsText } from "../utils/scheduleParser";
+import { parseScheduleFile, readFileAsText, detectConflicts } from "../utils/scheduleParser";
+import ImportPreviewDialog from "./dialogs/ImportPreviewDialog";
 
 /* Service imports */
 import { getTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
@@ -70,8 +71,9 @@ export default function TravelPlanner() {
   const [showReorder, setShowReorder] = useState(false);
   const [reorderList, setReorderList] = useState([]);
 
-  /* ── File import ref ── */
+  /* ── File import ── */
   const fileImportRef = useRef(null);
+  const [importPreview, setImportPreview] = useState(null); // { items, errors, conflicts }
 
   /* ── Debounced save ref ── */
   const debouncedSaveRef = useRef(null);
@@ -481,11 +483,10 @@ export default function TravelPlanner() {
     });
   }, [updateCustomData, editTarget]);
 
-  /* ── File Import: bulk add items from text/md file ── */
+  /* ── File Import: parse file and show preview dialog ── */
   const handleFileImport = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Reset input so same file can be re-selected
     e.target.value = "";
 
     try {
@@ -497,24 +498,55 @@ export default function TravelPlanner() {
         return;
       }
 
-      const dayIdx = toOrigIdx(selectedDay);
-      updateCustomData((prev) => {
-        const next = { ...prev };
-        if (!next[dayIdx]) next[dayIdx] = {};
-        if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
-        next[dayIdx].extraItems = [...next[dayIdx].extraItems, ...items];
-        return { ...next };
-      });
-
-      setToast({
-        message: `${items.length}개 일정이 추가되었습니다${errors.length > 0 ? ` (${errors.length}개 오류 무시)` : ""}`,
-        icon: "check",
-      });
+      const conflicts = detectConflicts(items, current);
+      setImportPreview({ items, errors, conflicts });
     } catch (err) {
       console.error("[FileImport] Error:", err);
       setToast({ message: "파일을 읽는 중 오류가 발생했습니다", icon: "info" });
     }
-  }, [updateCustomData, toOrigIdx, selectedDay]);
+  }, [current]);
+
+  /* ── Import: replace entire day ── */
+  const handleImportReplace = useCallback(() => {
+    if (!importPreview) return;
+    const dayIdx = toOrigIdx(selectedDay);
+    updateCustomData((prev) => {
+      const next = { ...prev };
+      // Clear existing section overrides for this day
+      if (next[dayIdx]) {
+        delete next[dayIdx].sections;
+        delete next[dayIdx].extraItems;
+      }
+      // For standalone extra days, reset their sections to empty
+      if (baseLen === 0 && next._extraDays?.[dayIdx - baseLen]) {
+        next._extraDays = [...next._extraDays];
+        const extraDay = { ...next._extraDays[dayIdx - baseLen] };
+        extraDay.sections = extraDay.sections.map((sec) => ({ ...sec, items: [] }));
+        next._extraDays[dayIdx - baseLen] = extraDay;
+      }
+      // Add all imported items as extraItems
+      if (!next[dayIdx]) next[dayIdx] = {};
+      next[dayIdx].extraItems = [...importPreview.items];
+      return { ...next };
+    });
+    setImportPreview(null);
+    setToast({ message: `${importPreview.items.length}개 일정으로 교체되었습니다`, icon: "check" });
+  }, [importPreview, updateCustomData, toOrigIdx, selectedDay, baseLen]);
+
+  /* ── Import: append to existing ── */
+  const handleImportAppend = useCallback(() => {
+    if (!importPreview) return;
+    const dayIdx = toOrigIdx(selectedDay);
+    updateCustomData((prev) => {
+      const next = { ...prev };
+      if (!next[dayIdx]) next[dayIdx] = {};
+      if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
+      next[dayIdx].extraItems = [...next[dayIdx].extraItems, ...importPreview.items];
+      return { ...next };
+    });
+    setImportPreview(null);
+    setToast({ message: `${importPreview.items.length}개 일정이 추가되었습니다`, icon: "check" });
+  }, [importPreview, updateCustomData, toOrigIdx, selectedDay]);
 
   /* ── Share link copy ── */
   const handleCopyShareLink = useCallback(async () => {
@@ -1329,6 +1361,20 @@ export default function TravelPlanner() {
         style={{ display: "none" }}
         onChange={handleFileImport}
       />
+
+      {/* Import Preview Dialog */}
+      {importPreview && (
+        <ImportPreviewDialog
+          items={importPreview.items}
+          errors={importPreview.errors}
+          conflicts={importPreview.conflicts}
+          dayLabel={current?.label || `Day ${selectedDay + 1}`}
+          existingCount={current?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0}
+          onReplace={handleImportReplace}
+          onAppend={handleImportAppend}
+          onCancel={() => setImportPreview(null)}
+        />
+      )}
 
       {/* Toast */}
       {toast && (

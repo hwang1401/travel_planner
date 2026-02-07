@@ -18,6 +18,13 @@
 
 const VALID_TYPES = new Set(["food", "spot", "shop", "move", "stay", "info"]);
 
+const TYPE_LABELS = {
+  food: "식사", spot: "관광", shop: "쇼핑",
+  move: "이동", stay: "숙소", info: "정보",
+};
+
+export { TYPE_LABELS };
+
 /**
  * Parse a single line into a schedule item.
  * Returns null if the line is empty or a comment.
@@ -105,6 +112,58 @@ export function parseScheduleFile(content) {
   });
 
   return { items, errors };
+}
+
+/**
+ * Detect conflicts: duplicate times within items and against existing day items.
+ * @param {Array} newItems - parsed items from file
+ * @param {object} currentDay - current day data (with sections)
+ * @returns {{ internal: Array, external: Array }}
+ *   internal: [{time, items: [desc1, desc2]}] - duplicates within the file
+ *   external: [{time, newDesc, existingDesc}] - conflicts with existing schedule
+ */
+export function detectConflicts(newItems, currentDay) {
+  const internal = [];
+  const external = [];
+
+  // 1) Internal: duplicate times within the file
+  const timeMap = {};
+  newItems.forEach((item) => {
+    if (!item.time) return;
+    if (!timeMap[item.time]) timeMap[item.time] = [];
+    timeMap[item.time].push(item.desc);
+  });
+  Object.entries(timeMap).forEach(([time, descs]) => {
+    if (descs.length > 1) {
+      internal.push({ time, items: descs });
+    }
+  });
+
+  // 2) External: conflicts with existing day items
+  if (currentDay?.sections) {
+    const existingTimes = {};
+    currentDay.sections.forEach((sec) => {
+      (sec.items || []).forEach((item) => {
+        if (item.time) {
+          if (!existingTimes[item.time]) existingTimes[item.time] = [];
+          existingTimes[item.time].push(item.desc);
+        }
+      });
+    });
+
+    newItems.forEach((item) => {
+      if (!item.time) return;
+      if (existingTimes[item.time]) {
+        external.push({
+          time: item.time,
+          newDesc: item.desc,
+          existingDescs: existingTimes[item.time],
+        });
+      }
+    });
+  }
+
+  return { internal, external };
 }
 
 /**
