@@ -20,6 +20,49 @@ function friendlyError(rawMsg, status) {
   return rawMsg;
 }
 
+/** Extract retry-after seconds from rate limit error, or 0 if not a rate limit */
+function getRetrySeconds(rawMsg) {
+  if (!rawMsg) return 0;
+  if (rawMsg.includes("quota") || rawMsg.includes("rate")) {
+    const match = rawMsg.match(/retry in ([\d.]+)/i);
+    return match ? Math.ceil(parseFloat(match[0].replace("retry in ", ""))) : 30;
+  }
+  return 0;
+}
+
+/** Sleep helper */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Fetch with auto-retry on rate limit (up to 2 retries).
+ * onStatus callback for UI updates (e.g. "30초 대기 중...")
+ */
+async function fetchWithRetry(body, { maxRetries = 2, onStatus } = {}) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (response.ok) return response;
+
+    const errData = await response.json().catch(() => ({}));
+    const rawMsg = errData?.error?.message || "";
+    const retrySec = getRetrySeconds(rawMsg);
+
+    // Not a rate limit error, or last attempt — return error
+    if (retrySec === 0 || attempt === maxRetries) {
+      return { ok: false, status: response.status, _errMsg: friendlyError(rawMsg, response.status) };
+    }
+
+    // Rate limit — wait and retry
+    const waitSec = retrySec + 2; // add small buffer
+    if (onStatus) onStatus(`요청 한도 초과 — ${waitSec}초 대기 후 자동 재시도...`);
+    await sleep(waitSec * 1000);
+  }
+}
+
 const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
 사용자가 제공하는 텍스트/마크다운 문서를 분석하여 여행 일정 아이템을 추출해주세요.
 
@@ -71,32 +114,14 @@ export async function analyzeScheduleWithAI(content, context = "") {
     : `다음 여행 문서에서 일정 아이템을 추출해주세요:\n\n${content}`;
 
   try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: SYSTEM_PROMPT }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: userPrompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 4096,
-          responseMimeType: "application/json",
-        },
-      }),
-    });
+    const reqBody = {
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 4096, responseMimeType: "application/json" },
+    };
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const errMsg = friendlyError(errData?.error?.message, response.status);
-      return { items: [], error: errMsg };
-    }
+    const response = await fetchWithRetry(reqBody);
+    if (response._errMsg) return { items: [], error: response._errMsg };
 
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -224,27 +249,14 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
   });
 
   try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: RECOMMEND_SYSTEM_PROMPT }],
-        },
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4096,
-          responseMimeType: "application/json",
-        },
-      }),
-    });
+    const reqBody = {
+      system_instruction: { parts: [{ text: RECOMMEND_SYSTEM_PROMPT }] },
+      contents,
+      generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: "application/json" },
+    };
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const errMsg = friendlyError(errData?.error?.message, response.status);
-      return { message: "", items: [], error: errMsg };
-    }
+    const response = await fetchWithRetry(reqBody);
+    if (response._errMsg) return { message: "", items: [], error: response._errMsg };
 
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -378,32 +390,14 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
   }
 
   try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: TRIP_GEN_SYSTEM_PROMPT }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: userPrompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 8192,
-          responseMimeType: "application/json",
-        },
-      }),
-    });
+    const reqBody = {
+      system_instruction: { parts: [{ text: TRIP_GEN_SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 8192, responseMimeType: "application/json" },
+    };
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const errMsg = friendlyError(errData?.error?.message, response.status);
-      return { days: [], error: errMsg };
-    }
+    const response = await fetchWithRetry(reqBody);
+    if (response._errMsg) return { days: [], error: response._errMsg };
 
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
