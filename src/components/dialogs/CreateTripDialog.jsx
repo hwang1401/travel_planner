@@ -405,22 +405,17 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
       </div>
 
       {/* Form */}
-      <div ref={previewScrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0' }}>
+      <div ref={previewScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        {/* ── Cover Image (full width, no padding, no radius) ── */}
-        <div style={{ marginBottom: '20px', borderBottom: '1px solid var(--color-outline-variant)' }}>
-          <ImagePicker
-            value={coverImage}
-            onChange={handleCoverFile}
-            onRemove={handleCoverRemove}
-            placeholder="여행 커버 이미지를 선택하세요"
-            aspect="cover"
-            uploading={coverUploading}
-            borderRadius="0"
-          />
-        </div>
-
-        <div style={{ padding: '0 20px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* ── Cover Image ── */}
+        <ImagePicker
+          value={coverImage}
+          onChange={handleCoverFile}
+          onRemove={handleCoverRemove}
+          placeholder="여행 커버 이미지를 선택하세요"
+          aspect="cover"
+          uploading={coverUploading}
+        />
 
         {/* ── Section: 여행 정보 ── */}
         <section>
@@ -777,7 +772,6 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             <style>{`@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }`}</style>
           </section>
         )}
-        </div>
       </div>
 
       {/* Submit */}
