@@ -239,7 +239,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
 
         {/* Tabs (only show for new items) */}
         {isNew && (
-          <div style={{ padding: "0 20px", flexShrink: 0 }}>
+          <div style={{ flexShrink: 0 }}>
             <Tab
               items={[
                 { label: "직접 입력", value: 0 },
@@ -484,30 +484,32 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                     border: "2px dashed var(--color-outline-variant)",
                     borderRadius: "var(--radius-md, 8px)",
                     background: "var(--color-surface-container-low)",
-                    textAlign: "center", cursor: "pointer",
+                    display: "flex", flexDirection: "column", alignItems: "center",
+                    cursor: "pointer",
                     transition: "border-color 0.15s, background 0.15s",
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--color-primary)"; e.currentTarget.style.background = "var(--color-primary-container)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--color-outline-variant)"; e.currentTarget.style.background = "var(--color-surface-container-low)"; }}
                 >
                   <Icon name="file" size={32} style={{ color: "var(--color-on-surface-variant2)", marginBottom: "12px" }} />
-                  <p style={{ margin: 0, fontSize: "var(--typo-label-2-bold-size)", fontWeight: "var(--typo-label-2-bold-weight)", color: "var(--color-on-surface)" }}>
+                  <p style={{ margin: 0, fontSize: "var(--typo-label-2-bold-size)", fontWeight: "var(--typo-label-2-bold-weight)", color: "var(--color-on-surface)", textAlign: "center" }}>
                     텍스트 파일 선택
                   </p>
-                  <p style={{ margin: "6px 0 0", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
+                  <p style={{ margin: "6px 0 0", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)", textAlign: "center" }}>
                     .txt, .md 파일을 업로드하면<br/>AI가 자동으로 일정을 분석합니다
                   </p>
                 </div>
 
                 <div style={{
-                  width: "100%", padding: "12px 14px",
+                  width: "100%", padding: "10px 14px",
                   background: "var(--color-surface-container-low)",
                   borderRadius: "var(--radius-md, 8px)",
-                  border: "1px dashed var(--color-outline-variant)",
+                  border: "1px solid var(--color-outline-variant)",
+                  display: "flex", alignItems: "center", gap: "10px",
                 }}>
-                  <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)", lineHeight: 1.6 }}>
-                    <Icon name="flash" size={12} style={{ marginRight: "4px", verticalAlign: "middle" }} />
-                    여행 가이드, 일정표, 메모 등 어떤 형식이든 AI가 분석하여 시간·장소·유형별로 일정을 자동 생성합니다
+                  <Icon name="flash" size={16} style={{ color: "var(--color-primary)", flexShrink: 0 }} />
+                  <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>
+                    여행 가이드, 일정표, 메모 등 어떤 형식이든 AI가 분석하여 일정을 자동 생성합니다
                   </p>
                 </div>
               </>
