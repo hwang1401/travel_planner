@@ -535,16 +535,29 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
               ))}
             </div>
 
-            {/* Generate button */}
-            <Button
-              variant="neutral" size="lg" fullWidth
-              iconLeft="flash"
-              onClick={handleGenerateAi}
-              disabled={!canGenerateAi}
-              style={{ marginTop: '12px' }}
-            >
-              {aiGenerating ? 'AI가 일정을 만들고 있어요...' : 'AI 일정 미리보기'}
-            </Button>
+            {/* Generate / Regenerate button */}
+            {!aiPreview && (
+              <Button
+                variant="neutral" size="lg" fullWidth
+                iconLeft="flash"
+                onClick={handleGenerateAi}
+                disabled={!canGenerateAi}
+                style={{ marginTop: '12px' }}
+              >
+                {aiGenerating ? 'AI가 일정을 만들고 있어요...' : 'AI 일정 미리보기'}
+              </Button>
+            )}
+            {aiPreview && !aiGenerating && (
+              <Button
+                variant="neutral" size="sm"
+                iconLeft="flash"
+                onClick={() => { setAiPreview(null); setExpandedDay(null); handleGenerateAi(); }}
+                disabled={!canGenerateAi}
+                style={{ marginTop: '12px', alignSelf: 'flex-start' }}
+              >
+                다시 생성하기
+              </Button>
+            )}
 
             {/* AI Loading */}
             {aiGenerating && (
