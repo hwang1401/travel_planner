@@ -881,9 +881,15 @@ export default function TravelPlanner() {
                     const isLast = ii === section.items.length - 1;
                     const hasDetail = !!item.detail && !!(item.detail.image || item.detail.images?.length || item.detail.tip || item.detail.address || item.detail.timetable);
                     const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
+                    const TYPE_TO_CATEGORY = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "정보" };
                     const handleClick = () => {
                       if (hasDetail) {
-                        setActiveDetail({ ...item.detail, _item: item, _si: effectiveSi, _ii: ii, _di: selectedDay });
+                        setActiveDetail({
+                          ...item.detail,
+                          name: item.detail.name || item.desc,
+                          category: item.detail.category || TYPE_TO_CATEGORY[item.type] || "정보",
+                          _item: item, _si: effectiveSi, _ii: ii, _di: selectedDay,
+                        });
                       }
                     };
                     return (

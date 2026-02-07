@@ -189,25 +189,31 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus } 
     }
 
     // Normalize items
+    const TYPE_CAT = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "정보" };
     const items = parsed
       .filter((item) => item && item.desc)
-      .map((item) => ({
-        time: (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0"),
-        type: ["food", "spot", "shop", "move", "stay", "info"].includes(item.type) ? item.type : "info",
-        desc: item.desc,
-        sub: item.sub || "",
-        ...(item.detail && Object.keys(item.detail).some((k) => item.detail[k])
-          ? {
-              detail: {
-                ...(item.detail.address ? { address: item.detail.address } : {}),
-                ...(item.detail.timetable ? { timetable: item.detail.timetable } : {}),
-                ...(item.detail.tip ? { tip: item.detail.tip } : {}),
-              },
-            }
-          : {}),
-        _extra: true,
-        _custom: true,
-      }));
+      .map((item) => {
+        const itemType = ["food", "spot", "shop", "move", "stay", "info"].includes(item.type) ? item.type : "info";
+        return {
+          time: (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0"),
+          type: itemType,
+          desc: item.desc,
+          sub: item.sub || "",
+          ...(item.detail && Object.keys(item.detail).some((k) => item.detail[k])
+            ? {
+                detail: {
+                  name: item.desc,
+                  category: TYPE_CAT[itemType] || "정보",
+                  ...(item.detail.address ? { address: item.detail.address } : {}),
+                  ...(item.detail.timetable ? { timetable: item.detail.timetable } : {}),
+                  ...(item.detail.tip ? { tip: item.detail.tip } : {}),
+                },
+              }
+            : {}),
+          _extra: true,
+          _custom: true,
+        };
+      });
 
     return { items, error: null };
   } catch (err) {
@@ -323,24 +329,30 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
     const message = parsed.message || "";
     const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
 
+    const TYPE_CAT2 = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "정보" };
     const items = rawItems
       .filter((item) => item && item.desc)
-      .map((item) => ({
-        time: (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0"),
-        type: ["food", "spot", "shop", "move", "stay", "info"].includes(item.type) ? item.type : "info",
-        desc: item.desc,
-        sub: item.sub || "",
-        ...(item.detail && Object.keys(item.detail).some((k) => item.detail[k])
-          ? {
-              detail: {
-                ...(item.detail.address ? { address: item.detail.address } : {}),
-                ...(item.detail.tip ? { tip: item.detail.tip } : {}),
-              },
-            }
-          : {}),
-        _extra: true,
-        _custom: true,
-      }));
+      .map((item) => {
+        const itemType = ["food", "spot", "shop", "move", "stay", "info"].includes(item.type) ? item.type : "info";
+        return {
+          time: (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0"),
+          type: itemType,
+          desc: item.desc,
+          sub: item.sub || "",
+          ...(item.detail && Object.keys(item.detail).some((k) => item.detail[k])
+            ? {
+                detail: {
+                  name: item.desc,
+                  category: TYPE_CAT2[itemType] || "정보",
+                  ...(item.detail.address ? { address: item.detail.address } : {}),
+                  ...(item.detail.tip ? { tip: item.detail.tip } : {}),
+                },
+              }
+            : {}),
+          _extra: true,
+          _custom: true,
+        };
+      });
 
     return { message, items, error: null };
   } catch (err) {
