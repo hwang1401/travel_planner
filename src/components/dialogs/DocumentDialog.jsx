@@ -236,10 +236,12 @@ function DynamicDocumentDialog({ onClose, tripId }) {
                     border: "1px solid var(--color-outline-variant)",
                     background: "var(--color-surface-container-low)",
                     width: "100%", cursor: "zoom-in",
+                    maxHeight: '50vh',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
                   <img src={selectedDoc.imageUrl} alt={selectedDoc.title}
-                    style={{ width: "100%", display: "block", objectFit: "contain" }} />
+                    style={{ width: "100%", maxHeight: '50vh', display: "block", objectFit: "contain" }} />
                 </div>
               ) : (
                 <div style={{

@@ -29,6 +29,7 @@ export default function ImagePicker({
   const [dragOver, setDragOver] = useState(false);
 
   const aspectRatio = aspect === 'square' ? '1 / 1' : aspect === 'doc' ? '3 / 4' : '16 / 9';
+  const maxHeight = aspect === 'doc' ? '300px' : aspect === 'square' ? '200px' : '180px';
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -74,6 +75,7 @@ export default function ImagePicker({
             style={{
               width: '100%',
               aspectRatio,
+              maxHeight,
               objectFit: 'cover',
               display: 'block',
             }}
@@ -127,6 +129,7 @@ export default function ImagePicker({
             border: `2px dashed ${dragOver ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
             background: dragOver ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
             aspectRatio,
+            maxHeight,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             gap: '8px',
