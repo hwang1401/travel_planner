@@ -13,13 +13,19 @@ import { generateFullTripSchedule } from '../../services/geminiService';
  * Full-screen style bottom sheet for creating a new trip
  */
 
-/* ── Date Picker BottomSheet ── */
-function DatePickerSheet({ label, value, onChange, onClose, minDate }) {
+/* ── Date Range Picker BottomSheet ── */
+function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
   const today = new Date();
-  const [viewYear, setViewYear] = useState(value ? new Date(value).getFullYear() : today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(value ? new Date(value).getMonth() : today.getMonth());
+  const initDate = startDate ? new Date(startDate) : today;
+  const [viewYear, setViewYear] = useState(initDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initDate.getMonth());
+  const [selStart, setSelStart] = useState(startDate || '');
+  const [selEnd, setSelEnd] = useState(endDate || '');
+  const [selectingEnd, setSelectingEnd] = useState(!!startDate && !endDate);
 
   const DAYS_KR = ['일', '월', '화', '수', '목', '금', '토'];
+
+  const toStr = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1).getDay();
@@ -39,45 +45,97 @@ function DatePickerSheet({ label, value, onChange, onClose, minDate }) {
     else setViewMonth(viewMonth + 1);
   };
 
-  const isDisabled = (day) => {
-    if (!day || !minDate) return false;
-    const d = new Date(viewYear, viewMonth, day);
-    return d < new Date(minDate);
-  };
-
-  const isSelected = (day) => {
-    if (!day || !value) return false;
-    const sel = new Date(value);
-    return sel.getFullYear() === viewYear && sel.getMonth() === viewMonth && sel.getDate() === day;
-  };
-
   const isToday = (day) => {
     if (!day) return false;
     return today.getFullYear() === viewYear && today.getMonth() === viewMonth && today.getDate() === day;
   };
 
+  const getDayStr = (day) => day ? toStr(viewYear, viewMonth, day) : '';
+
   const handleSelect = (day) => {
-    if (!day || isDisabled(day)) return;
-    const m = String(viewMonth + 1).padStart(2, '0');
-    const d = String(day).padStart(2, '0');
-    onChange(`${viewYear}-${m}-${d}`);
-    onClose();
+    if (!day) return;
+    const str = getDayStr(day);
+    if (!selectingEnd) {
+      // Selecting start date
+      setSelStart(str);
+      setSelEnd('');
+      setSelectingEnd(true);
+    } else {
+      // Selecting end date
+      if (str < selStart) {
+        // Clicked before start — reset start
+        setSelStart(str);
+        setSelEnd('');
+      } else {
+        setSelEnd(str);
+        setSelectingEnd(false);
+      }
+    }
+  };
+
+  const handleConfirm = () => {
+    if (selStart) {
+      onConfirm(selStart, selEnd || selStart);
+      onClose();
+    }
+  };
+
+  // Duration display
+  const dur = selStart && selEnd
+    ? Math.max(1, Math.ceil((new Date(selEnd) - new Date(selStart)) / (1000 * 60 * 60 * 24)) + 1)
+    : null;
+
+  const formatShort = (str) => {
+    if (!str) return '';
+    const d = new Date(str);
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return `${d.getMonth() + 1}.${d.getDate()} (${days[d.getDay()]})`;
   };
 
   return (
     <BottomSheet onClose={onClose} maxHeight="auto" zIndex={4000}>
       <div style={{ padding: '8px 20px 20px' }}>
         {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          marginBottom: '16px',
-        }}>
+        <div style={{ marginBottom: '14px' }}>
           <h3 style={{
-            margin: 0, fontSize: 'var(--typo-body-2-n---bold-size)',
+            margin: '0 0 8px', fontSize: 'var(--typo-body-2-n---bold-size)',
             fontWeight: 'var(--typo-body-2-n---bold-weight)', color: 'var(--color-on-surface)',
           }}>
-            {label}
+            여행 기간 선택
           </h3>
+          {/* Selection summary */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            fontSize: 'var(--typo-caption-1-medium-size)',
+            color: 'var(--color-on-surface-variant)',
+          }}>
+            <span style={{
+              padding: '4px 10px', borderRadius: '6px',
+              background: selStart ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
+              color: selStart ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
+              fontWeight: 'var(--typo-caption-1-bold-weight)',
+            }}>
+              {selStart ? formatShort(selStart) : '출발일'}
+            </span>
+            <span style={{ color: 'var(--color-on-surface-variant2)' }}>→</span>
+            <span style={{
+              padding: '4px 10px', borderRadius: '6px',
+              background: selEnd ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
+              color: selEnd ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
+              fontWeight: 'var(--typo-caption-1-bold-weight)',
+            }}>
+              {selEnd ? formatShort(selEnd) : '귀국일'}
+            </span>
+            {dur && (
+              <span style={{
+                fontSize: 'var(--typo-caption-2-medium-size)',
+                color: 'var(--color-primary)',
+                fontWeight: 'var(--typo-caption-2-bold-weight)',
+              }}>
+                {dur - 1}박 {dur}일
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Month navigation */}
@@ -125,42 +183,77 @@ function DatePickerSheet({ label, value, onChange, onClose, minDate }) {
 
         {/* Calendar grid */}
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px',
+          display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0',
         }}>
           {calendarDays.map((day, i) => {
-            const disabled = isDisabled(day);
-            const selected = isSelected(day);
+            const str = getDayStr(day);
+            const isStart = str && str === selStart;
+            const isEnd = str && str === selEnd;
+            const isInRange = str && selStart && selEnd && str > selStart && str < selEnd;
             const todayMark = isToday(day);
+            const isSelected = isStart || isEnd;
+
             return (
               <div key={i}
                 onClick={() => handleSelect(day)}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  height: '38px', borderRadius: 'var(--radius-md, 8px)',
-                  cursor: day && !disabled ? 'pointer' : 'default',
-                  background: selected ? 'var(--color-primary)' : 'transparent',
-                  color: selected ? 'var(--color-on-primary)'
-                    : disabled ? 'var(--color-outline-variant)'
-                    : todayMark ? 'var(--color-primary)'
-                    : 'var(--color-on-surface)',
-                  fontSize: 'var(--typo-label-2-medium-size)',
-                  fontWeight: selected || todayMark ? 'var(--typo-label-2-bold-weight)' : 'var(--typo-label-2-medium-weight)',
-                  transition: 'background 0.1s',
+                  height: '38px',
+                  cursor: day ? 'pointer' : 'default',
                   position: 'relative',
+                  // Range background
+                  background: isInRange ? 'var(--color-primary-container)'
+                    : (isStart && selEnd) ? 'linear-gradient(to right, transparent 50%, var(--color-primary-container) 50%)'
+                    : (isEnd && selStart) ? 'linear-gradient(to left, transparent 50%, var(--color-primary-container) 50%)'
+                    : 'transparent',
                 }}
               >
-                {day}
-                {todayMark && !selected && (
-                  <div style={{
-                    position: 'absolute', bottom: '4px',
-                    width: '4px', height: '4px', borderRadius: '50%',
-                    background: 'var(--color-primary)',
-                  }} />
-                )}
+                <div style={{
+                  width: '34px', height: '34px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: '50%',
+                  background: isSelected ? 'var(--color-primary)' : 'transparent',
+                  color: isSelected ? 'var(--color-on-primary)'
+                    : isInRange ? 'var(--color-on-primary-container)'
+                    : todayMark ? 'var(--color-primary)'
+                    : day ? 'var(--color-on-surface)' : 'transparent',
+                  fontSize: 'var(--typo-label-2-medium-size)',
+                  fontWeight: isSelected || todayMark ? 'var(--typo-label-2-bold-weight)' : 'var(--typo-label-2-medium-weight)',
+                  transition: 'background 0.1s',
+                  position: 'relative',
+                }}>
+                  {day}
+                  {todayMark && !isSelected && (
+                    <div style={{
+                      position: 'absolute', bottom: '2px',
+                      width: '4px', height: '4px', borderRadius: '50%',
+                      background: 'var(--color-primary)',
+                    }} />
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
+
+        {/* Guide text */}
+        <p style={{
+          margin: '10px 0 0', textAlign: 'center',
+          fontSize: 'var(--typo-caption-3-regular-size)',
+          color: 'var(--color-on-surface-variant2)',
+        }}>
+          {!selStart ? '출발일을 선택하세요' : selectingEnd ? '귀국일을 선택하세요' : ''}
+        </p>
+
+        {/* Confirm button */}
+        <Button
+          variant="primary" size="lg" fullWidth
+          onClick={handleConfirm}
+          disabled={!selStart}
+          style={{ marginTop: '14px' }}
+        >
+          {selStart && selEnd ? '확인' : selStart ? '당일치기로 선택' : '날짜를 선택하세요'}
+        </Button>
       </div>
     </BottomSheet>
   );
@@ -175,7 +268,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
   const [destInput, setDestInput] = useState('');
   const [startDate, setStartDate] = useState(editTrip?.startDate || '');
   const [endDate, setEndDate] = useState(editTrip?.endDate || '');
-  const [datePickerTarget, setDatePickerTarget] = useState(null); // 'start' | 'end' | null
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [coverImage, setCoverImage] = useState(editTrip?.coverImage || '');
   const [coverUploading, setCoverUploading] = useState(false);
 
@@ -314,8 +407,8 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
       {/* Form */}
       <div ref={previewScrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0' }}>
 
-        {/* ── Cover Image (full width, no padding) ── */}
-        <div style={{ marginBottom: '20px' }}>
+        {/* ── Cover Image (full width, no padding, no radius) ── */}
+        <div style={{ marginBottom: '20px', borderBottom: '1px solid var(--color-outline-variant)' }}>
           <ImagePicker
             value={coverImage}
             onChange={handleCoverFile}
@@ -323,6 +416,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             placeholder="여행 커버 이미지를 선택하세요"
             aspect="cover"
             uploading={coverUploading}
+            borderRadius="0"
           />
         </div>
 
@@ -393,85 +487,44 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             일정
           </p>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {/* Start date: tappable field */}
-            <div style={{ flex: 1 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                paddingBottom: 'var(--spacing-sp40, 4px)',
+          {/* Date range tappable field */}
+          <div
+            onClick={() => setShowDatePicker(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              width: '100%', minHeight: 'var(--height-lg, 36px)',
+              padding: '8px var(--spacing-sp140, 14px)',
+              border: '1px solid var(--color-outline-variant)',
+              borderRadius: 'var(--radius-md, 8px)',
+              cursor: 'pointer', boxSizing: 'border-box',
+            }}
+          >
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                fontSize: 'var(--typo-label-1-n---regular-size)',
+                color: startDate ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
               }}>
-                <span style={{
-                  fontSize: 'var(--typo-caption-2-bold-size)',
-                  fontWeight: 'var(--typo-caption-2-bold-weight)',
-                  color: 'var(--color-on-surface-variant)',
-                }}>출발일</span>
-                <span style={{ color: 'var(--color-error)', fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 'var(--typo-caption-2-bold-weight)' }}>*</span>
-              </div>
-              <div
-                onClick={() => setDatePickerTarget('start')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  width: '100%', height: 'var(--height-lg, 36px)',
-                  padding: '0 var(--spacing-sp140, 14px)',
-                  border: '1px solid var(--color-outline-variant)',
-                  borderRadius: 'var(--radius-md, 8px)',
-                  cursor: 'pointer', boxSizing: 'border-box',
-                }}
-              >
-                <Icon name="calendar" size={16} style={{ flexShrink: 0, opacity: 0.5 }} />
-                <span style={{
-                  flex: 1, fontSize: 'var(--typo-label-1-n---regular-size)',
-                  color: startDate ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {startDate ? formatDateDisplay(startDate) : '날짜 선택'}
-                </span>
-              </div>
-            </div>
-
-            {/* End date: tappable field */}
-            <div style={{ flex: 1 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                paddingBottom: 'var(--spacing-sp40, 4px)',
+                {startDate ? formatDateDisplay(startDate) : '출발일'}
+              </span>
+              <span style={{ color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-caption-2-regular-size)' }}>→</span>
+              <span style={{
+                fontSize: 'var(--typo-label-1-n---regular-size)',
+                color: endDate ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
               }}>
-                <span style={{
-                  fontSize: 'var(--typo-caption-2-bold-size)',
-                  fontWeight: 'var(--typo-caption-2-bold-weight)',
-                  color: 'var(--color-on-surface-variant)',
-                }}>귀국일</span>
-              </div>
-              <div
-                onClick={() => setDatePickerTarget('end')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  width: '100%', height: 'var(--height-lg, 36px)',
-                  padding: '0 var(--spacing-sp140, 14px)',
-                  border: '1px solid var(--color-outline-variant)',
-                  borderRadius: 'var(--radius-md, 8px)',
-                  cursor: 'pointer', boxSizing: 'border-box',
-                }}
-              >
-                <Icon name="calendar" size={16} style={{ flexShrink: 0, opacity: 0.5 }} />
-                <span style={{
-                  flex: 1, fontSize: 'var(--typo-label-1-n---regular-size)',
-                  color: endDate ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {endDate ? formatDateDisplay(endDate) : '날짜 선택'}
-                </span>
-              </div>
+                {endDate ? formatDateDisplay(endDate) : '귀국일'}
+              </span>
             </div>
+            {duration && (
+              <span style={{
+                fontSize: 'var(--typo-caption-2-bold-size)',
+                fontWeight: 'var(--typo-caption-2-bold-weight)',
+                color: 'var(--color-primary)',
+                flexShrink: 0,
+              }}>
+                {duration - 1}박 {duration}일
+              </span>
+            )}
           </div>
-
-          {duration && (
-            <p style={{
-              margin: '8px 0 0', fontSize: 'var(--typo-caption-2-medium-size)',
-              fontWeight: 'var(--typo-caption-2-medium-weight)', color: 'var(--color-on-surface-variant)',
-            }}>
-              {duration - 1}박 {duration}일
-            </p>
-          )}
         </section>
 
         {/* ── Section: AI 일정 자동 생성 (only for new trips) ── */}
@@ -762,25 +815,13 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         )}
       </div>
 
-      {/* Date Picker */}
-      {datePickerTarget === 'start' && (
-        <DatePickerSheet
-          label="출발일 선택"
-          value={startDate}
-          onChange={(v) => {
-            setStartDate(v);
-            if (endDate && v > endDate) setEndDate('');
-          }}
-          onClose={() => setDatePickerTarget(null)}
-        />
-      )}
-      {datePickerTarget === 'end' && (
-        <DatePickerSheet
-          label="귀국일 선택"
-          value={endDate || startDate}
-          onChange={(v) => setEndDate(v)}
-          onClose={() => setDatePickerTarget(null)}
-          minDate={startDate}
+      {/* Date Range Picker */}
+      {showDatePicker && (
+        <DateRangePickerSheet
+          startDate={startDate}
+          endDate={endDate}
+          onConfirm={(s, e) => { setStartDate(s); setEndDate(e); }}
+          onClose={() => setShowDatePicker(false)}
         />
       )}
     </BottomSheet>

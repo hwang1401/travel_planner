@@ -24,6 +24,7 @@ export default function ImagePicker({
   aspect = 'cover',
   uploading = false,
   disabled = false,
+  borderRadius,
 }) {
   const fileRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
@@ -65,9 +66,9 @@ export default function ImagePicker({
         /* ── Preview ── */
         <div style={{
           position: 'relative',
-          borderRadius: 'var(--radius-md, 8px)',
+          borderRadius: borderRadius !== undefined ? borderRadius : 'var(--radius-md, 8px)',
           overflow: 'hidden',
-          border: '1px solid var(--color-outline-variant)',
+          border: borderRadius === '0' ? 'none' : '1px solid var(--color-outline-variant)',
         }}>
           <img
             src={value}
@@ -125,8 +126,8 @@ export default function ImagePicker({
         <div
           onClick={() => !disabled && !uploading && fileRef.current?.click()}
           style={{
-            borderRadius: 'var(--radius-md, 8px)',
-            border: `2px dashed ${dragOver ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
+            borderRadius: borderRadius !== undefined ? borderRadius : 'var(--radius-md, 8px)',
+            border: borderRadius === '0' ? 'none' : `2px dashed ${dragOver ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
             background: dragOver ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
             aspectRatio,
             maxHeight,
