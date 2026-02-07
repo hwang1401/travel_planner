@@ -18,6 +18,9 @@
     <meta name="apple-mobile-web-app-title" content="여행 플래너" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
 
+    <!-- Pretendard Web Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+
     <!-- iOS Splash Screens -->
     <link rel="apple-touch-startup-image" href="/icons/splash/splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <link rel="apple-touch-startup-image" href="/icons/splash/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
@@ -36,9 +39,9 @@
         /* Prevent pull-to-refresh on mobile */
         overscroll-behavior-y: contain;
       }
-      /* iOS safe area padding */
+      /* Safe area is handled by TravelPlanner component */
       #root {
-        padding-top: env(safe-area-inset-top, 0px);
+        min-height: 100vh;
       }
     </style>
   </head>

@@ -1,0 +1,46 @@
+/* ══ Sizing Tokens (auto-generated — do NOT edit) ══ */
+/* Source: tokens/Sizing/Default.json */
+:root {
+  /* height */
+  --height-md: 32px;
+  --height-lg: 36px;
+  --height-xlg: 40px;
+  --height-sm: 28px;
+  --height-xsm: 24px;
+
+  /* radius */
+  --radius-md: 8px;
+  --radius-xlg: 16px;
+  --radius-lg: 12px;
+  --radius-circle: 999px;
+  --radius-sm: 4px;
+  --radius-xsm: 2px;
+
+  /* breakpoint */
+  --breakpoint-xsm: 480px;
+  --breakpoint-sm: 747px;
+  --breakpoint-md: 1024px;
+  --breakpoint-lg: 1440px;
+  --breakpoint-xlg: 1920px;
+
+  /* spacing */
+  --spacing-sp40: 4px;
+  --spacing-none: 0px;
+  --spacing-sp20: 2px;
+  --spacing-sp60: 6px;
+  --spacing-sp80: 8px;
+  --spacing-sp100: 10px;
+  --spacing-sp120: 12px;
+  --spacing-sp140: 14px;
+  --spacing-sp160: 16px;
+  --spacing-sp200: 20px;
+  --spacing-sp240: 24px;
+  --spacing-sp280: 28px;
+  --spacing-sp320: 32px;
+  --spacing-sp360: 36px;
+  --spacing-sp400: 40px;
+  --spacing-sp440: 44px;
+  --spacing-sp480: 48px;
+  --spacing-sp520: 52px;
+
+}

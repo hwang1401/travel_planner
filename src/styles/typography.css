@@ -1,0 +1,649 @@
+/* ══ Typography Tokens (auto-generated — do NOT edit) ══ */
+/* Source: tokens/foundation/light.json → semantic typography */
+
+:root {
+  /* Font Family */
+  --font-family-base: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* hero 1 */
+  --typo-hero-1-regular-size: 48px;
+  --typo-hero-1-regular-line-height: 120.8%;
+  --typo-hero-1-regular-weight: 400;
+  --typo-hero-1-regular-letter-spacing: -0.0250em;
+  --typo-hero-1-medium-size: 48px;
+  --typo-hero-1-medium-line-height: 120.8%;
+  --typo-hero-1-medium-weight: 500;
+  --typo-hero-1-medium-letter-spacing: -0.0250em;
+  --typo-hero-1-bold-size: 48px;
+  --typo-hero-1-bold-line-height: 120.8%;
+  --typo-hero-1-bold-weight: 700;
+  --typo-hero-1-bold-letter-spacing: -0.0250em;
+
+  /* hero 2 */
+  --typo-hero-2-regular-size: 40px;
+  --typo-hero-2-regular-line-height: 125%;
+  --typo-hero-2-regular-weight: 400;
+  --typo-hero-2-regular-letter-spacing: -0.0230em;
+  --typo-hero-2-medium-size: 40px;
+  --typo-hero-2-medium-line-height: 125%;
+  --typo-hero-2-medium-weight: 500;
+  --typo-hero-2-medium-letter-spacing: -0.0230em;
+  --typo-hero-2-bold-size: 40px;
+  --typo-hero-2-bold-line-height: 125%;
+  --typo-hero-2-bold-weight: 700;
+  --typo-hero-2-bold-letter-spacing: -0.0230em;
+
+  /* title 1 */
+  --typo-title-1-regular-size: 32px;
+  --typo-title-1-regular-line-height: 125%;
+  --typo-title-1-regular-weight: 400;
+  --typo-title-1-regular-letter-spacing: -0.0210em;
+  --typo-title-1-medium-size: 32px;
+  --typo-title-1-medium-line-height: 125%;
+  --typo-title-1-medium-weight: 500;
+  --typo-title-1-medium-letter-spacing: -0.0210em;
+  --typo-title-1-bold-size: 32px;
+  --typo-title-1-bold-line-height: 125%;
+  --typo-title-1-bold-weight: 700;
+  --typo-title-1-bold-letter-spacing: -0.0210em;
+
+  /* title 2 */
+  --typo-title-2-regular-size: 28px;
+  --typo-title-2-regular-line-height: 125%;
+  --typo-title-2-regular-weight: 400;
+  --typo-title-2-regular-letter-spacing: -0.0210em;
+  --typo-title-2-medium-size: 28px;
+  --typo-title-2-medium-line-height: 125%;
+  --typo-title-2-medium-weight: 500;
+  --typo-title-2-medium-letter-spacing: -0.0210em;
+  --typo-title-2-bold-size: 28px;
+  --typo-title-2-bold-line-height: 125%;
+  --typo-title-2-bold-weight: 700;
+  --typo-title-2-bold-letter-spacing: -0.0210em;
+
+  /* Heading 1 */
+  --typo-heading-1-regular-size: 22px;
+  --typo-heading-1-regular-line-height: 136.4%;
+  --typo-heading-1-regular-weight: 400;
+  --typo-heading-1-regular-letter-spacing: -0.0194em;
+  --typo-heading-1-medium-size: 22px;
+  --typo-heading-1-medium-line-height: 136.4%;
+  --typo-heading-1-medium-weight: 500;
+  --typo-heading-1-medium-letter-spacing: -0.0194em;
+  --typo-heading-1-bold-size: 22px;
+  --typo-heading-1-bold-line-height: 136.4%;
+  --typo-heading-1-bold-weight: 700;
+  --typo-heading-1-bold-letter-spacing: -0.0194em;
+
+  /* Heading 2 */
+  --typo-heading-2-regular-size: 20px;
+  --typo-heading-2-regular-line-height: 140%;
+  --typo-heading-2-regular-weight: 400;
+  --typo-heading-2-regular-letter-spacing: -0.0120em;
+  --typo-heading-2-medium-size: 20px;
+  --typo-heading-2-medium-line-height: 140%;
+  --typo-heading-2-medium-weight: 500;
+  --typo-heading-2-medium-letter-spacing: -0.0120em;
+  --typo-heading-2-bold-size: 20px;
+  --typo-heading-2-bold-line-height: 140%;
+  --typo-heading-2-bold-weight: 700;
+  --typo-heading-2-bold-letter-spacing: -0.0120em;
+
+  /* Heading 3 */
+  --typo-heading-3-regular-size: 18px;
+  --typo-heading-3-regular-line-height: 144.5%;
+  --typo-heading-3-regular-weight: 400;
+  --typo-heading-3-regular-letter-spacing: -0.0002em;
+  --typo-heading-3-medium-size: 18px;
+  --typo-heading-3-medium-line-height: 144.5%;
+  --typo-heading-3-medium-weight: 500;
+  --typo-heading-3-medium-letter-spacing: -0.0002em;
+  --typo-heading-3-bold-size: 18px;
+  --typo-heading-3-bold-line-height: 144.5%;
+  --typo-heading-3-bold-weight: 700;
+  --typo-heading-3-bold-letter-spacing: -0.0002em;
+
+  /* Body 1 */
+  --typo-body-1-n---regular-size: 16px;
+  --typo-body-1-n---regular-line-height: 150%;
+  --typo-body-1-n---regular-weight: 400;
+  --typo-body-1-n---regular-letter-spacing: 0.0057em;
+  --typo-body-1-n---medium-size: 16px;
+  --typo-body-1-n---medium-line-height: 150%;
+  --typo-body-1-n---medium-weight: 500;
+  --typo-body-1-n---medium-letter-spacing: 0.0057em;
+  --typo-body-1-n---bold-size: 16px;
+  --typo-body-1-n---bold-line-height: 150%;
+  --typo-body-1-n---bold-weight: 700;
+  --typo-body-1-n---bold-letter-spacing: 0.0057em;
+  --typo-body-1-r---regular-size: 16px;
+  --typo-body-1-r---regular-line-height: 162.5%;
+  --typo-body-1-r---regular-weight: 400;
+  --typo-body-1-r---regular-letter-spacing: 0.0057em;
+  --typo-body-1-r---medium-size: 16px;
+  --typo-body-1-r---medium-line-height: 162.5%;
+  --typo-body-1-r---medium-weight: 500;
+  --typo-body-1-r---medium-letter-spacing: 0.0057em;
+  --typo-body-1-r---bold-size: 16px;
+  --typo-body-1-r---bold-line-height: 162.5%;
+  --typo-body-1-r---bold-weight: 600;
+  --typo-body-1-r---bold-letter-spacing: 0.0057em;
+
+  /* Body 2 */
+  --typo-body-2-n---regular-size: 15px;
+  --typo-body-2-n---regular-line-height: 146.7%;
+  --typo-body-2-n---regular-weight: 400;
+  --typo-body-2-n---regular-letter-spacing: 0.0096em;
+  --typo-body-2-n---medium-size: 15px;
+  --typo-body-2-n---medium-line-height: 146.7%;
+  --typo-body-2-n---medium-weight: 500;
+  --typo-body-2-n---medium-letter-spacing: 0.0096em;
+  --typo-body-2-n---bold-size: 15px;
+  --typo-body-2-n---bold-line-height: 146.7%;
+  --typo-body-2-n---bold-weight: 600;
+  --typo-body-2-n---bold-letter-spacing: 0.0096em;
+  --typo-body-2-r---regular-size: 15px;
+  --typo-body-2-r---regular-line-height: 160%;
+  --typo-body-2-r---regular-weight: 400;
+  --typo-body-2-r---regular-letter-spacing: 0.0096em;
+  --typo-body-2-r---medium-size: 15px;
+  --typo-body-2-r---medium-line-height: 160%;
+  --typo-body-2-r---medium-weight: 500;
+  --typo-body-2-r---medium-letter-spacing: 0.0096em;
+  --typo-body-2-r---bold-size: 15px;
+  --typo-body-2-r---bold-line-height: 160%;
+  --typo-body-2-r---bold-weight: 700;
+  --typo-body-2-r---bold-letter-spacing: 0.0096em;
+
+  /* Label 1 */
+  --typo-label-1-n---regular-size: 14px;
+  --typo-label-1-n---regular-line-height: 142.9%;
+  --typo-label-1-n---regular-weight: 400;
+  --typo-label-1-n---regular-letter-spacing: 0.0145em;
+  --typo-label-1-n---medium-size: 14px;
+  --typo-label-1-n---medium-line-height: 142.9%;
+  --typo-label-1-n---medium-weight: 500;
+  --typo-label-1-n---medium-letter-spacing: 0.0145em;
+  --typo-label-1-n---bold-size: 14px;
+  --typo-label-1-n---bold-line-height: 142.9%;
+  --typo-label-1-n---bold-weight: 700;
+  --typo-label-1-n---bold-letter-spacing: 0.0145em;
+  --typo-label-1-r---regular-size: 14px;
+  --typo-label-1-r---regular-line-height: 157.1%;
+  --typo-label-1-r---regular-weight: 400;
+  --typo-label-1-r---regular-letter-spacing: 0.0145em;
+  --typo-label-1-r---medium-size: 14px;
+  --typo-label-1-r---medium-line-height: 157.1%;
+  --typo-label-1-r---medium-weight: 500;
+  --typo-label-1-r---medium-letter-spacing: 0.0145em;
+  --typo-label-1-r---bold-size: 14px;
+  --typo-label-1-r---bold-line-height: 157.14%;
+  --typo-label-1-r---bold-weight: 700;
+  --typo-label-1-r---bold-letter-spacing: 0.0145em;
+
+  /* Label 2 */
+  --typo-label-2-regular-size: 13px;
+  --typo-label-2-regular-line-height: 138.5%;
+  --typo-label-2-regular-weight: 400;
+  --typo-label-2-regular-letter-spacing: 0.0194em;
+  --typo-label-2-medium-size: 13px;
+  --typo-label-2-medium-line-height: 138.5%;
+  --typo-label-2-medium-weight: 500;
+  --typo-label-2-medium-letter-spacing: 0.0194em;
+  --typo-label-2-bold-size: 13px;
+  --typo-label-2-bold-line-height: 138.5%;
+  --typo-label-2-bold-weight: 700;
+  --typo-label-2-bold-letter-spacing: 0.0194em;
+
+  /* caption 1 */
+  --typo-caption-1-regular-size: 12px;
+  --typo-caption-1-regular-line-height: 133.4%;
+  --typo-caption-1-regular-weight: 400;
+  --typo-caption-1-regular-letter-spacing: 0.0252em;
+  --typo-caption-1-medium-size: 12px;
+  --typo-caption-1-medium-line-height: 133.4%;
+  --typo-caption-1-medium-weight: 500;
+  --typo-caption-1-medium-letter-spacing: 0.0252em;
+  --typo-caption-1-bold-size: 12px;
+  --typo-caption-1-bold-line-height: 133.4%;
+  --typo-caption-1-bold-weight: 700;
+  --typo-caption-1-bold-letter-spacing: 0.0252em;
+
+  /* caption 2 */
+  --typo-caption-2-regular-size: 11px;
+  --typo-caption-2-regular-line-height: 127.3%;
+  --typo-caption-2-regular-weight: 400;
+  --typo-caption-2-regular-letter-spacing: 0.0311em;
+  --typo-caption-2-medium-size: 11px;
+  --typo-caption-2-medium-line-height: 127.3%;
+  --typo-caption-2-medium-weight: 500;
+  --typo-caption-2-medium-letter-spacing: 0.0311em;
+  --typo-caption-2-bold-size: 11px;
+  --typo-caption-2-bold-line-height: 127.3%;
+  --typo-caption-2-bold-weight: 700;
+  --typo-caption-2-bold-letter-spacing: 0.0311em;
+
+  /* caption 3 */
+  --typo-caption-3-regular-size: 10px;
+  --typo-caption-3-regular-line-height: 125%;
+  --typo-caption-3-regular-weight: 400;
+  --typo-caption-3-regular-letter-spacing: 0.0320em;
+  --typo-caption-3-medium-size: 10px;
+  --typo-caption-3-medium-line-height: 125%;
+  --typo-caption-3-medium-weight: 500;
+  --typo-caption-3-medium-letter-spacing: 0.0320em;
+  --typo-caption-3-bold-size: 10px;
+  --typo-caption-3-bold-line-height: 125%;
+  --typo-caption-3-bold-weight: 700;
+  --typo-caption-3-bold-letter-spacing: 0.0320em;
+
+}
+
+.typo-hero-1-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-hero-1-regular-size);
+  line-height: var(--typo-hero-1-regular-line-height);
+  font-weight: var(--typo-hero-1-regular-weight);
+  letter-spacing: var(--typo-hero-1-regular-letter-spacing);
+}
+
+.typo-hero-1-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-hero-1-medium-size);
+  line-height: var(--typo-hero-1-medium-line-height);
+  font-weight: var(--typo-hero-1-medium-weight);
+  letter-spacing: var(--typo-hero-1-medium-letter-spacing);
+}
+
+.typo-hero-1-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-hero-1-bold-size);
+  line-height: var(--typo-hero-1-bold-line-height);
+  font-weight: var(--typo-hero-1-bold-weight);
+  letter-spacing: var(--typo-hero-1-bold-letter-spacing);
+}
+
+.typo-hero-2-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-hero-2-regular-size);
+  line-height: var(--typo-hero-2-regular-line-height);
+  font-weight: var(--typo-hero-2-regular-weight);
+  letter-spacing: var(--typo-hero-2-regular-letter-spacing);
+}
+
+.typo-hero-2-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-hero-2-medium-size);
+  line-height: var(--typo-hero-2-medium-line-height);
+  font-weight: var(--typo-hero-2-medium-weight);
+  letter-spacing: var(--typo-hero-2-medium-letter-spacing);
+}
+
+.typo-hero-2-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-hero-2-bold-size);
+  line-height: var(--typo-hero-2-bold-line-height);
+  font-weight: var(--typo-hero-2-bold-weight);
+  letter-spacing: var(--typo-hero-2-bold-letter-spacing);
+}
+
+.typo-title-1-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-title-1-regular-size);
+  line-height: var(--typo-title-1-regular-line-height);
+  font-weight: var(--typo-title-1-regular-weight);
+  letter-spacing: var(--typo-title-1-regular-letter-spacing);
+}
+
+.typo-title-1-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-title-1-medium-size);
+  line-height: var(--typo-title-1-medium-line-height);
+  font-weight: var(--typo-title-1-medium-weight);
+  letter-spacing: var(--typo-title-1-medium-letter-spacing);
+}
+
+.typo-title-1-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-title-1-bold-size);
+  line-height: var(--typo-title-1-bold-line-height);
+  font-weight: var(--typo-title-1-bold-weight);
+  letter-spacing: var(--typo-title-1-bold-letter-spacing);
+}
+
+.typo-title-2-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-title-2-regular-size);
+  line-height: var(--typo-title-2-regular-line-height);
+  font-weight: var(--typo-title-2-regular-weight);
+  letter-spacing: var(--typo-title-2-regular-letter-spacing);
+}
+
+.typo-title-2-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-title-2-medium-size);
+  line-height: var(--typo-title-2-medium-line-height);
+  font-weight: var(--typo-title-2-medium-weight);
+  letter-spacing: var(--typo-title-2-medium-letter-spacing);
+}
+
+.typo-title-2-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-title-2-bold-size);
+  line-height: var(--typo-title-2-bold-line-height);
+  font-weight: var(--typo-title-2-bold-weight);
+  letter-spacing: var(--typo-title-2-bold-letter-spacing);
+}
+
+.typo-heading-1-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-heading-1-regular-size);
+  line-height: var(--typo-heading-1-regular-line-height);
+  font-weight: var(--typo-heading-1-regular-weight);
+  letter-spacing: var(--typo-heading-1-regular-letter-spacing);
+}
+
+.typo-heading-1-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-heading-1-medium-size);
+  line-height: var(--typo-heading-1-medium-line-height);
+  font-weight: var(--typo-heading-1-medium-weight);
+  letter-spacing: var(--typo-heading-1-medium-letter-spacing);
+}
+
+.typo-heading-1-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-heading-1-bold-size);
+  line-height: var(--typo-heading-1-bold-line-height);
+  font-weight: var(--typo-heading-1-bold-weight);
+  letter-spacing: var(--typo-heading-1-bold-letter-spacing);
+}
+
+.typo-heading-2-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-heading-2-regular-size);
+  line-height: var(--typo-heading-2-regular-line-height);
+  font-weight: var(--typo-heading-2-regular-weight);
+  letter-spacing: var(--typo-heading-2-regular-letter-spacing);
+}
+
+.typo-heading-2-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-heading-2-medium-size);
+  line-height: var(--typo-heading-2-medium-line-height);
+  font-weight: var(--typo-heading-2-medium-weight);
+  letter-spacing: var(--typo-heading-2-medium-letter-spacing);
+}
+
+.typo-heading-2-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-heading-2-bold-size);
+  line-height: var(--typo-heading-2-bold-line-height);
+  font-weight: var(--typo-heading-2-bold-weight);
+  letter-spacing: var(--typo-heading-2-bold-letter-spacing);
+}
+
+.typo-heading-3-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-heading-3-regular-size);
+  line-height: var(--typo-heading-3-regular-line-height);
+  font-weight: var(--typo-heading-3-regular-weight);
+  letter-spacing: var(--typo-heading-3-regular-letter-spacing);
+}
+
+.typo-heading-3-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-heading-3-medium-size);
+  line-height: var(--typo-heading-3-medium-line-height);
+  font-weight: var(--typo-heading-3-medium-weight);
+  letter-spacing: var(--typo-heading-3-medium-letter-spacing);
+}
+
+.typo-heading-3-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-heading-3-bold-size);
+  line-height: var(--typo-heading-3-bold-line-height);
+  font-weight: var(--typo-heading-3-bold-weight);
+  letter-spacing: var(--typo-heading-3-bold-letter-spacing);
+}
+
+.typo-body-1-n---regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-1-n---regular-size);
+  line-height: var(--typo-body-1-n---regular-line-height);
+  font-weight: var(--typo-body-1-n---regular-weight);
+  letter-spacing: var(--typo-body-1-n---regular-letter-spacing);
+}
+
+.typo-body-1-n---medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-1-n---medium-size);
+  line-height: var(--typo-body-1-n---medium-line-height);
+  font-weight: var(--typo-body-1-n---medium-weight);
+  letter-spacing: var(--typo-body-1-n---medium-letter-spacing);
+}
+
+.typo-body-1-n---bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-1-n---bold-size);
+  line-height: var(--typo-body-1-n---bold-line-height);
+  font-weight: var(--typo-body-1-n---bold-weight);
+  letter-spacing: var(--typo-body-1-n---bold-letter-spacing);
+}
+
+.typo-body-1-r---regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-1-r---regular-size);
+  line-height: var(--typo-body-1-r---regular-line-height);
+  font-weight: var(--typo-body-1-r---regular-weight);
+  letter-spacing: var(--typo-body-1-r---regular-letter-spacing);
+}
+
+.typo-body-1-r---medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-1-r---medium-size);
+  line-height: var(--typo-body-1-r---medium-line-height);
+  font-weight: var(--typo-body-1-r---medium-weight);
+  letter-spacing: var(--typo-body-1-r---medium-letter-spacing);
+}
+
+.typo-body-1-r---bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-1-r---bold-size);
+  line-height: var(--typo-body-1-r---bold-line-height);
+  font-weight: var(--typo-body-1-r---bold-weight);
+  letter-spacing: var(--typo-body-1-r---bold-letter-spacing);
+}
+
+.typo-body-2-n---regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-2-n---regular-size);
+  line-height: var(--typo-body-2-n---regular-line-height);
+  font-weight: var(--typo-body-2-n---regular-weight);
+  letter-spacing: var(--typo-body-2-n---regular-letter-spacing);
+}
+
+.typo-body-2-n---medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-2-n---medium-size);
+  line-height: var(--typo-body-2-n---medium-line-height);
+  font-weight: var(--typo-body-2-n---medium-weight);
+  letter-spacing: var(--typo-body-2-n---medium-letter-spacing);
+}
+
+.typo-body-2-n---bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-2-n---bold-size);
+  line-height: var(--typo-body-2-n---bold-line-height);
+  font-weight: var(--typo-body-2-n---bold-weight);
+  letter-spacing: var(--typo-body-2-n---bold-letter-spacing);
+}
+
+.typo-body-2-r---regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-2-r---regular-size);
+  line-height: var(--typo-body-2-r---regular-line-height);
+  font-weight: var(--typo-body-2-r---regular-weight);
+  letter-spacing: var(--typo-body-2-r---regular-letter-spacing);
+}
+
+.typo-body-2-r---medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-2-r---medium-size);
+  line-height: var(--typo-body-2-r---medium-line-height);
+  font-weight: var(--typo-body-2-r---medium-weight);
+  letter-spacing: var(--typo-body-2-r---medium-letter-spacing);
+}
+
+.typo-body-2-r---bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-body-2-r---bold-size);
+  line-height: var(--typo-body-2-r---bold-line-height);
+  font-weight: var(--typo-body-2-r---bold-weight);
+  letter-spacing: var(--typo-body-2-r---bold-letter-spacing);
+}
+
+.typo-label-1-n---regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-label-1-n---regular-size);
+  line-height: var(--typo-label-1-n---regular-line-height);
+  font-weight: var(--typo-label-1-n---regular-weight);
+  letter-spacing: var(--typo-label-1-n---regular-letter-spacing);
+}
+
+.typo-label-1-n---medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-label-1-n---medium-size);
+  line-height: var(--typo-label-1-n---medium-line-height);
+  font-weight: var(--typo-label-1-n---medium-weight);
+  letter-spacing: var(--typo-label-1-n---medium-letter-spacing);
+}
+
+.typo-label-1-n---bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-label-1-n---bold-size);
+  line-height: var(--typo-label-1-n---bold-line-height);
+  font-weight: var(--typo-label-1-n---bold-weight);
+  letter-spacing: var(--typo-label-1-n---bold-letter-spacing);
+}
+
+.typo-label-1-r---regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-label-1-r---regular-size);
+  line-height: var(--typo-label-1-r---regular-line-height);
+  font-weight: var(--typo-label-1-r---regular-weight);
+  letter-spacing: var(--typo-label-1-r---regular-letter-spacing);
+}
+
+.typo-label-1-r---medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-label-1-r---medium-size);
+  line-height: var(--typo-label-1-r---medium-line-height);
+  font-weight: var(--typo-label-1-r---medium-weight);
+  letter-spacing: var(--typo-label-1-r---medium-letter-spacing);
+}
+
+.typo-label-1-r---bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-label-1-r---bold-size);
+  line-height: var(--typo-label-1-r---bold-line-height);
+  font-weight: var(--typo-label-1-r---bold-weight);
+  letter-spacing: var(--typo-label-1-r---bold-letter-spacing);
+}
+
+.typo-label-2-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-label-2-regular-size);
+  line-height: var(--typo-label-2-regular-line-height);
+  font-weight: var(--typo-label-2-regular-weight);
+  letter-spacing: var(--typo-label-2-regular-letter-spacing);
+}
+
+.typo-label-2-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-label-2-medium-size);
+  line-height: var(--typo-label-2-medium-line-height);
+  font-weight: var(--typo-label-2-medium-weight);
+  letter-spacing: var(--typo-label-2-medium-letter-spacing);
+}
+
+.typo-label-2-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-label-2-bold-size);
+  line-height: var(--typo-label-2-bold-line-height);
+  font-weight: var(--typo-label-2-bold-weight);
+  letter-spacing: var(--typo-label-2-bold-letter-spacing);
+}
+
+.typo-caption-1-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-caption-1-regular-size);
+  line-height: var(--typo-caption-1-regular-line-height);
+  font-weight: var(--typo-caption-1-regular-weight);
+  letter-spacing: var(--typo-caption-1-regular-letter-spacing);
+}
+
+.typo-caption-1-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-caption-1-medium-size);
+  line-height: var(--typo-caption-1-medium-line-height);
+  font-weight: var(--typo-caption-1-medium-weight);
+  letter-spacing: var(--typo-caption-1-medium-letter-spacing);
+}
+
+.typo-caption-1-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-caption-1-bold-size);
+  line-height: var(--typo-caption-1-bold-line-height);
+  font-weight: var(--typo-caption-1-bold-weight);
+  letter-spacing: var(--typo-caption-1-bold-letter-spacing);
+}
+
+.typo-caption-2-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-caption-2-regular-size);
+  line-height: var(--typo-caption-2-regular-line-height);
+  font-weight: var(--typo-caption-2-regular-weight);
+  letter-spacing: var(--typo-caption-2-regular-letter-spacing);
+}
+
+.typo-caption-2-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-caption-2-medium-size);
+  line-height: var(--typo-caption-2-medium-line-height);
+  font-weight: var(--typo-caption-2-medium-weight);
+  letter-spacing: var(--typo-caption-2-medium-letter-spacing);
+}
+
+.typo-caption-2-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-caption-2-bold-size);
+  line-height: var(--typo-caption-2-bold-line-height);
+  font-weight: var(--typo-caption-2-bold-weight);
+  letter-spacing: var(--typo-caption-2-bold-letter-spacing);
+}
+
+.typo-caption-3-regular {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-caption-3-regular-size);
+  line-height: var(--typo-caption-3-regular-line-height);
+  font-weight: var(--typo-caption-3-regular-weight);
+  letter-spacing: var(--typo-caption-3-regular-letter-spacing);
+}
+
+.typo-caption-3-medium {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-caption-3-medium-size);
+  line-height: var(--typo-caption-3-medium-line-height);
+  font-weight: var(--typo-caption-3-medium-weight);
+  letter-spacing: var(--typo-caption-3-medium-letter-spacing);
+}
+
+.typo-caption-3-bold {
+  font-family: var(--font-family-base);
+  font-size: var(--typo-caption-3-bold-size);
+  line-height: var(--typo-caption-3-bold-line-height);
+  font-weight: var(--typo-caption-3-bold-weight);
+  letter-spacing: var(--typo-caption-3-bold-letter-spacing);
+}
+

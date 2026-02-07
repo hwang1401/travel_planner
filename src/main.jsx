@@ -1,12 +1,10 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
+import "leaflet/dist/leaflet.css";
 import "./index.css";
-import TravelPlanner from "./App";
+import App from "./App";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <TravelPlanner />
-  </React.StrictMode>
+  <App />
 );
 
 // Register Service Worker for PWA

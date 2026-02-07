@@ -4,15 +4,18 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "build:tokens": "node scripts/build-tokens.cjs",
+    "dev": "npm run build:tokens && vite",
+    "build": "npm run build:tokens && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
     "leaflet": "^1.9.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.13.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",

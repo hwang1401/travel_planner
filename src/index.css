@@ -1,99 +1,14 @@
 @import "tailwindcss";
 
-/* ── Design Tokens: Semantic Colors (Light) ── */
-:root {
-  /* Primary */
-  --color-primary: #8b7bff;
-  --color-on-primary: #fff4ff;
-  --color-primary-container: #e9d2ff;
-  --color-on-primary-container: #2c34b3;
+/* ══ Design System: auto-generated from tokens/ ══ */
+/* Run `npm run build:tokens` to regenerate          */
+@import "./styles/foundation.css";
+@import "./styles/semantic.css";
+@import "./styles/semantic-dark.css";
+@import "./styles/sizing.css";
+@import "./styles/typography.css";
 
-  /* Secondary */
-  --color-secondary: #79d8b6;
-  --color-on-secondary: #00482d;
-  --color-secondary-container: #a0f3d4;
-  --color-on-secondary-container: #003c23;
-
-  /* Tertiary */
-  --color-tertiary: #984717;
-  --color-on-tertiary: #ffe8d8;
-  --color-tertiary-container: #ffd1a7;
-  --color-on-tertiary-container: #793102;
-
-  /* Error */
-  --color-error: #db3b33;
-  --color-on-error: #ffe8d8;
-  --color-error-container: #ffbea9;
-  --color-on-error-container: #580000;
-
-  /* Warning */
-  --color-warning: #cf7e00;
-  --color-on-warning: #fff5b6;
-  --color-warning-container: #ffd476;
-  --color-on-warning-container: #4c1600;
-
-  /* Success */
-  --color-success: #006e4e;
-  --color-on-success: #d4fff5;
-  --color-success-container: #a0f3d4;
-  --color-on-success-container: #00260e;
-
-  /* Info */
-  --color-info: #4c4ad6;
-  --color-on-info: #fff4ff;
-  --color-info-container: #e9d2ff;
-  --color-on-info-container: #001865;
-
-  /* Neutral / Surface */
-  --color-surface: #fbf8ff;
-  --color-on-surface: #1c1b21;
-  --color-on-surface-variant: #48464d;
-  --color-on-surface-variant2: #78767e;
-  --color-surface-dim: #e4e1eb;
-  --color-surface-bright: #fbf8ff;
-  --color-surface-container-lowest: #fffeff;
-  --color-surface-container-low: #f2eff9;
-  --color-surface-container: #e4e1eb;
-  --color-surface-container-high: #c8c5ce;
-  --color-surface-container-highest: #acaab3;
-  --color-outline: #78767e;
-  --color-outline-variant: #c8c5ce;
-  --color-surface-variant: #e4e1eb;
-  --color-inverse-surface: #312f37;
-  --color-on-inverse-surface: #f2eff9;
-  --color-scrim: #02000b;
-  --color-shadow: #02000b;
-
-  /* Sizing Tokens */
-  --height-xsm: 24px;
-  --height-sm: 28px;
-  --height-md: 32px;
-  --height-lg: 36px;
-  --height-xlg: 40px;
-
-  --radius-xsm: 2px;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xlg: 16px;
-  --radius-circle: 999px;
-
-  --spacing-none: 0px;
-  --spacing-20: 2px;
-  --spacing-40: 4px;
-  --spacing-60: 6px;
-  --spacing-80: 8px;
-  --spacing-100: 10px;
-  --spacing-120: 12px;
-  --spacing-160: 16px;
-  --spacing-200: 20px;
-  --spacing-240: 24px;
-  --spacing-320: 32px;
-  --spacing-400: 40px;
-  --spacing-480: 48px;
-}
-
-/* ── Tailwind Theme Extension ── */
+/* ── Tailwind Theme Extension (bridges tokens → Tailwind utilities) ── */
 @theme {
   /* Semantic Colors */
   --color-primary: var(--color-primary);
@@ -115,35 +30,21 @@
   --color-outline-variant: var(--color-outline-variant);
   --color-scrim: var(--color-scrim);
 
-  /* Typography Scale */
-  --font-size-display: 2rem;         /* 32px */
-  --font-size-headline-lg: 1.5rem;   /* 24px */
-  --font-size-headline-md: 1.25rem;  /* 20px */
-  --font-size-headline-sm: 1.125rem; /* 18px */
-  --font-size-title-lg: 1rem;        /* 16px */
-  --font-size-title-md: 0.9375rem;   /* 15px */
-  --font-size-body-lg: 0.875rem;     /* 14px */
-  --font-size-body-md: 0.8125rem;    /* 13px */
-  --font-size-body-sm: 0.75rem;      /* 12px */
-  --font-size-label-lg: 0.6875rem;   /* 11px */
-  --font-size-label-md: 0.625rem;    /* 10px */
-  --font-size-label-sm: 0.5625rem;   /* 9px */
+  /* Spacing (from sizing tokens) */
+  --spacing-sp20: var(--spacing-sp20);
+  --spacing-sp40: var(--spacing-sp40);
+  --spacing-sp60: var(--spacing-sp60);
+  --spacing-sp80: var(--spacing-sp80);
+  --spacing-sp100: var(--spacing-sp100);
+  --spacing-sp120: var(--spacing-sp120);
+  --spacing-sp160: var(--spacing-sp160);
+  --spacing-sp200: var(--spacing-sp200);
+  --spacing-sp240: var(--spacing-sp240);
+  --spacing-sp320: var(--spacing-sp320);
+  --spacing-sp400: var(--spacing-sp400);
+  --spacing-sp480: var(--spacing-sp480);
 
-  /* Spacing */
-  --spacing-sp20: var(--spacing-20);
-  --spacing-sp40: var(--spacing-40);
-  --spacing-sp60: var(--spacing-60);
-  --spacing-sp80: var(--spacing-80);
-  --spacing-sp100: var(--spacing-100);
-  --spacing-sp120: var(--spacing-120);
-  --spacing-sp160: var(--spacing-160);
-  --spacing-sp200: var(--spacing-200);
-  --spacing-sp240: var(--spacing-240);
-  --spacing-sp320: var(--spacing-320);
-  --spacing-sp400: var(--spacing-400);
-  --spacing-sp480: var(--spacing-480);
-
-  /* Radius */
+  /* Radius (from sizing tokens) */
   --radius-xs: var(--radius-xsm);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -154,7 +55,7 @@
 
 /* ── Base Styles ── */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-family-base, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   color: var(--color-on-surface);
   background: var(--color-surface);
   -webkit-font-smoothing: antialiased;
@@ -174,9 +75,9 @@ body {
 
 /* Leaflet popup overrides */
 .leaflet-popup-content-wrapper {
-  border-radius: 10px !important;
+  border-radius: var(--radius-md) !important;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;
 }
 .leaflet-popup-content {
-  margin: 10px 12px !important;
+  margin: var(--spacing-sp100) var(--spacing-sp120) !important;
 }
