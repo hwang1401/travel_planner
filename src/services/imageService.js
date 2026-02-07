@@ -1,6 +1,6 @@
 /*
- * ── Image Service ──
- * Handles image upload/delete via Supabase Storage.
+ * ── Image / File Service ──
+ * Handles image & PDF upload/delete via Supabase Storage.
  * Bucket: "images" (public)
  */
 
@@ -19,7 +19,6 @@ async function resizeImage(file, maxSize = MAX_SIZE) {
     img.onload = () => {
       let { width, height } = img;
 
-      // Only resize if larger than max
       if (width > maxSize || height > maxSize) {
         if (width > height) {
           height = Math.round((height * maxSize) / width);
@@ -41,26 +40,22 @@ async function resizeImage(file, maxSize = MAX_SIZE) {
         0.85
       );
     };
-    img.onerror = () => resolve(file); // fallback to original
+    img.onerror = () => resolve(file);
     img.src = URL.createObjectURL(file);
   });
 }
 
 /**
- * Upload an image to Supabase Storage.
- * @param {File} file - The image file to upload
- * @param {string} path - Storage path (e.g. "trips/{tripId}/cover.jpg")
- * @returns {string} Public URL of the uploaded image
+ * Upload an image to Supabase Storage (with resize).
  */
 export async function uploadImage(file, path) {
-  // Resize before upload
   const resized = await resizeImage(file);
 
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, resized, {
       contentType: 'image/jpeg',
-      upsert: true, // overwrite if exists
+      upsert: true,
     });
 
   if (error) {
@@ -68,15 +63,41 @@ export async function uploadImage(file, path) {
     throw error;
   }
 
-  // Get public URL
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  // Append cache-buster to avoid stale images
   return `${data.publicUrl}?t=${Date.now()}`;
 }
 
 /**
- * Delete an image from Supabase Storage.
- * @param {string} path - Storage path to delete
+ * Upload any file (image or PDF) to Supabase Storage.
+ * Images are resized; PDFs are uploaded as-is.
+ */
+export async function uploadFile(file, path) {
+  const isPdf = file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
+
+  if (isPdf) {
+    // Upload PDF as-is
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('[ImageService] PDF upload error:', error);
+      throw error;
+    }
+
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    return `${data.publicUrl}?t=${Date.now()}`;
+  }
+
+  // Image — resize and upload
+  return uploadImage(file, path);
+}
+
+/**
+ * Delete a file from Supabase Storage.
  */
 export async function deleteImage(path) {
   const { error } = await supabase.storage
@@ -89,14 +110,25 @@ export async function deleteImage(path) {
 }
 
 /**
- * Generate a unique storage path for a trip image.
+ * Generate a unique storage path.
  * @param {string} tripId
  * @param {string} folder - "cover" | "items" | "docs"
+ * @param {string} ext - file extension (default "jpg")
  * @returns {string} path
  */
-export function generateImagePath(tripId, folder = 'items') {
+export function generateImagePath(tripId, folder = 'items', ext = 'jpg') {
   if (folder === 'cover') {
-    return `trips/${tripId}/cover_${Date.now()}.jpg`;
+    return `trips/${tripId}/cover_${Date.now()}.${ext}`;
   }
-  return `trips/${tripId}/${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 6)}.jpg`;
+  return `trips/${tripId}/${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`;
+}
+
+/**
+ * Check if a URL points to a PDF.
+ */
+export function isPdfUrl(url) {
+  if (!url) return false;
+  // Remove query params for check
+  const clean = url.split('?')[0].toLowerCase();
+  return clean.endsWith('.pdf');
 }

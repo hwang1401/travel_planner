@@ -1,14 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import Field from '../common/Field';
 import BottomSheet from '../common/BottomSheet';
 import ImageViewer from '../common/ImageViewer';
-import ImagePicker from '../common/ImagePicker';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { loadDocuments, createDocument, updateDocument, deleteDocument } from '../../services/documentService';
-import { uploadImage, generateImagePath } from '../../services/imageService';
+import { uploadFile, generateImagePath, isPdfUrl } from '../../services/imageService';
 
 /* ── Category presets ── */
 const DOC_CATEGORIES = [
@@ -199,23 +198,56 @@ function DynamicDocumentDialog({ onClose, tripId }) {
                 </p>
               )}
 
-              {/* Image */}
+              {/* File preview (image or PDF) */}
               {selectedDoc.imageUrl ? (
-                <div onClick={() => setViewImage(selectedDoc.imageUrl)} style={{
-                  borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
-                  border: "1px solid var(--color-outline-variant)",
-                  background: "var(--color-surface-container-low)",
-                  width: "100%", cursor: "zoom-in",
-                  maxHeight: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <img src={selectedDoc.imageUrl} alt={selectedDoc.title}
-                    style={{ width: "100%", maxHeight: '50vh', display: "block", objectFit: "contain" }} />
-                </div>
+                isPdfUrl(selectedDoc.imageUrl) ? (
+                  /* PDF viewer */
+                  <div style={{
+                    borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
+                    border: "1px solid var(--color-outline-variant)",
+                    background: "var(--color-surface-container-low)",
+                    width: "100%",
+                  }}>
+                    <iframe
+                      src={`${selectedDoc.imageUrl.split('?')[0]}#toolbar=0&navpanes=0`}
+                      title={selectedDoc.title}
+                      style={{ width: '100%', height: '50vh', border: 'none', display: 'block' }}
+                    />
+                    <a
+                      href={selectedDoc.imageUrl.split('?')[0]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                        padding: '10px', borderTop: '1px solid var(--color-outline-variant)',
+                        fontSize: 'var(--typo-caption-1-bold-size)',
+                        fontWeight: 'var(--typo-caption-1-bold-weight)',
+                        color: 'var(--color-primary)',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <Icon name="externalLink" size={14} />
+                      새 탭에서 열기
+                    </a>
+                  </div>
+                ) : (
+                  /* Image viewer */
+                  <div onClick={() => setViewImage(selectedDoc.imageUrl)} style={{
+                    borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
+                    border: "1px solid var(--color-outline-variant)",
+                    background: "var(--color-surface-container-low)",
+                    width: "100%", cursor: "zoom-in",
+                    maxHeight: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <img src={selectedDoc.imageUrl} alt={selectedDoc.title}
+                      style={{ width: "100%", maxHeight: '50vh', display: "block", objectFit: "contain" }} />
+                  </div>
+                )
               ) : (
                 <div style={{ borderRadius: "var(--radius-md, 8px)", border: "2px dashed var(--color-outline-variant)", padding: "40px 20px", textAlign: "center", background: "var(--color-surface-container-low)" }}>
                   <Icon name="file" size={32} style={{ opacity: 0.3 }} />
                   <p style={{ margin: "10px 0 0", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
-                    이미지가 없습니다
+                    파일이 없습니다
                   </p>
                 </div>
               )}
@@ -262,14 +294,19 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
 
   const canSave = title.trim() && !uploading && !saving;
 
-  const handleImageFile = useCallback(async (file) => {
+  const fileRef = useRef(null);
+
+  const handleFileSelect = useCallback(async (file) => {
+    if (!file) return;
     setUploading(true);
     try {
-      const path = generateImagePath(tripId, 'docs');
-      const url = await uploadImage(file, path);
+      const isPdf = file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
+      const ext = isPdf ? 'pdf' : 'jpg';
+      const path = generateImagePath(tripId, 'docs', ext);
+      const url = await uploadFile(file, path);
       setImageUrl(url);
     } catch (err) {
-      console.error('Doc image upload error:', err);
+      console.error('Doc file upload error:', err);
     } finally {
       setUploading(false);
     }
@@ -370,22 +407,94 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
             value={caption} onChange={(e) => setCaption(e.target.value)}
             placeholder="예: KE8795 인천→후쿠오카" rows={2} />
 
-          {/* Image */}
+          {/* File (image or PDF) */}
           <div>
             <p style={{
               margin: '0 0 8px', fontSize: 'var(--typo-caption-2-bold-size)',
               fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant)',
             }}>
-              문서 이미지
+              파일 (이미지 또는 PDF)
             </p>
-            <ImagePicker
-              value={imageUrl}
-              onChange={handleImageFile}
-              onRemove={() => setImageUrl('')}
-              placeholder="이미지를 추가하세요"
-              aspect="doc"
-              uploading={uploading}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,application/pdf"
+              style={{ display: 'none' }}
+              onChange={(e) => { handleFileSelect(e.target.files?.[0]); e.target.value = ''; }}
             />
+
+            {imageUrl ? (
+              <div style={{ position: 'relative', borderRadius: 'var(--radius-md, 8px)', overflow: 'hidden', border: '1px solid var(--color-outline-variant)' }}>
+                {isPdfUrl(imageUrl) ? (
+                  /* PDF preview */
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '14px 16px',
+                    background: 'var(--color-surface-container-low)',
+                  }}>
+                    <div style={{
+                      width: '40px', height: '40px', borderRadius: 'var(--radius-md, 8px)',
+                      background: 'var(--color-error-container, #FEE2E2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-error)' }}>PDF</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 'var(--typo-caption-1-bold-weight)', color: 'var(--color-on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {title.trim() || 'PDF 문서'}
+                      </p>
+                      <p style={{ margin: '2px 0 0', fontSize: 'var(--typo-caption-3-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
+                        PDF 파일 업로드 완료
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  /* Image preview */
+                  <img src={imageUrl} alt="" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-container-low)' }} />
+                )}
+                {/* Actions overlay */}
+                <div style={{
+                  display: 'flex', justifyContent: 'flex-end', gap: '6px',
+                  padding: '8px', borderTop: '1px solid var(--color-outline-variant)',
+                  background: 'var(--color-surface-container-lowest)',
+                }}>
+                  <Button variant="ghost-neutral" size="xsm" iconLeft="edit" onClick={() => fileRef.current?.click()}>변경</Button>
+                  <Button variant="ghost-neutral" size="xsm" iconLeft="trash" onClick={() => setImageUrl('')} style={{ color: 'var(--color-error)' }}>삭제</Button>
+                </div>
+                {uploading && (
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '24px', height: '24px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Empty state */
+              <div
+                onClick={() => !uploading && fileRef.current?.click()}
+                style={{
+                  borderRadius: 'var(--radius-md, 8px)',
+                  border: '2px dashed var(--color-outline-variant)',
+                  background: 'var(--color-surface-container-low)',
+                  padding: '24px 16px', textAlign: 'center',
+                  cursor: uploading ? 'default' : 'pointer',
+                }}
+              >
+                {uploading ? (
+                  <>
+                    <div style={{ width: '24px', height: '24px', border: '3px solid var(--color-outline-variant)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 8px' }} />
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-medium-size)', color: 'var(--color-on-surface-variant2)' }}>업로드 중...</p>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="plus" size={24} style={{ opacity: 0.4, margin: '0 auto 6px', display: 'block' }} />
+                    <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-medium-size)', color: 'var(--color-on-surface-variant2)' }}>이미지 또는 PDF를 선택하세요</p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
