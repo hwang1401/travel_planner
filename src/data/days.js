@@ -4,7 +4,7 @@ export const BASE_DAYS = [
     color: "#D94F3B", icon: "navigation", stay: "하카타 1박", booked: true,
     sections: [
       {
-        title: "이동",
+        title: "오후",
         items: [
           { time: "15:30", desc: "인천공항 출발 (KE8795)", type: "move",
             detail: {
@@ -118,7 +118,7 @@ export const BASE_DAYS = [
     color: "#D97B2B", icon: "car", stay: "구마모토 1박", booked: false,
     sections: [
       {
-        title: "오전 · 이동",
+        title: "오전",
         items: [
           { time: "10:00", desc: "스미요시 숙소 체크아웃", type: "stay" },
           { time: "10:15", desc: "하카타역으로 이동", type: "move", sub: "도보 15분" },
@@ -319,7 +319,7 @@ export const BASE_DAYS = [
     color: "#B8912A", icon: "flag", stay: "구마모토 1박", booked: false,
     sections: [
       {
-        title: "오전 · 이동",
+        title: "오전",
         items: [
           { time: "10:30", desc: "구마모토역 출발 (JR 호히본선)", type: "move", sub: "JR패스 이용 · 약 1시간 15분",
             detail: {
@@ -371,7 +371,7 @@ export const BASE_DAYS = [
         ],
       },
       {
-        title: "오후 · 아소산 관광",
+        title: "오후",
         items: [
           { time: "13:00", desc: "아소역 앞 버스 탑승 → 아소산", type: "move", sub: "약 26분 · ~600엔",
             detail: {
@@ -438,7 +438,7 @@ export const BASE_DAYS = [
         ],
       },
       {
-        title: "늦은 오후 · 아소 신사",
+        title: "늦은 오후",
         items: [
           { time: "15:00", desc: "아소 신사 참배", type: "spot", sub: "약 45분",
             detail: {
@@ -529,7 +529,7 @@ export const BASE_DAYS = [
     color: "#3E8E5B", icon: "compass", stay: "유후인 1박", booked: false,
     sections: [
       {
-        title: "이동",
+        title: "오전",
         items: [
           { time: "09:00", desc: "구마모토 호텔 체크아웃", type: "stay" },
           { time: "09:42", desc: "신칸센 탑승 (구마모토→쿠루메)", type: "move", sub: "약 20분 · JR패스",
@@ -641,7 +641,7 @@ export const BASE_DAYS = [
         ],
       },
       {
-        title: "이동",
+        title: "낮",
         items: [
           { time: "11:18", desc: "특급 유후인노모리 탑승 → 하카타", type: "move", sub: "약 2시간 15분 · JR패스(지정석)",
             detail: {

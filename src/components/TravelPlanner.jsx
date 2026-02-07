@@ -427,6 +427,10 @@ export default function TravelPlanner() {
                 next[dayIdx].extraItems = [...next[dayIdx].extraItems];
                 next[dayIdx].extraItems.splice(itemIdx, 1);
               }
+              // Clean up empty extraItems array
+              if (next[dayIdx].extraItems.length === 0) {
+                delete next[dayIdx].extraItems;
+              }
             }
           } else {
             if (!next[dayIdx]) next[dayIdx] = {};
