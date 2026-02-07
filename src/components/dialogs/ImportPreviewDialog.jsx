@@ -168,13 +168,23 @@ export default function ImportPreviewDialog({
                     }}>
                       {item.desc}
                     </p>
-                    {item.sub && (
+                    {(item.sub || item.detail) && (
                       <p style={{
                         margin: 0, fontSize: "var(--typo-caption-3-regular-size)",
                         color: "var(--color-on-surface-variant2)",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
                         {item.sub}
+                        {item.sub && item.detail ? " · " : ""}
+                        {item.detail && (
+                          <span style={{ color: "var(--color-primary)", opacity: 0.7 }}>
+                            {[
+                              item.detail.address && "주소",
+                              item.detail.timetable && "영업시간",
+                              item.detail.tip && "상세정보",
+                            ].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
                       </p>
                     )}
                   </div>
