@@ -19,9 +19,9 @@ export default function ImageViewer({ src, alt, onClose }) {
     >
       <Button variant="ghost-neutral" size="lg" iconOnly="close" onClick={onClose}
         style={{
-          position: "absolute", top: "16px", right: "16px", zIndex: 10000,
-          background: "rgba(255,255,255,0.12)", backdropFilter: "blur(4px)",
-          width: "36px", height: "36px",
+          position: "absolute", top: "calc(16px + env(safe-area-inset-top, 0px))", right: "calc(16px + env(safe-area-inset-right, 0px))", zIndex: 10000,
+          background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)",
+          width: "40px", height: "40px",
         }} />
       <img
         src={src}
