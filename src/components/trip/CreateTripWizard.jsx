@@ -7,7 +7,8 @@ import ImagePicker from '../common/ImagePicker';
 import PageTransition from '../common/PageTransition';
 import Toast from '../common/Toast';
 import { uploadImage, generateImagePath } from '../../services/imageService';
-import { generateFullTripSchedule, analyzeScheduleWithAI } from '../../services/geminiService';
+import { generateFullTripSchedule, analyzeScheduleWithAI, formatBookedItemsForPrompt } from '../../services/geminiService';
+import { readFileAsBase64 } from '../../utils/fileReader';
 import { getTypeConfig, COLOR, SPACING, RADIUS } from '../../styles/tokens';
 
 /* ── CreateTripWizard ──
@@ -49,10 +50,16 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
   };
 
   const isToday = (day) => day && today.getFullYear() === viewYear && today.getMonth() === viewMonth && today.getDate() === day;
+  const isPast = (day) => {
+    if (!day) return false;
+    const cell = new Date(viewYear, viewMonth, day);
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return cell < todayStart;
+  };
   const getDayStr = (day) => day ? toStr(viewYear, viewMonth, day) : '';
 
   const handleDayClick = (day) => {
-    if (!day) return;
+    if (!day || isPast(day)) return;
     const str = getDayStr(day);
     if (!selectingEnd) {
       setSelStart(str); setSelEnd(''); setSelectingEnd(true);
@@ -136,6 +143,7 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
         {calendarDays.map((day, i) => {
           if (!day) return <div key={i} />;
           const str = getDayStr(day);
+          const past = isPast(day);
           const isStart = str === selStart;
           const isEnd = str === selEnd;
           const inRange = selStart && selEnd && str > selStart && str < selEnd;
@@ -144,7 +152,9 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
             <div key={i}
               onClick={() => handleDayClick(day)}
               style={{
-                textAlign: 'center', padding: '10px 0', cursor: 'pointer',
+                textAlign: 'center', padding: '10px 0',
+                cursor: past ? 'not-allowed' : 'pointer',
+                opacity: past ? 0.4 : 1,
                 borderRadius: isStart ? '8px 0 0 8px' : isEnd ? '0 8px 8px 0' : selected ? '8px' : '0',
                 background: selected ? 'var(--color-primary)' : inRange ? 'var(--color-primary-container)' : 'transparent',
                 color: selected ? '#fff' : isToday(day) ? 'var(--color-primary)' : 'var(--color-on-surface)',
@@ -182,7 +192,10 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
   // Step 3 state
   const [step3Mode, setStep3Mode] = useState(null); // null | 'paste' | 'ai'
   const [pasteText, setPasteText] = useState('');
+  const [pasteAttachments, setPasteAttachments] = useState([]); // [{ mimeType, data, name? }]
   const [aiPreferences, setAiPreferences] = useState('');
+  const [bookedText, setBookedText] = useState('');
+  const [bookedAttachments, setBookedAttachments] = useState([]); // [{ mimeType, data, name? }]
   const [generating, setGenerating] = useState(false);
   const [genStatusMsg, setGenStatusMsg] = useState('');
   const [genError, setGenError] = useState('');
@@ -237,28 +250,53 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
   };
 
   const handleBack = () => {
-    if (step3Mode) { setStep3Mode(null); setPreview(null); setGenError(''); return; }
+    if (step3Mode) {
+      setStep3Mode(null); setPreview(null); setGenError('');
+      setPasteText(''); setPasteAttachments([]);
+      setBookedText(''); setBookedAttachments([]);
+      return;
+    }
     if (step > 1) setStep(step - 1);
     else onClose();
   };
+
+  const canPasteGenerate = pasteText.trim() || pasteAttachments.length > 0;
+  const hasBookedInput = bookedText.trim() || bookedAttachments.length > 0;
 
   // Step 3: Generate
   const handleGenerate = async () => {
     setGenerating(true); setGenError(''); setPreview(null); setGenStatusMsg('');
     try {
       if (step3Mode === 'paste') {
-        if (!pasteText.trim()) { setGenError('텍스트를 붙여넣어 주세요'); setGenerating(false); return; }
-        const { items, error } = await analyzeScheduleWithAI(pasteText.trim(), `여행지: ${destinations.map(d => d.name).join(', ')}`);
+        if (!canPasteGenerate) { setGenError('텍스트를 붙여넣거나 이미지/PDF를 첨부해 주세요'); setGenerating(false); return; }
+        const attachmentParts = pasteAttachments.map((a) => ({ mimeType: a.mimeType, data: a.data }));
+        const { items, error } = await analyzeScheduleWithAI(pasteText.trim(), `여행지: ${destinations.map(d => d.name).join(', ')}`, {
+          onStatus: setGenStatusMsg,
+          attachments: attachmentParts.length > 0 ? attachmentParts : undefined,
+        });
         if (error) { setGenError(error); setGenerating(false); return; }
         // Convert flat items to day structure
         const dayItems = { sections: [{ title: "일정", items }] };
         setPreview({ days: [{ day: 1, label: "붙여넣기 일정", ...dayItems }] });
       } else if (step3Mode === 'ai') {
+        let bookedItemsStr = '';
+        if (hasBookedInput) {
+          setGenStatusMsg('예약 정보 추출 중...');
+          const attachmentParts = bookedAttachments.map((a) => ({ mimeType: a.mimeType, data: a.data }));
+          const { items: extractedItems, error: extractErr } = await analyzeScheduleWithAI(bookedText.trim(), '여행 예약 정보', {
+            onStatus: setGenStatusMsg,
+            attachments: attachmentParts.length > 0 ? attachmentParts : undefined,
+          });
+          if (extractErr) { setGenError(extractErr); setGenerating(false); return; }
+          bookedItemsStr = extractedItems?.length ? formatBookedItemsForPrompt(extractedItems) : bookedText.trim();
+        }
+        setGenStatusMsg('일정 생성 중...');
         const { days, error } = await generateFullTripSchedule({
           destinations: destinations.map((d) => d.name),
           duration: duration || 1,
           startDate,
           preferences: aiPreferences,
+          bookedItems: bookedItemsStr || undefined,
           onStatus: setGenStatusMsg,
         });
         if (error) { setGenError(error); setGenerating(false); return; }
@@ -517,7 +555,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
           <div style={{ padding: '24px 20px 32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <button
               type="button"
-              onClick={() => { setStep3Mode(null); setPreview(null); setGenError(''); setPasteText(''); }}
+              onClick={() => { setStep3Mode(null); setPreview(null); setGenError(''); setPasteText(''); setPasteAttachments([]); }}
               style={{
                 alignSelf: 'flex-start',
                 display: 'flex', alignItems: 'center', gap: '4px',
@@ -534,7 +572,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                 예약 정보 붙여넣기
               </h2>
               <p style={{ margin: 0, fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
-                확인 메일, 바우처, 일정을 복사해서 붙여넣으세요
+                확인 메일, 바우처, 일정을 복사해서 붙여넣거나 이미지/PDF를 첨부하세요
               </p>
             </div>
 
@@ -553,9 +591,52 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                 outline: 'none', boxSizing: 'border-box',
               }}
             />
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 14px', borderRadius: '8px',
+              border: '1px dashed var(--color-outline-variant)',
+              cursor: 'pointer', color: 'var(--color-on-surface-variant)',
+              fontSize: 'var(--typo-caption-1-regular-size)',
+              background: 'var(--color-surface-container-lowest)',
+            }}>
+              <Icon name="document" size={16} style={{ opacity: 0.6 }} />
+              <span>이미지/PDF 첨부 (바우처, 확인 메일 등) {pasteAttachments.length > 0 && `· ${pasteAttachments.length}개 선택됨`}</span>
+              <input type="file" accept="image/*,application/pdf" multiple onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                e.target.value = '';
+                const toAdd = [];
+                for (const file of files) {
+                  try {
+                    const { mimeType, data } = await readFileAsBase64(file);
+                    toAdd.push({ mimeType, data, name: file.name });
+                  } catch (err) {
+                    setGenError(err.message || '파일을 읽을 수 없습니다');
+                    return;
+                  }
+                }
+                if (toAdd.length) setPasteAttachments((prev) => [...prev, ...toAdd]);
+              }} style={{ display: 'none' }} />
+            </label>
+            {pasteAttachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {pasteAttachments.map((a, i) => (
+                  <span key={i} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '6px 10px', borderRadius: '8px',
+                    background: 'var(--color-surface-container-high)', fontSize: 'var(--typo-caption-2-regular-size)',
+                    color: 'var(--color-on-surface-variant)',
+                  }}>
+                    {a.name || '첨부'}
+                    <button type="button" onClick={() => setPasteAttachments((prev) => prev.filter((_, idx) => idx !== i))} aria-label="제거"
+                      style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'inherit', opacity: 0.8 }}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
 
             <Button variant="primary" size="lg" fullWidth iconLeft="flash"
-              onClick={handleGenerate} disabled={generating || !pasteText.trim()}>
+              onClick={handleGenerate} disabled={generating || !canPasteGenerate}>
               {generating ? 'AI가 분석하고 있어요...' : 'AI로 분석하기'}
             </Button>
 
@@ -580,7 +661,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
           <div style={{ padding: '24px 20px 32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <button
               type="button"
-              onClick={() => { setStep3Mode(null); setPreview(null); setGenError(''); setAiPreferences(''); }}
+              onClick={() => { setStep3Mode(null); setPreview(null); setGenError(''); setAiPreferences(''); setBookedText(''); setBookedAttachments([]); }}
               style={{
                 alignSelf: 'flex-start',
                 display: 'flex', alignItems: 'center', gap: '4px',
@@ -606,6 +687,54 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               placeholder="예: 맛집 위주로, 쇼핑도 좀, 너무 빡빡하지 않게"
               rows={2}
             />
+            <Field as="textarea" label="예약 정보 (선택)" size="lg" variant="outlined"
+              value={bookedText} onChange={(e) => setBookedText(e.target.value)}
+              placeholder="예약 확인 메일·바우처 텍스트 붙여넣기 또는 아래에서 이미지/PDF 첨부"
+              rows={2}
+            />
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 14px', borderRadius: '8px',
+              border: '1px dashed var(--color-outline-variant)',
+              cursor: 'pointer', color: 'var(--color-on-surface-variant)',
+              fontSize: 'var(--typo-caption-1-regular-size)',
+              background: 'var(--color-surface-container-lowest)',
+            }}>
+              <Icon name="document" size={16} style={{ opacity: 0.6 }} />
+              <span>이미지/PDF 첨부 (바우처, 확인 메일 등) {bookedAttachments.length > 0 && `· ${bookedAttachments.length}개 선택됨`}</span>
+              <input type="file" accept="image/*,application/pdf" multiple onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                e.target.value = '';
+                const toAdd = [];
+                for (const file of files) {
+                  try {
+                    const { mimeType, data } = await readFileAsBase64(file);
+                    toAdd.push({ mimeType, data, name: file.name });
+                  } catch (err) {
+                    setGenError(err.message || '파일을 읽을 수 없습니다');
+                    return;
+                  }
+                }
+                if (toAdd.length) setBookedAttachments((prev) => [...prev, ...toAdd]);
+              }} style={{ display: 'none' }} />
+            </label>
+            {bookedAttachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {bookedAttachments.map((a, i) => (
+                  <span key={i} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '6px 10px', borderRadius: '8px',
+                    background: 'var(--color-surface-container-high)', fontSize: 'var(--typo-caption-2-regular-size)',
+                    color: 'var(--color-on-surface-variant)',
+                  }}>
+                    {a.name || '첨부'}
+                    <button type="button" onClick={() => setBookedAttachments((prev) => prev.filter((_, idx) => idx !== i))} aria-label="제거"
+                      style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'inherit', opacity: 0.8 }}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {['맛집 위주', '관광 중심', '쇼핑 많이', '여유롭게', '알차게'].map((chip) => (

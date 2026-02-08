@@ -13,6 +13,13 @@ export function loadGoogleMapsScript() {
 
   const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   if (!key) {
+    if (typeof window !== 'undefined') {
+      console.warn(
+        '[Google Maps] VITE_GOOGLE_MAPS_API_KEY is not set. ' +
+        'Set it in .env (local) or in your deploy environment (e.g. Vercel Environment Variables). ' +
+        'See docs/google-places-setup.md'
+      );
+    }
     loadPromise = Promise.reject(new Error('VITE_GOOGLE_MAPS_API_KEY not set'));
     return loadPromise;
   }

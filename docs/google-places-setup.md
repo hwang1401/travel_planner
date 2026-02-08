@@ -46,6 +46,31 @@ VITE_GOOGLE_MAPS_API_KEY=발급받은_API_키
 - 키가 없으면 주소/장소 검색 시 결과가 나오지 않습니다.
 - `.env`는 Git에 커밋하지 마세요 (이미 `.gitignore`에 포함됨).
 
+## 6. 배포 버전에서 검색이 안 될 때
+
+로컬에서는 검색이 되는데 **배포(예: Vercel)에서만 안 되면** 아래 두 가지를 확인하세요.
+
+### 6.1 배포 환경에 API 키 설정
+
+Vite는 빌드 시점에 `import.meta.env.VITE_*` 값을 박아 넣습니다. 배포 서버에서 빌드할 때 키가 없으면 결과물에 키가 들어가지 않습니다.
+
+- **Vercel**: 프로젝트 → **Settings** → **Environment Variables**  
+  - `VITE_GOOGLE_MAPS_API_KEY` = (로컬과 동일한 API 키)  
+  - **Production**, **Preview** 등 사용하는 환경에 체크  
+- **저장 후 재배포**: 새 빌드가 돌아가야 환경 변수가 반영됩니다 (Deployments → 최신 배포 옆 ⋮ → **Redeploy**).
+
+### 6.2 Google Cloud에서 배포 도메인 허용
+
+API 키에 **애플리케이션 제한**으로 "HTTP 리퍼러"를 쓰고 있다면, **배포 URL을 반드시 추가**해야 합니다.
+
+- Google Cloud Console → **API 및 서비스** → **사용자 인증 정보** → 해당 API 키 **편집**
+- **애플리케이션 제한** → "HTTP 리퍼러(웹사이트)"에서 다음을 추가:
+  - `https://your-app.vercel.app/*` (실제 배포 URL로 교체)
+  - 커스텀 도메인을 쓰면 `https://your-domain.com/*` 도 추가
+- **저장** 후 몇 분 지나면 적용됩니다.
+
+로컬만 허용되어 있으면 배포 도메인에서는 요청이 차단되어 검색이 동작하지 않습니다.
+
 ## 참고
 
 - **비용**: Places API는 Autocomplete(세션당) + Place Details(선택 시) 단위 과금. 월 $200 무료 크레딧으로 개인/소규모 사용은 보통 충분합니다.

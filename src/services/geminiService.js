@@ -3,6 +3,8 @@
  * Also provides AI-powered schedule recommendations via chat.
  */
 
+import { getRAGContext } from './ragService.js';
+
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
@@ -94,7 +96,7 @@ async function fetchWithRetry(body, { maxRetries = 2, onStatus } = {}) {
 }
 
 const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
-사용자가 제공하는 텍스트/마크다운 문서를 분석하여 여행 일정 아이템을 추출해주세요.
+사용자가 제공하는 텍스트/마크다운 문서, 또는 이미지·PDF(바우처, 확인 메일 등)를 분석하여 여행 일정 아이템을 추출해주세요. 이미지나 PDF는 OCR/내용을 읽어 일정을 추출하세요.
 
 반드시 아래 JSON 배열 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
 
@@ -137,23 +139,39 @@ const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
 
 /**
  * Analyze document content using Gemini AI and extract schedule items.
- * @param {string} content - document text content
+ * Supports text, image, and PDF via optional attachments (inlineData).
+ * @param {string} content - document text content (can be empty if only attachments)
  * @param {string} [context] - optional context (e.g. "Day 3 아소산 당일치기")
+ * @param {{ onStatus?: (msg: string) => void, attachments?: Array<{ mimeType: string, data: string }> }} [opts]
  * @returns {Promise<{ items: Array, error: string|null }>}
  */
-export async function analyzeScheduleWithAI(content, context = "", { onStatus } = {}) {
+export async function analyzeScheduleWithAI(content, context = "", { onStatus, attachments } = {}) {
   if (!API_KEY) {
     return { items: [], error: "Gemini API 키가 설정되지 않았습니다" };
   }
 
-  const userPrompt = context
-    ? `다음은 "${context}" 관련 여행 문서입니다. 일정 아이템을 추출해주세요:\n\n${content}`
-    : `다음 여행 문서에서 일정 아이템을 추출해주세요:\n\n${content}`;
+  const hasText = (content || "").trim().length > 0;
+  const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+  const promptIntro = context
+    ? `다음은 "${context}" 관련 여행 문서입니다. 일정 아이템을 추출해주세요.`
+    : hasText
+      ? "다음 여행 문서에서 일정 아이템을 추출해주세요."
+      : "첨부한 이미지/PDF에서 일정 아이템을 추출해주세요.";
+  const userPrompt = hasText ? `${promptIntro}\n\n${(content || "").trim()}` : promptIntro;
+
+  const userParts = [{ text: userPrompt }];
+  if (hasAttachments) {
+    for (const att of attachments) {
+      if (att?.mimeType && att?.data) {
+        userParts.push({ inlineData: { mimeType: att.mimeType, data: att.data } });
+      }
+    }
+  }
 
   try {
     const reqBody = {
       system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      contents: [{ role: "user", parts: userParts }],
       generationConfig: { temperature: 0.2, maxOutputTokens: 65536, responseMimeType: "application/json" },
     };
 
@@ -228,6 +246,25 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus } 
     console.error("[GeminiService] Error:", err);
     return { items: [], error: `네트워크 오류: ${err.message}` };
   }
+}
+
+/**
+ * Format extracted schedule items into a short string for bookedItems prompt.
+ * @param {Array<{ time?: string, desc: string, sub?: string }>} items
+ * @returns {string}
+ */
+export function formatBookedItemsForPrompt(items) {
+  if (!Array.isArray(items) || items.length === 0) return "";
+  return items
+    .map((it) => {
+      const t = (it.time || "").trim();
+      const d = (it.desc || "").trim();
+      const s = (it.sub || "").trim();
+      if (t && d) return `${t} ${d}${s ? ` (${s})` : ""}`;
+      return d || "";
+    })
+    .filter(Boolean)
+    .join("\n");
 }
 
 /* ─── AI Recommendation Chat ─── */
@@ -442,7 +479,8 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 10. 여행 첫날이나 마지막날은 이동이 많으므로 일정을 가볍게 잡으세요.
 11. detail.highlights에는 해당 장소/일정의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등).
 12. food, spot, shop 타입은 반드시 highlights를 포함하세요.
-13. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요.`;
+13. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요.
+14. 사용자가 "참고 데이터" 또는 "참고 장소"를 제공하면, 그 목록에 있는 장소를 우선 반영해 일정을 만들어주세요. 참고 목록에 없는 장소를 추가할 수 있으나, 목록에 있는 장소를 최대한 활용하세요.`;
 
 /** 장기 일정은 7일 단위로 나눠 요청 (MAX_TOKENS 방지) */
 const CHUNK_DAYS = 7;
@@ -460,18 +498,33 @@ const TRIP_GEN_CHUNK_SYSTEM_PROMPT = `${TRIP_GEN_SYSTEM_PROMPT}
  * @param {number} params.duration - number of days
  * @param {string} params.startDate - e.g. "2026-03-01"
  * @param {string} params.preferences - user's natural language preferences
+ * @param {string} [params.bookedItems] - already booked (tickets, hotel) e.g. "USJ 3/15, 호텔 난바 14일 체크인 17일 체크아웃"
  * @returns {Promise<{ days: Array, error: string|null }>}
  */
-export async function generateFullTripSchedule({ destinations, duration, startDate, preferences, onStatus }) {
+export async function generateFullTripSchedule({ destinations, duration, startDate, preferences, bookedItems, onStatus }) {
   if (!API_KEY) {
     return { days: [], error: "Gemini API 키가 설정되지 않았습니다" };
   }
 
-  const destStr = destinations.join(", ");
+  let placesText = "";
+  try {
+    console.log("[RAG] 일정 생성용 장소 조회 시작");
+    const rag = await getRAGContext({ destinations, preferences, duration });
+    console.log("[RAG] 검색된 장소 수:", rag.placeCount, rag.placeCount === 0 ? "(Supabase rag_places 시드·region 확인)" : "");
+    if (rag.placeCount > 0 && rag.placesText) placesText = rag.placesText;
+  } catch (e) {
+    console.warn("[GeminiService] RAG context skipped:", e);
+  }
+
+  const destStr = Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean).join(", ") : "";
   const dateInfo = startDate ? `출발일: ${startDate}` : "";
 
-  const baseUserPrompt = `여행지: ${destStr}\n기간: ${duration}일\n${dateInfo}` +
-    (preferences?.trim() ? `\n\n사용자 요청:\n${preferences.trim()}` : "");
+  let baseUserPrompt = `여행지: ${destStr}\n기간: ${duration}일\n${dateInfo}` +
+    (preferences?.trim() ? `\n\n사용자 요청:\n${preferences.trim()}` : "") +
+    (bookedItems?.trim() ? `\n\n이미 예약된 것 (티켓·숙소 등). 이에 맞춰 일정을 잡아주세요:\n${bookedItems.trim()}` : "");
+  if (placesText) {
+    baseUserPrompt += "\n\n## 참고 데이터 (아래 장소를 우선 반영해 일정을 만들어주세요)\n\n" + placesText;
+  }
 
   const normalizeDays = (rawDays, dayOffset = 0) => {
     const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];

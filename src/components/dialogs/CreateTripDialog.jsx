@@ -7,7 +7,8 @@ import BottomSheet from '../common/BottomSheet';
 import ImagePicker from '../common/ImagePicker';
 import Toast from '../common/Toast';
 import { uploadImage, generateImagePath } from '../../services/imageService';
-import { generateFullTripSchedule } from '../../services/geminiService';
+import { generateFullTripSchedule, analyzeScheduleWithAI, formatBookedItemsForPrompt } from '../../services/geminiService';
+import { readFileAsBase64 } from '../../utils/fileReader';
 import { getTypeConfig, RADIUS } from '../../styles/tokens';
 
 /*
@@ -51,11 +52,17 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
     if (!day) return false;
     return today.getFullYear() === viewYear && today.getMonth() === viewMonth && today.getDate() === day;
   };
+  const isPast = (day) => {
+    if (!day) return false;
+    const cell = new Date(viewYear, viewMonth, day);
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return cell < todayStart;
+  };
 
   const getDayStr = (day) => day ? toStr(viewYear, viewMonth, day) : '';
 
   const handleSelect = (day) => {
-    if (!day) return;
+    if (!day || isPast(day)) return;
     const str = getDayStr(day);
     if (!selectingEnd) {
       // Selecting start date
@@ -189,6 +196,7 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
         }}>
           {calendarDays.map((day, i) => {
             const str = getDayStr(day);
+            const past = day && isPast(day);
             const isStart = str && str === selStart;
             const isEnd = str && str === selEnd;
             const isInRange = str && selStart && selEnd && str > selStart && str < selEnd;
@@ -201,7 +209,8 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   height: '38px',
-                  cursor: day ? 'pointer' : 'default',
+                  cursor: day ? (past ? 'not-allowed' : 'pointer') : 'default',
+                  opacity: past ? 0.4 : 1,
                   position: 'relative',
                   // Range background
                   background: isInRange ? 'var(--color-primary-container)'
@@ -321,6 +330,8 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
 
   /* ── AI schedule generation ── */
   const [aiPreferences, setAiPreferences] = useState('');
+  const [bookedText, setBookedText] = useState('');
+  const [bookedAttachments, setBookedAttachments] = useState([]); // [{ mimeType, data, name? }]
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiStatusMsg, setAiStatusMsg] = useState(''); // 청크 진행 시 "1~7일차 일정 생성 중..."
   const [aiPreview, setAiPreview] = useState(null); // { days: [...] }
@@ -334,6 +345,8 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1)
     : null;
 
+  const hasBookedInput = bookedText.trim() || bookedAttachments.length > 0;
+
   const handleGenerateAi = useCallback(async () => {
     // Validation
     if (!name.trim()) { setToast({ message: '여행 이름을 입력해주세요', icon: 'info' }); return; }
@@ -345,12 +358,31 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     setAiPreview(null);
     setAiStatusMsg('');
 
+    let bookedItemsStr = '';
+    if (hasBookedInput) {
+      setAiStatusMsg('예약 정보 추출 중...');
+      const attachmentParts = bookedAttachments.map((a) => ({ mimeType: a.mimeType, data: a.data }));
+      const { items: extractedItems, error: extractErr } = await analyzeScheduleWithAI(bookedText.trim(), '여행 예약 정보', {
+        onStatus: setAiStatusMsg,
+        attachments: attachmentParts.length > 0 ? attachmentParts : undefined,
+      });
+      if (extractErr) {
+        setAiGenerating(false);
+        setAiStatusMsg('');
+        setAiError(extractErr);
+        return;
+      }
+      bookedItemsStr = extractedItems?.length ? formatBookedItemsForPrompt(extractedItems) : bookedText.trim();
+    }
+
+    setAiStatusMsg('일정 생성 중...');
     const dur = duration || 1;
     const { days, error } = await generateFullTripSchedule({
       destinations: destinations.map((d) => d.name),
       duration: dur,
       startDate,
       preferences: aiPreferences,
+      bookedItems: bookedItemsStr || undefined,
       onStatus: setAiStatusMsg,
     });
 
@@ -369,7 +401,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     setTimeout(() => {
       previewScrollRef.current?.scrollTo({ top: previewScrollRef.current.scrollHeight, behavior: 'smooth' });
     }, 200);
-  }, [destinations, startDate, duration, aiPreferences, name, aiGenerating, submitting]);
+  }, [destinations, startDate, duration, aiPreferences, bookedText, bookedAttachments, name, aiGenerating, submitting]);
 
   const handleSubmit = async (withAi = false) => {
     if (!canSubmit) return;
@@ -539,6 +571,55 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
               placeholder="예: 맛집 위주로, 쇼핑도 좀, 너무 빡빡하지 않게"
               rows={2}
             />
+            <Field as="textarea" label="예약 정보 (선택)" size="lg" variant="outlined"
+              value={bookedText}
+              onChange={(e) => setBookedText(e.target.value)}
+              placeholder="예약 확인 메일·바우처 텍스트 붙여넣기 또는 아래에서 이미지/PDF 첨부"
+              rows={2}
+            />
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 14px', borderRadius: '8px',
+              border: '1px dashed var(--color-outline-variant)',
+              cursor: 'pointer', color: 'var(--color-on-surface-variant)',
+              fontSize: 'var(--typo-caption-1-regular-size)',
+              background: 'var(--color-surface-container-lowest)',
+            }}>
+              <Icon name="document" size={16} style={{ opacity: 0.6 }} />
+              <span>이미지/PDF 첨부 (바우처, 확인 메일 등) {bookedAttachments.length > 0 && `· ${bookedAttachments.length}개 선택됨`}</span>
+              <input type="file" accept="image/*,application/pdf" multiple onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                e.target.value = '';
+                const toAdd = [];
+                for (const file of files) {
+                  try {
+                    const { mimeType, data } = await readFileAsBase64(file);
+                    toAdd.push({ mimeType, data, name: file.name });
+                  } catch (err) {
+                    setAiError(err.message || '파일을 읽을 수 없습니다');
+                    return;
+                  }
+                }
+                if (toAdd.length) setBookedAttachments((prev) => [...prev, ...toAdd]);
+              }} style={{ display: 'none' }} />
+            </label>
+            {bookedAttachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {bookedAttachments.map((a, i) => (
+                  <span key={i} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '6px 10px', borderRadius: '8px',
+                    background: 'var(--color-surface-container-high)', fontSize: 'var(--typo-caption-2-regular-size)',
+                    color: 'var(--color-on-surface-variant)',
+                  }}>
+                    {a.name || '첨부'}
+                    <button type="button" onClick={() => setBookedAttachments((prev) => prev.filter((_, idx) => idx !== i))} aria-label="제거"
+                      style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'inherit', opacity: 0.8 }}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Quick preference chips */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>

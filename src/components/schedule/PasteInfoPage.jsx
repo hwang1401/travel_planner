@@ -4,6 +4,7 @@ import Icon from '../common/Icon';
 import PageTransition from '../common/PageTransition';
 import { analyzeScheduleWithAI } from '../../services/geminiService';
 import { readFileAsText } from '../../utils/scheduleParser';
+import { readFileAsBase64 } from '../../utils/fileReader';
 import { getTypeConfig, COLOR, SPACING, RADIUS } from '../../styles/tokens';
 
 /* ── PasteInfoPage ──
@@ -18,33 +19,65 @@ import { getTypeConfig, COLOR, SPACING, RADIUS } from '../../styles/tokens';
  */
 export default function PasteInfoPage({ open, onClose, onImport, context = '' }) {
   const [pasteText, setPasteText] = useState('');
+  const [attachments, setAttachments] = useState([]); // [{ mimeType, data, name? }]
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
   const [preview, setPreview] = useState(null); // { items: [...] }
   const [statusMsg, setStatusMsg] = useState('');
 
+  const isTextFile = (file) => {
+    const n = (file.name || '').toLowerCase();
+    const t = (file.type || '').toLowerCase();
+    return t.startsWith('text/') || n.endsWith('.txt') || n.endsWith('.md') || n.endsWith('.text');
+  };
+  const isImageOrPdf = (file) => {
+    const t = (file.type || '').toLowerCase();
+    return t.startsWith('image/') || t === 'application/pdf';
+  };
+
   const handleFileSelect = useCallback(async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await readFileAsText(file);
-      setPasteText(text);
-    } catch (err) {
-      setGenError('파일을 읽을 수 없습니다: ' + err.message);
+    const files = e.target.files;
+    if (!files?.length) return;
+    e.target.value = '';
+    for (const file of files) {
+      try {
+        if (isTextFile(file)) {
+          const text = await readFileAsText(file);
+          setPasteText((prev) => (prev ? prev + '\n\n' + text : text));
+        } else if (isImageOrPdf(file)) {
+          const { mimeType, data } = await readFileAsBase64(file);
+          setAttachments((prev) => [...prev, { mimeType, data, name: file.name }]);
+        } else {
+          setGenError('지원 형식: .txt, .md, 이미지, PDF');
+        }
+      } catch (err) {
+        setGenError(err.message || '파일을 읽을 수 없습니다');
+        break;
+      }
     }
   }, []);
 
+  const removeAttachment = useCallback((index) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const canAnalyze = pasteText.trim() || attachments.length > 0;
+
   const handleAnalyze = async () => {
-    if (!pasteText.trim()) return;
+    if (!canAnalyze) return;
     setGenerating(true); setGenError(''); setPreview(null); setStatusMsg('');
 
-    const { items, error } = await analyzeScheduleWithAI(pasteText.trim(), context, {
+    const content = pasteText.trim() || (attachments.length > 0 ? '' : '');
+    const attachmentParts = attachments.map((a) => ({ mimeType: a.mimeType, data: a.data }));
+
+    const { items, error } = await analyzeScheduleWithAI(content, context, {
       onStatus: (msg) => setStatusMsg(msg),
+      attachments: attachmentParts.length > 0 ? attachmentParts : undefined,
     });
     setGenerating(false); setStatusMsg('');
 
     if (error) { setGenError(error); return; }
-    if (!items || items.length === 0) { setGenError('분석 결과가 없습니다. 텍스트를 확인해주세요.'); return; }
+    if (!items || items.length === 0) { setGenError('분석 결과가 없습니다. 텍스트 또는 파일을 확인해주세요.'); return; }
     setPreview({ items });
   };
 
@@ -108,14 +141,32 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
           fontSize: 'var(--typo-caption-1-regular-size)',
         }}>
           <Icon name="document" size={16} style={{ opacity: 0.6 }} />
-          <span>또는 파일 첨부 (.txt, .md)</span>
-          <input type="file" accept=".txt,.md,.text" onChange={handleFileSelect}
+          <span>또는 이미지/PDF 첨부 (바우처, 확인 메일 등)</span>
+          <input type="file" accept=".txt,.md,.text,image/*,application/pdf" multiple onChange={handleFileSelect}
             style={{ display: 'none' }} />
         </label>
+        {attachments.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {attachments.map((a, i) => (
+              <span key={i} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '6px 10px', borderRadius: '8px',
+                background: 'var(--color-surface-container-high)', fontSize: 'var(--typo-caption-2-regular-size)',
+                color: 'var(--color-on-surface-variant)',
+              }}>
+                {a.name || '첨부'}
+                <button type="button" onClick={() => removeAttachment(i)} aria-label="제거"
+                  style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'inherit', opacity: 0.8 }}>
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Analyze button */}
         <Button variant="primary" size="lg" fullWidth iconLeft="flash"
-          onClick={handleAnalyze} disabled={generating || !pasteText.trim()}>
+          onClick={handleAnalyze} disabled={generating || !canAnalyze}>
           {generating ? (statusMsg || 'AI가 분석하고 있어요...') : 'AI로 분석하기'}
         </Button>
 
@@ -128,7 +179,7 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
               ))}
             </div>
             <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)' }}>
-              {statusMsg || '텍스트를 분석하고 있습니다...'}
+              {statusMsg || '분석 중...'}
             </span>
           </div>
         )}
