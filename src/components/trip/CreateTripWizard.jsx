@@ -422,7 +422,14 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+      }}>
 
         {/* Step 1: 어디로? */}
         {step === 1 && (
@@ -818,7 +825,15 @@ function PreviewAccordion({ days, expandedDay, setExpandedDay }) {
           AI 추천 일정 ({days.length}일)
         </span>
       </div>
-      <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+      <div style={{
+        maxHeight: '360px',
+        minHeight: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+        transform: 'translateZ(0)',
+      }}>
         {days.map((day, di) => {
           const allItems = day.sections?.flatMap((s) => s.items || []) || [];
           const isOpen = expandedDay === di;

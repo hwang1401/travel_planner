@@ -5,3 +5,7 @@ dist/
 *.local
 .env
 .env.*
+!.env.example
+
+# RAG pipeline rejected list output
+scripts/output/

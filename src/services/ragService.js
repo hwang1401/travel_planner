@@ -7,26 +7,24 @@ import { supabase } from '../lib/supabase.js';
 
 const MAX_PLACES = 80;
 
-/** 한글/영문 여행지명 → region 코드 (일본 우선). "오사카시" 등 변형 포함 */
+/** 한글/영문 여행지명 → region 코드 (일본 우선). "오사카시" 등 변형 포함. scripts/rag-seed.js REGION_CONFIG와 동기화 */
 const DESTINATION_TO_REGION = {
-  오사카: 'osaka',
-  오사카시: 'osaka',
-  osaka: 'osaka',
-  교토: 'kyoto',
-  교토시: 'kyoto',
-  kyoto: 'kyoto',
-  도쿄: 'tokyo',
-  도쿄도: 'tokyo',
-  tokyo: 'tokyo',
-  후쿠오카: 'fukuoka',
-  후쿠오카시: 'fukuoka',
-  fukuoka: 'fukuoka',
-  나라: 'nara',
-  나라시: 'nara',
-  nara: 'nara',
-  고베: 'kobe',
-  고베시: 'kobe',
-  kobe: 'kobe',
+  오사카: 'osaka', 오사카시: 'osaka', osaka: 'osaka',
+  교토: 'kyoto', 교토시: 'kyoto', kyoto: 'kyoto',
+  도쿄: 'tokyo', 도쿄도: 'tokyo', tokyo: 'tokyo',
+  후쿠오카: 'fukuoka', 후쿠오카시: 'fukuoka', fukuoka: 'fukuoka',
+  나라: 'nara', 나라시: 'nara', nara: 'nara',
+  고베: 'kobe', 고베시: 'kobe', kobe: 'kobe',
+  오키나와: 'okinawa', okinawa: 'okinawa',
+  삿포로: 'sapporo', sapporo: 'sapporo',
+  나고야: 'nagoya', nagoya: 'nagoya',
+  히로시마: 'hiroshima', hiroshima: 'hiroshima',
+  하코네: 'hakone', hakone: 'hakone',
+  요코하마: 'yokohama', yokohama: 'yokohama',
+  가나자와: 'kanazawa', kanazawa: 'kanazawa',
+  벳푸: 'beppu', beppu: 'beppu',
+  가마쿠라: 'kamakura', kamakura: 'kamakura',
+  닛코: 'nikko', nikko: 'nikko',
 };
 
 /** preferences 자연어 → rag_places.tags 매핑 (규칙 기반) */
@@ -101,6 +99,7 @@ export async function getRAGContext({ destinations, preferences, duration }) {
       .from('rag_places')
       .select('region, name_ko, type, description, tags, price_range, opening_hours')
       .in('region', regions)
+      .or('confidence.eq.verified,confidence.is.null')
       .limit(MAX_PLACES);
 
     const tags = extractTagsFromPreferences(preferences || '');

@@ -7,7 +7,13 @@
     "build:tokens": "node scripts/build-tokens.cjs",
     "dev": "npm run build:tokens && vite",
     "build": "npm run build:tokens && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "rag-seed": "node scripts/rag-seed.js",
+    "rag-seed:full": "node scripts/rag-seed.js --region osaka --type food",
+    "rag-seed:all": "node scripts/rag-seed.js --all",
+    "rag-seed:tier1": "node scripts/rag-seed.js --tier 1",
+    "rag-seed:tier2": "node scripts/rag-seed.js --tier 2",
+    "rag-seed:tier3": "node scripts/rag-seed.js --tier 3"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",

@@ -360,6 +360,34 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
   const [flyTarget, setFlyTarget] = useState(null);
   const [mapReady, setMapReady] = useState(false);
 
+  // 모바일 키보드가 검색 결과를 가리지 않도록: visualViewport 기준 하단 여백
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  useEffect(() => {
+    if (!isSearchFocused) {
+      setKeyboardOffset(0);
+      return;
+    }
+    if (!window.visualViewport) return;
+    const update = () => {
+      const vh = window.visualViewport.height;
+      const ih = window.innerHeight;
+      if (vh < ih - 100) {
+        setKeyboardOffset(Math.max(0, ih - vh - 100));
+      } else {
+        setKeyboardOffset(0);
+      }
+    };
+    update();
+    window.visualViewport.addEventListener('resize', update);
+    window.visualViewport.addEventListener('scroll', update);
+    return () => {
+      window.visualViewport.removeEventListener('resize', update);
+      window.visualViewport.removeEventListener('scroll', update);
+      setKeyboardOffset(0);
+    };
+  }, [isSearchFocused]);
+
   // Default center (Tokyo area — will be overridden by search results)
   const defaultCenter = [35.68, 139.76];
 
@@ -559,6 +587,8 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
               placeholder="장소명, 주소를 검색하세요"
               style={{
                 flex: 1, border: 'none', background: 'none', outline: 'none',
@@ -577,12 +607,12 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
         </div>
       </div>
 
-      {/* ── Map area ── */}
+      {/* ── Map area ── (검색 포커스+결과 있을 때는 줄여서 하단 결과가 키보드 위로) */}
       <div style={{
-        flex: mode === 'form' ? '0 0 35vh' : '1 1 auto',
+        flex: mode === 'form' ? '0 0 35vh' : (isSearchFocused && searchResults.length > 0 ? '0 0 22vh' : '1 1 auto'),
         position: 'relative',
-        minHeight: '180px',
-        transition: 'flex 0.3s ease',
+        minHeight: '140px',
+        transition: 'flex 0.25s ease',
       }}>
         {open && (
           <MapContainer
@@ -663,9 +693,15 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
           <div style={{ width: '32px', height: '4px', borderRadius: RADIUS.xs, background: 'var(--color-outline-variant)' }} />
         </div>
 
-        {/* ── Search results list ── */}
+        {/* ── Search results list ── (키보드 높이만큼 하단 패딩으로 스크롤 시 결과가 가려지지 않게) */}
         {mode === 'search' && (
-          <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: keyboardOffset,
+          }}>
             {searching && (
               <div style={{ padding: SPACING.xxl, textAlign: 'center' }}>
                 <p style={{ margin: 0, fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>

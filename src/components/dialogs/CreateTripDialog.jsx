@@ -435,7 +435,18 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     <BottomSheet onClose={onClose} maxHeight="92vh" title={isEdit ? '여행 수정' : '새 여행 만들기'}>
 
       {/* Form */}
-      <div ref={previewScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div ref={previewScrollRef} style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+        padding: '20px 20px 32px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+      }}>
 
         {/* ── Cover Image ── */}
         <ImagePicker
@@ -744,8 +755,16 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                   </button>
                 </div>
 
-                {/* Day accordion list */}
-                <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                {/* Day accordion list — 단일 스크롤, 터치 스크롤 부드럽게 */}
+                <div style={{
+                  maxHeight: '360px',
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  WebkitOverflowScrolling: 'touch',
+                  overscrollBehavior: 'contain',
+                  transform: 'translateZ(0)',
+                }}>
                   {aiPreview.days.map((day, di) => {
                     const allItems = day.sections?.flatMap((s) => s.items || []) || [];
                     const totalItems = allItems.length;
