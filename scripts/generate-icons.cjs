@@ -44,6 +44,20 @@ async function generateLogo(size, kernel = "lanczos3") {
     .toBuffer();
 }
 
+/** 로고 이미지를 흰색(RGB=255)으로 바꾸고 알파는 유지 (primary 배경용) */
+async function logoToWhite(pngBuffer) {
+  const { data, info } = await sharp(pngBuffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 255;
+    data[i + 1] = 255;
+    data[i + 2] = 255;
+  }
+  return sharp(Buffer.from(data), { raw: info }).png().toBuffer();
+}
+
 async function generate() {
   const meta = await sharp(LOGO_SRC).metadata();
   console.log(`Original logo: ${meta.width}x${meta.height}`);
@@ -52,16 +66,16 @@ async function generate() {
   const splashDir = path.join(OUT_DIR, "splash");
   if (!fs.existsSync(splashDir)) fs.mkdirSync(splashDir, { recursive: true });
 
-  // ── PWA App Icons (192, 512) ──
+  // ── PWA App Icons (192, 512): primary 배경 + 흰색 로고 ──
   for (const size of [192, 512]) {
     const logoSize = Math.round(size * 0.55);
     const radius = Math.round(size * 0.22);
 
-    const logo = await generateLogo(logoSize);
+    const logo = await logoToWhite(await generateLogo(logoSize));
 
     const bg = Buffer.from(
       `<svg width="${size}" height="${size}">
-        <rect width="${size}" height="${size}" rx="${radius}" fill="${BG_COLOR}"/>
+        <rect width="${size}" height="${size}" rx="${radius}" fill="${THEME_COLOR}"/>
       </svg>`
     );
 
@@ -74,10 +88,10 @@ async function generate() {
     console.log(`Created: app-icon-${size}.png`);
   }
 
-  // ── Favicon (32x32) ──
+  // ── Favicon (32x32): primary 배경 + 흰색 로고 ──
   const faviconSize = 32;
   const faviconLogoSize = Math.round(faviconSize * 0.6);
-  const faviconLogo = await generateLogo(faviconLogoSize);
+  const faviconLogo = await logoToWhite(await generateLogo(faviconLogoSize));
 
   const faviconBg = Buffer.from(
     `<svg width="32" height="32"><rect width="32" height="32" rx="6" fill="${THEME_COLOR}"/></svg>`
@@ -89,12 +103,12 @@ async function generate() {
     .toFile(path.join(PUBLIC_DIR, "favicon.png"));
   console.log("Created: favicon.png");
 
-  // ── Apple Touch Icon (180x180) ──
+  // ── Apple Touch Icon (180x180): primary 배경 + 흰색 로고 ──
   const appleSize = 180;
-  const appleLogo = await generateLogo(Math.round(appleSize * 0.55));
+  const appleLogo = await logoToWhite(await generateLogo(Math.round(appleSize * 0.55)));
 
   const appleBg = Buffer.from(
-    `<svg width="${appleSize}" height="${appleSize}"><rect width="${appleSize}" height="${appleSize}" fill="${BG_COLOR}"/></svg>`
+    `<svg width="${appleSize}" height="${appleSize}"><rect width="${appleSize}" height="${appleSize}" fill="${THEME_COLOR}"/></svg>`
   );
 
   await sharp(appleBg)
@@ -112,7 +126,7 @@ async function generate() {
     const logoH = Math.round(screen.h * 0.18);
     const logoW = Math.round(logoH * (splashMeta.width / splashMeta.height));
 
-    const logo = await sharp(SPLASH_LOGO_SRC)
+    const logoRaw = await sharp(SPLASH_LOGO_SRC)
       .resize(logoW, logoH, {
         fit: "contain",
         background: { r: 0, g: 0, b: 0, alpha: 0 },
@@ -120,6 +134,7 @@ async function generate() {
       })
       .png()
       .toBuffer();
+    const logo = await logoToWhite(logoRaw);
 
     const bg = Buffer.from(
       `<svg width="${screen.w}" height="${screen.h}">
