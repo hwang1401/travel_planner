@@ -163,7 +163,11 @@ export default function AddressSearch({
           type="text"
           value={query}
           onChange={handleInputChange}
-          onFocus={() => { setFocused(true); if (results.length > 0) setShowResults(true); }}
+          onFocus={() => {
+            setFocused(true);
+            if (results.length > 0) setShowResults(true);
+            setTimeout(() => wrapperRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 350);
+          }}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
           style={{

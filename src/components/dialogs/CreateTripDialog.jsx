@@ -340,6 +340,21 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
   const [toast, setToast] = useState(null);
   const previewScrollRef = useRef(null);
 
+  /* 키보드 노출 시 시트 높이를 visualViewport에 맞춰 폼·버튼이 가리지 않게 */
+  const [viewportHeight, setViewportHeight] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportHeight(vv.height);
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
   /* ── Duration calc ── */
   const duration = startDate && endDate
     ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1)
@@ -432,7 +447,15 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
   };
 
   return (
-    <BottomSheet onClose={onClose} maxHeight="92vh" title={isEdit ? '여행 수정' : '새 여행 만들기'}>
+    <BottomSheet
+      onClose={onClose}
+      maxHeight={
+        viewportHeight != null && viewportHeight < window.innerHeight - 80
+          ? `${Math.max(320, viewportHeight * 0.92)}px`
+          : '92vh'
+      }
+      title={isEdit ? '여행 수정' : '새 여행 만들기'}
+    >
 
       {/* Form */}
       <div ref={previewScrollRef} style={{

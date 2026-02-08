@@ -1,4 +1,4 @@
-import { useState, useCallback, Children } from 'react';
+import { useState, useCallback, useRef, Children } from 'react';
 import Icon from './Icon';
 import BottomSheet from './BottomSheet';
 
@@ -55,6 +55,7 @@ export default function Field({
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const fieldRef = useRef(null);
 
   const s = SIZE_MAP[size] || SIZE_MAP.lg;
   const isTextarea = as === 'textarea';
@@ -132,8 +133,16 @@ export default function Field({
     if (!disabled) setSheetOpen(true);
   }, [disabled]);
 
+  /* 키보드 노출 시 커서가 필드 밖으로 나가는 것 방지: 포커스 후 스크롤하여 필드를 가시 영역 안으로 */
+  const handleFocusScroll = useCallback(() => {
+    if (isSelect) return;
+    setTimeout(() => {
+      fieldRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    }, 350);
+  }, [isSelect]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', minWidth: '60px', ...customStyle }} className={className}>
+    <div ref={fieldRef} style={{ display: 'flex', flexDirection: 'column', gap: '0px', minWidth: '60px', ...customStyle }} className={className}>
       {/* Label — 입력 박스와 같은 왼쪽 시작(0). TimePicker와 동일하게 라벨/필드 왼쪽 정렬 */}
       {label && (
         <div style={{
@@ -252,7 +261,7 @@ export default function Field({
               onChange={onChange}
               placeholder={placeholder}
               {...rest}
-              onFocus={(e) => { setFocused(true); rest.onFocus?.(e); }}
+              onFocus={(e) => { setFocused(true); handleFocusScroll(); rest.onFocus?.(e); }}
               onBlur={(e) => { setFocused(false); rest.onBlur?.(e); }}
             />
           ) : (
@@ -263,7 +272,7 @@ export default function Field({
               onChange={onChange}
               placeholder={placeholder}
               {...rest}
-              onFocus={(e) => { setFocused(true); rest.onFocus?.(e); }}
+              onFocus={(e) => { setFocused(true); handleFocusScroll(); rest.onFocus?.(e); }}
               onBlur={(e) => { setFocused(false); rest.onBlur?.(e); }}
             />
           )}

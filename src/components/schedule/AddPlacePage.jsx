@@ -370,32 +370,36 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
   const [flyTarget, setFlyTarget] = useState(null);
   const [mapReady, setMapReady] = useState(false);
 
-  // 모바일 키보드가 검색 결과를 가리지 않도록: visualViewport 기준 하단 여백
+  // 모바일 키보드: visualViewport 기준 — 검색 시 하단 여백, 폼 모드 시 패널 높이 제한
+  const [viewportHeight, setViewportHeight] = useState(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const isSearchFocusedRef = useRef(isSearchFocused);
+  isSearchFocusedRef.current = isSearchFocused;
   useEffect(() => {
-    if (!isSearchFocused) {
-      setKeyboardOffset(0);
-      return;
-    }
-    if (!window.visualViewport) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
     const update = () => {
-      const vh = window.visualViewport.height;
+      const vh = vv.height;
       const ih = window.innerHeight;
-      if (vh < ih - 100) {
+      setViewportHeight(vh);
+      if (isSearchFocusedRef.current && vh < ih - 100) {
         setKeyboardOffset(Math.max(0, ih - vh - 100));
-      } else {
+      } else if (!isSearchFocusedRef.current) {
         setKeyboardOffset(0);
       }
     };
     update();
-    window.visualViewport.addEventListener('resize', update);
-    window.visualViewport.addEventListener('scroll', update);
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
     return () => {
-      window.visualViewport.removeEventListener('resize', update);
-      window.visualViewport.removeEventListener('scroll', update);
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
       setKeyboardOffset(0);
     };
+  }, []);
+  useEffect(() => {
+    if (!isSearchFocused) setKeyboardOffset(0);
   }, [isSearchFocused]);
 
   // Default center (Tokyo area — will be overridden by search results)
@@ -711,7 +715,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
         )}
       </div>
 
-      {/* ── Bottom panel ── */}
+      {/* ── Bottom panel. 키보드 노출 시 패널 높이를 visualViewport에 맞춰 버튼이 가리지 않게 ── */}
       <div style={{
         flexShrink: 0,
         background: 'var(--color-surface-container-lowest)',
@@ -722,8 +726,14 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
         zIndex: 5,
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: mode === 'form' ? '55vh' : '45vh',
-        transition: 'max-height 0.3s ease',
+        maxHeight: (() => {
+          const base = mode === 'form' ? '55vh' : '45vh';
+          if (mode === 'form' && viewportHeight != null && viewportHeight < window.innerHeight - 80) {
+            return `${Math.max(200, viewportHeight - 180)}px`;
+          }
+          return base;
+        })(),
+        transition: 'max-height 0.25s ease',
       }}>
         {/* Drag handle visual */}
         <div style={{

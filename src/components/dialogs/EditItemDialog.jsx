@@ -114,6 +114,21 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const chatScrollRef = useRef(null);
   const chatInputRef = useRef(null);
 
+  /* 키보드 노출 시 모달 높이를 visualViewport에 맞춰 입력창·커서가 가려지지 않게 */
+  const [viewportHeight, setViewportHeight] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportHeight(vv.height);
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    update();
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
   const handleSendChat = useCallback(async () => {
     const msg = chatInput.trim();
     if (!msg || chatLoading) return;
@@ -285,7 +300,10 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
 
   const fullScreenModal = (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed',
+      top: 0, left: 0, right: 0,
+      ...(viewportHeight != null ? { height: `${viewportHeight}px` } : { bottom: 0 }),
+      zIndex: 1000,
       display: 'flex', flexDirection: 'column',
       background: 'var(--color-surface-container-lowest)',
       overflow: 'hidden',
@@ -499,6 +517,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 ref={chatInputRef}
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
+                onFocus={() => {
+                  /* 키보드 올라온 뒤 입력창이 보이도록 스크롤, 커서가 필드·세이프에리어 안에 보이게 */
+                  setTimeout(() => {
+                    chatInputRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+                  }, 400);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -515,6 +539,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                   border: "1px solid var(--color-outline-variant)",
                   background: "var(--color-surface-container-lowest)",
                   fontSize: "var(--typo-caption-1-regular-size)",
+                  lineHeight: 1.4,
                   color: "var(--color-on-surface)",
                   outline: "none", fontFamily: "inherit",
                   maxHeight: "80px",
