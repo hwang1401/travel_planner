@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Field from '../common/Field';
 import BottomSheet from '../common/BottomSheet';
 import Button from '../common/Button';
@@ -40,9 +40,30 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
   const maxDay = existingNums.length > 0 ? Math.max(...existingNums) : 0;
   const rangeEnd = Math.max(maxDay + 5, 15);
 
+  const [viewportRect, setViewportRect] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
+
+  const sheetWrapperStyle = {
+    position: 'fixed',
+    ...(viewportRect != null ? { top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height } : { inset: 0 }),
+    zIndex: 3000,
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  };
+
   return (
     <>
-      <BottomSheet onClose={onCancel} maxHeight="auto" zIndex={3000} title="날짜 추가">
+      <div style={sheetWrapperStyle}>
+        <BottomSheet onClose={onCancel} maxHeight="auto" zIndex={3000} title="날짜 추가">
         <div style={{ padding: "8px 20px 24px" }}>
 
           {/* Day number — inline horizontal chip selector (no nested BottomSheet) */}
@@ -120,6 +141,7 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
           </div>
         </div>
       </BottomSheet>
+      </div>
 
       {/* Overwrite confirmation */}
       {showOverwrite && (

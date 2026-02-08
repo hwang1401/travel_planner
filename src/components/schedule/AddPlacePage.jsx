@@ -370,8 +370,8 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
   const [flyTarget, setFlyTarget] = useState(null);
   const [mapReady, setMapReady] = useState(false);
 
-  // 모바일 키보드: visualViewport 기준 — 검색 시 하단 여백, 폼 모드 시 패널 높이 제한
-  const [viewportHeight, setViewportHeight] = useState(null);
+  // 모바일 키보드: visualViewport 전체(offset 포함) — 페이지·패널이 키보드에 가리지 않게
+  const [viewportRect, setViewportRect] = useState(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const isSearchFocusedRef = useRef(isSearchFocused);
@@ -382,7 +382,12 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
     const update = () => {
       const vh = vv.height;
       const ih = window.innerHeight;
-      setViewportHeight(vh);
+      setViewportRect({
+        top: vv.offsetTop,
+        left: vv.offsetLeft,
+        width: vv.width,
+        height: vh,
+      });
       if (isSearchFocusedRef.current && vh < ih - 100) {
         setKeyboardOffset(Math.max(0, ih - vh - 100));
       } else if (!isSearchFocusedRef.current) {
@@ -603,7 +608,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
     .map((r) => [r.lat, r.lon]);
 
   return (
-    <PageTransition open={open} onClose={onClose}>
+    <PageTransition open={open} onClose={onClose} viewportRect={viewportRect}>
       {/* ── Header with search bar ── */}
       <div style={{
         flexShrink: 0,
@@ -728,8 +733,8 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
         flexDirection: 'column',
         maxHeight: (() => {
           const base = mode === 'form' ? '55vh' : '45vh';
-          if (mode === 'form' && viewportHeight != null && viewportHeight < window.innerHeight - 80) {
-            return `${Math.max(200, viewportHeight - 180)}px`;
+          if (mode === 'form' && viewportRect != null && viewportRect.height < window.innerHeight - 80) {
+            return `${Math.max(200, viewportRect.height - 180)}px`;
           }
           return base;
         })(),

@@ -114,12 +114,19 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const chatScrollRef = useRef(null);
   const chatInputRef = useRef(null);
 
-  /* 키보드 노출 시 모달 높이를 visualViewport에 맞춰 입력창·커서가 가려지지 않게 */
-  const [viewportHeight, setViewportHeight] = useState(null);
+  /* 키보드 노출 시 모달을 visualViewport 전체에 맞춰 입력창·버튼이 가려지지 않게 (offset 포함) */
+  const [viewportRect, setViewportRect] = useState(null);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = () => setViewportHeight(vv.height);
+    const update = () => {
+      setViewportRect({
+        top: vv.offsetTop,
+        left: vv.offsetLeft,
+        width: vv.width,
+        height: vv.height,
+      });
+    };
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
     update();
@@ -301,8 +308,14 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const fullScreenModal = (
     <div style={{
       position: 'fixed',
-      top: 0, left: 0, right: 0,
-      ...(viewportHeight != null ? { height: `${viewportHeight}px` } : { bottom: 0 }),
+      ...(viewportRect != null
+        ? {
+            top: viewportRect.top,
+            left: viewportRect.left,
+            width: viewportRect.width,
+            height: viewportRect.height,
+          }
+        : { top: 0, left: 0, right: 0, bottom: 0 }),
       zIndex: 1000,
       display: 'flex', flexDirection: 'column',
       background: 'var(--color-surface-container-lowest)',

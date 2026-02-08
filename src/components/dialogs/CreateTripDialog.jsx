@@ -340,12 +340,19 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
   const [toast, setToast] = useState(null);
   const previewScrollRef = useRef(null);
 
-  /* 키보드 노출 시 시트 높이를 visualViewport에 맞춰 폼·버튼이 가리지 않게 */
-  const [viewportHeight, setViewportHeight] = useState(null);
+  /* 키보드 노출 시 모달을 visualViewport 전체에 맞춰 폼·버튼이 가리지 않게 (offset 포함) */
+  const [viewportRect, setViewportRect] = useState(null);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = () => setViewportHeight(vv.height);
+    const update = () => {
+      setViewportRect({
+        top: vv.offsetTop,
+        left: vv.offsetLeft,
+        width: vv.width,
+        height: vv.height,
+      });
+    };
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
     update();
@@ -446,16 +453,28 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     }
   };
 
+  const sheetWrapperStyle = {
+    position: 'fixed',
+    ...(viewportRect != null
+      ? { top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height }
+      : { inset: 0 }),
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  };
+
   return (
-    <BottomSheet
-      onClose={onClose}
-      maxHeight={
-        viewportHeight != null && viewportHeight < window.innerHeight - 80
-          ? `${Math.max(320, viewportHeight * 0.92)}px`
-          : '92vh'
-      }
-      title={isEdit ? '여행 수정' : '새 여행 만들기'}
-    >
+    <div style={sheetWrapperStyle}>
+      <BottomSheet
+        onClose={onClose}
+        maxHeight={
+          viewportRect != null && viewportRect.height < window.innerHeight - 80
+            ? `${Math.max(320, viewportRect.height * 0.92)}px`
+            : '92vh'
+        }
+        title={isEdit ? '여행 수정' : '새 여행 만들기'}
+      >
 
       {/* Form */}
       <div ref={previewScrollRef} style={{
@@ -951,5 +970,6 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         />
       )}
     </BottomSheet>
+    </div>
   );
 }

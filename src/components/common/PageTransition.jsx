@@ -5,7 +5,7 @@ import { useScrollLock } from '../../hooks/useScrollLock';
  * Full-screen overlay that slides in from right (iOS push style).
  * Used for wizards, add place page, paste info page, etc.
  */
-export default function PageTransition({ open, onClose, children }) {
+export default function PageTransition({ open, onClose, viewportRect, children }) {
   const containerRef = useRef(null);
   const startX = useRef(0);
   const currentX = useRef(0);
@@ -70,7 +70,14 @@ export default function PageTransition({ open, onClose, children }) {
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        ...(viewportRect != null
+          ? {
+              top: viewportRect.top,
+              left: viewportRect.left,
+              width: viewportRect.width,
+              height: viewportRect.height,
+            }
+          : { inset: 0 }),
         zIndex: 'var(--z-dialog, 2000)',
         background: 'var(--color-surface)',
         animation: 'pageSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)',

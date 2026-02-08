@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
@@ -48,9 +48,26 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
 
   const title = step === 1 ? '출발지 선택' : '도착지 선택';
 
+  /* 키보드 노출 시 오버레이를 visualViewport 전체에 맞춤 */
+  const [viewportRect, setViewportRect] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
   const overlay = (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
+      position: 'fixed',
+      ...(viewportRect != null ? { top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height } : { inset: 0 }),
+      zIndex: 9999,
       display: 'flex', flexDirection: 'column',
       background: 'var(--color-surface-container-lowest)',
       animation: 'stationPickerSlideIn 0.25s cubic-bezier(0.16,1,0.3,1)',

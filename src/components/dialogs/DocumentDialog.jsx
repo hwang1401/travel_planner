@@ -96,6 +96,26 @@ function DynamicDocumentDialog({ onClose, tripId }) {
 
   useEffect(() => { fetchDocs(); }, [fetchDocs]);
 
+  const [viewportRect, setViewportRect] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
+
+  const sheetWrapperStyle = {
+    position: 'fixed',
+    ...(viewportRect != null ? { top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height } : { inset: 0 }),
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  };
+
   const handleDelete = useCallback((doc) => {
     setConfirmDel({
       title: '문서 삭제',
@@ -116,7 +136,8 @@ function DynamicDocumentDialog({ onClose, tripId }) {
   }, [fetchDocs]);
 
   return (
-    <BottomSheet onClose={onClose} maxHeight="85vh" title="여행 서류">
+    <div style={sheetWrapperStyle}>
+      <BottomSheet onClose={onClose} maxHeight={viewportRect != null && viewportRect.height < window.innerHeight - 80 ? `${Math.max(280, viewportRect.height * 0.9)}px` : '85vh'} title="여행 서류">
 
       {/* Loading */}
       {loading && (
@@ -260,6 +281,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
           confirmLabel={confirmDel.confirmLabel} onConfirm={confirmDel.onConfirm} onCancel={() => setConfirmDel(null)} />
       )}
     </BottomSheet>
+    </div>
   );
 }
 
@@ -272,6 +294,17 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
   const [imageUrl, setImageUrl] = useState(doc?.imageUrl || '');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const [viewportRect, setViewportRect] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
 
   const canSave = title.trim() && !uploading && !saving;
 
@@ -313,7 +346,9 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 5000,
+        position: 'fixed',
+        ...(viewportRect != null ? { top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height } : { inset: 0 }),
+        zIndex: 5000,
         background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '20px',

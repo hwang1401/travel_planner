@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import BottomSheet from '../common/BottomSheet';
 import Icon from '../common/Icon';
 import { TIMETABLE_DB } from '../../data/timetable';
@@ -30,8 +30,29 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
     onClose();
   };
 
+  const [viewportRect, setViewportRect] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
+
+  const wrapperStyle = {
+    position: 'fixed',
+    ...(viewportRect != null ? { top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height } : { inset: 0 }),
+    zIndex: 1100,
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  };
+
   return (
-    <BottomSheet onClose={onClose} title="시간표 검색" maxHeight="85vh" minHeight="60vh" zIndex={1100}>
+    <div style={wrapperStyle}>
+      <BottomSheet onClose={onClose} title="시간표 검색" maxHeight={viewportRect != null && viewportRect.height < window.innerHeight - 80 ? `${Math.max(240, viewportRect.height * 0.9)}px` : '85vh'} minHeight="60vh" zIndex={1100}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <div style={{ padding: '12px 20px', flexShrink: 0, borderBottom: '1px solid var(--color-outline-variant)' }}>
           <div style={{
@@ -108,5 +129,6 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
         </ul>
       </div>
     </BottomSheet>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Button from '../common/Button';
 import Field from '../common/Field';
 import Icon from '../common/Icon';
@@ -329,10 +329,19 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
     }
   };
 
-  /* type colors from shared tokens */
+  const [viewportRect, setViewportRect] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
 
   return (
-    <PageTransition open={open} onClose={onClose}>
+    <PageTransition open={open} onClose={onClose} viewportRect={viewportRect}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 'var(--spacing-sp80)',
