@@ -184,6 +184,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
   const [pasteText, setPasteText] = useState('');
   const [aiPreferences, setAiPreferences] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [genStatusMsg, setGenStatusMsg] = useState('');
   const [genError, setGenError] = useState('');
   const [preview, setPreview] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
@@ -243,7 +244,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
 
   // Step 3: Generate
   const handleGenerate = async () => {
-    setGenerating(true); setGenError(''); setPreview(null);
+    setGenerating(true); setGenError(''); setPreview(null); setGenStatusMsg('');
     try {
       if (step3Mode === 'paste') {
         if (!pasteText.trim()) { setGenError('텍스트를 붙여넣어 주세요'); setGenerating(false); return; }
@@ -258,13 +259,14 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
           duration: duration || 1,
           startDate,
           preferences: aiPreferences,
+          onStatus: setGenStatusMsg,
         });
         if (error) { setGenError(error); setGenerating(false); return; }
         if (days.length === 0) { setGenError('AI가 일정을 생성하지 못했습니다.'); setGenerating(false); return; }
         setPreview({ days });
       }
     } catch (err) { setGenError(err.message); }
-    finally { setGenerating(false); }
+    finally { setGenerating(false); setGenStatusMsg(''); }
   };
 
   // Submit
@@ -404,7 +406,12 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               <AddressSearch
                 label="여행지"
                 value={destInput}
-                onChange={(addr, lat, lon) => { if (addr) addDestination(addr, lat, lon); else setDestInput(''); }}
+                onChange={(addr, lat, lon) => {
+                if (addr) {
+                  addDestination(addr, lat, lon);
+                  setDestInput('');
+                } else setDestInput('');
+              }}
                 placeholder="도시 또는 장소를 검색하세요"
                 size="lg"
               />
@@ -628,7 +635,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                   ))}
                 </div>
                 <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)' }}>
-                  일정을 생성하고 있습니다...
+                  {genStatusMsg || '일정을 생성하고 있습니다...'}
                 </span>
               </div>
             )}

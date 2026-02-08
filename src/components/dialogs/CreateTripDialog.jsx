@@ -322,6 +322,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
   /* ── AI schedule generation ── */
   const [aiPreferences, setAiPreferences] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiStatusMsg, setAiStatusMsg] = useState(''); // 청크 진행 시 "1~7일차 일정 생성 중..."
   const [aiPreview, setAiPreview] = useState(null); // { days: [...] }
   const [aiError, setAiError] = useState('');
   const [expandedDay, setExpandedDay] = useState(null); // accordion: which day is expanded
@@ -342,6 +343,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
     setAiGenerating(true);
     setAiError('');
     setAiPreview(null);
+    setAiStatusMsg('');
 
     const dur = duration || 1;
     const { days, error } = await generateFullTripSchedule({
@@ -349,9 +351,11 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
       duration: dur,
       startDate,
       preferences: aiPreferences,
+      onStatus: setAiStatusMsg,
     });
 
     setAiGenerating(false);
+    setAiStatusMsg('');
     if (error) {
       setAiError(error);
       return;
@@ -432,8 +436,10 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                 label="여행지"
                 value={destInput}
                 onChange={(addr, lat, lon) => {
-                  if (addr) addDestination(addr, lat, lon);
-                  else setDestInput('');
+                  if (addr) {
+                    addDestination(addr, lat, lon);
+                    setDestInput('');
+                  } else setDestInput('');
                 }}
                 placeholder="도시 또는 장소를 검색하세요"
                 size="lg"
@@ -607,7 +613,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                   fontSize: 'var(--typo-caption-2-regular-size)',
                   color: 'var(--color-on-primary-container)',
                 }}>
-                  {destinations.map((d) => d.name).join(', ')} {duration || 1}일 일정을 생성하고 있습니다...
+                  {aiStatusMsg || `${destinations.map((d) => d.name).join(', ')} ${duration || 1}일 일정을 생성하고 있습니다...`}
                 </span>
               </div>
             )}

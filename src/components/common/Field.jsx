@@ -37,6 +37,7 @@ export default function Field({
   as = 'input',       // 'input' | 'textarea' | 'select'
   label,
   helper,
+  error,
   required = false,
   size = 'lg',
   variant = 'outlined', // 'outlined' | 'filled'
@@ -65,14 +66,16 @@ export default function Field({
     ? (options.find((o) => String(o.value) === String(value))?.label || '')
     : '';
 
-  // State-based border color
-  const borderColor = disabled
-    ? 'var(--color-surface-container)'
-    : (focused || sheetOpen)
-      ? 'var(--color-primary)'
-      : hovered
-        ? 'var(--color-outline)'
-        : 'var(--color-outline-variant)';
+  // State-based border color (error overrides focus/hover)
+  const borderColor = error
+    ? 'var(--color-error)'
+    : disabled
+      ? 'var(--color-surface-container)'
+      : (focused || sheetOpen)
+        ? 'var(--color-primary)'
+        : hovered
+          ? 'var(--color-outline)'
+          : 'var(--color-outline-variant)';
 
   // Background
   const bg = variant === 'filled'
@@ -268,8 +271,8 @@ export default function Field({
         </div>
       )}
 
-      {/* Helper text */}
-      {helper && (
+      {/* Helper text (hidden when error is set) */}
+      {helper && !error && (
         <div style={{ paddingTop: 'var(--spacing-sp40, 4px)' }}>
           <span style={{
             fontSize: 'var(--typo-caption-1-regular-size)',
@@ -277,6 +280,18 @@ export default function Field({
             color: 'var(--color-on-surface-variant2)',
           }}>
             {helper}
+          </span>
+        </div>
+      )}
+      {/* Error text */}
+      {error && (
+        <div style={{ paddingTop: 'var(--spacing-sp40, 4px)' }}>
+          <span style={{
+            fontSize: 'var(--typo-caption-1-regular-size)',
+            fontWeight: 'var(--typo-caption-1-regular-weight)',
+            color: 'var(--color-error)',
+          }}>
+            {error}
           </span>
         </div>
       )}

@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import Icon from './Icon';
+import { getPlacePredictions, getPlaceDetails } from '../../lib/googlePlaces.js';
 
 /*
  * ── Address Search Component ──
- * Uses Nominatim (OpenStreetMap) free geocoding API
- * No API key required
+ * Google Places Autocomplete (다저스 → Dodger Stadium, 엘에이 → LA 등)
+ * Requires VITE_GOOGLE_MAPS_API_KEY, Maps JavaScript API enabled
  *
  * Props:
  *   value        — current selected address string
@@ -66,29 +67,20 @@ export default function AddressSearch({
   }, [value]);
 
   const searchAddress = useCallback(async (q) => {
-    if (!q || q.length < 2) {
+    if (!q || String(q).trim().length < 2) {
       setResults([]);
       return;
     }
     setLoading(true);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?` +
-        `q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=6&accept-language=ko,ja,en`,
-        { headers: { 'Accept': 'application/json' } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data.map((item) => ({
-          displayName: item.display_name,
-          name: item.name || item.display_name.split(',')[0],
-          lat: parseFloat(item.lat),
-          lon: parseFloat(item.lon),
-          type: item.type,
-          address: item.address,
-        })));
-        setShowResults(true);
-      }
+      const list = await getPlacePredictions(String(q).trim(), 6);
+      const mapped = list.map((p) => ({
+        placeId: p.placeId,
+        name: p.description,
+        displayName: p.description,
+      }));
+      setResults(mapped);
+      setShowResults(true);
     } catch {
       setResults([]);
     } finally {
@@ -104,11 +96,28 @@ export default function AddressSearch({
     debouncedSearch(val);
   };
 
-  const handleSelect = (result) => {
-    setQuery(result.name);
+  const handleSelect = useCallback(async (result) => {
     setShowResults(false);
-    if (onChange) onChange(result.name, result.lat, result.lon);
-  };
+    if (!result?.placeId) return;
+    setLoading(true);
+    try {
+      const details = await getPlaceDetails(result.placeId);
+      if (details) {
+        const label = details.name || details.formatted_address;
+        if (onChange) onChange(label, details.lat, details.lon);
+        setQuery('');
+      } else {
+        if (onChange) onChange(result.name, null, null);
+        setQuery('');
+      }
+    } catch {
+      if (onChange) onChange(result.name, null, null);
+      setQuery('');
+    } finally {
+      setLoading(false);
+    }
+  }, [onChange]);
+
 
   const handleClear = () => {
     setQuery('');
@@ -205,13 +214,6 @@ export default function AddressSearch({
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {r.name}
-                </p>
-                <p style={{
-                  margin: '2px 0 0', fontSize: 'var(--typo-caption-2-regular-size)',
-                  color: 'var(--color-on-surface-variant2)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {r.displayName}
                 </p>
               </div>
             </div>

@@ -43,17 +43,4 @@
   --spacing-sp480: 48px;
   --spacing-sp520: 52px;
 
-  /* z-index */
-  --z-fab: 900;
-  --z-sheet: 1000;
-  --z-dialog: 2000;
-  --z-confirm: 3000;
-  --z-toast: 4000;
-  --z-viewer: 5000;
-
-  /* transition */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-  --transition-slow: 350ms ease;
-
 }

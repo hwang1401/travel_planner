@@ -444,8 +444,17 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 12. food, spot, shop 타입은 반드시 highlights를 포함하세요.
 13. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요.`;
 
+/** 장기 일정은 7일 단위로 나눠 요청 (MAX_TOKENS 방지) */
+const CHUNK_DAYS = 7;
+const MAX_SINGLE_REQUEST_DAYS = 14;
+
+const TRIP_GEN_CHUNK_SYSTEM_PROMPT = `${TRIP_GEN_SYSTEM_PROMPT}
+
+중요: 이번 요청에서는 "지정된 일수만" 생성하세요. 사용자가 "N일차~M일차만 생성해주세요"라고 하면, days 배열에는 day N, N+1, ... M 만 포함하고, day 필드는 반드시 N, N+1, ... M 로 넣으세요. 이전/이후 일정은 생성하지 마세요.`;
+
 /**
  * Generate a full multi-day trip schedule using AI.
+ * For duration > 14 days, generates in chunks of 7 days to avoid MAX_TOKENS.
  * @param {Object} params
  * @param {string[]} params.destinations - e.g. ["오사카", "교토"]
  * @param {number} params.duration - number of days
@@ -461,49 +470,12 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
   const destStr = destinations.join(", ");
   const dateInfo = startDate ? `출발일: ${startDate}` : "";
 
-  let userPrompt = `여행지: ${destStr}\n기간: ${duration}일\n${dateInfo}`;
-  if (preferences?.trim()) {
-    userPrompt += `\n\n사용자 요청:\n${preferences.trim()}`;
-  }
+  const baseUserPrompt = `여행지: ${destStr}\n기간: ${duration}일\n${dateInfo}` +
+    (preferences?.trim() ? `\n\n사용자 요청:\n${preferences.trim()}` : "");
 
-  try {
-    const reqBody = {
-      system_instruction: { parts: [{ text: TRIP_GEN_SYSTEM_PROMPT }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 65536, responseMimeType: "application/json" },
-    };
-
-    const response = await fetchWithRetry(reqBody, { onStatus });
-    if (response._errMsg) return { days: [], error: response._errMsg };
-
-    const data = await response.json();
-    const finishReason = data?.candidates?.[0]?.finishReason;
-    const text = extractText(data);
-
-    if (!text) {
-      console.error("[GeminiService] Trip gen empty. finishReason:", finishReason);
-      return { days: [], error: "AI 응답이 비어있습니다" };
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try { parsed = JSON.parse(jsonMatch[0]); } catch { /* fall through */ }
-      }
-      if (!parsed) {
-        console.error("[GeminiService] Trip gen parse fail:", text.substring(0, 500), "finishReason:", finishReason);
-        return { days: [], error: finishReason === "MAX_TOKENS" ? "AI 응답이 잘렸습니다. 일정 기간을 줄여서 다시 시도해주세요." : "AI 응답을 파싱할 수 없습니다" };
-      }
-    }
-
-    const rawDays = Array.isArray(parsed.days) ? parsed.days : [];
+  const normalizeDays = (rawDays, dayOffset = 0) => {
     const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
-
-    // Normalize days into our schedule data format
-    const days = rawDays.map((day, i) => {
+    return rawDays.map((day, i) => {
       const sections = (day.sections || []).map((sec) => ({
         title: sec.title || "일정",
         items: (sec.items || [])
@@ -528,26 +500,22 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
             _custom: true,
           })),
       }));
-
-      // Compute date string from startDate
+      const dayNum = dayOffset + i + 1;
       let dateStr = "";
       if (startDate) {
         const base = new Date(startDate);
-        base.setDate(base.getDate() + i);
+        base.setDate(base.getDate() + (dayNum - 1));
         const m = base.getMonth() + 1;
         const d = base.getDate();
         const w = WEEKDAY_KR[base.getDay()];
         dateStr = `${m}/${d} (${w})`;
       }
-
-      // Extract stay info from stay-type items
       const allItems = sections.flatMap((s) => s.items);
       const stayItem = allItems.find((it) => it.type === "stay");
       const stayStr = stayItem ? stayItem.desc : "";
-
       return {
-        day: day.day || i + 1,
-        label: day.label || `Day ${i + 1}`,
+        day: dayNum,
+        label: day.label || `Day ${dayNum}`,
         icon: "pin",
         date: dateStr,
         stay: stayStr,
@@ -555,8 +523,79 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
         _custom: true,
       };
     });
+  };
 
-    return { days, error: null };
+  const requestOneChunk = async (startDay, endDay, previousSummary) => {
+    const rangeText = previousSummary
+      ? `\n\n이전 일정 요약 (참고용):\n${previousSummary}\n\n위 일정에 이어서, ${startDay}일차~${endDay}일차 일정만 생성해주세요. days 배열에는 day ${startDay}, ${startDay + 1}, ... ${endDay} 만 포함하세요.`
+      : `\n\n${startDay}일차~${endDay}일차 일정만 생성해주세요. days 배열에는 day ${startDay}, ${startDay + 1}, ... ${endDay} 만 포함하세요.`;
+    const userPrompt = baseUserPrompt + rangeText;
+    const reqBody = {
+      system_instruction: { parts: [{ text: TRIP_GEN_CHUNK_SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 65536, responseMimeType: "application/json" },
+    };
+    const response = await fetchWithRetry(reqBody, { onStatus });
+    if (response._errMsg) return { days: [], error: response._errMsg };
+    const data = await response.json();
+    const finishReason = data?.candidates?.[0]?.finishReason;
+    const text = extractText(data);
+    if (!text) return { days: [], error: "AI 응답이 비어있습니다" };
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) try { parsed = JSON.parse(jsonMatch[0]); } catch { /* noop */ }
+    }
+    if (!parsed || !Array.isArray(parsed.days)) {
+      return { days: [], error: finishReason === "MAX_TOKENS" ? "AI 응답이 잘렸습니다. 다시 시도해주세요." : "AI 응답을 파싱할 수 없습니다" };
+    }
+    return { days: normalizeDays(parsed.days, startDay - 1), error: null };
+  };
+
+  try {
+    if (duration <= MAX_SINGLE_REQUEST_DAYS) {
+      const userPrompt = baseUserPrompt;
+      const reqBody = {
+        system_instruction: { parts: [{ text: TRIP_GEN_SYSTEM_PROMPT }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 65536, responseMimeType: "application/json" },
+      };
+      const response = await fetchWithRetry(reqBody, { onStatus });
+      if (response._errMsg) return { days: [], error: response._errMsg };
+      const data = await response.json();
+      const finishReason = data?.candidates?.[0]?.finishReason;
+      const text = extractText(data);
+      if (!text) {
+        return { days: [], error: "AI 응답이 비어있습니다" };
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) try { parsed = JSON.parse(jsonMatch[0]); } catch { /* noop */ }
+      }
+      if (!parsed || !Array.isArray(parsed.days)) {
+        return { days: [], error: finishReason === "MAX_TOKENS" ? "AI 응답이 잘렸습니다. 일정 기간을 줄여서 다시 시도해주세요." : "AI 응답을 파싱할 수 없습니다" };
+      }
+      const days = normalizeDays(parsed.days, 0);
+      return { days, error: null };
+    }
+
+    // Chunked: 7일 단위로 요청 후 병합
+    const allDays = [];
+    let previousSummary = "";
+    for (let startDay = 1; startDay <= duration; startDay += CHUNK_DAYS) {
+      const endDay = Math.min(startDay + CHUNK_DAYS - 1, duration);
+      if (onStatus) onStatus(`${startDay}~${endDay}일차 일정 생성 중...`);
+      const { days: chunkDays, error } = await requestOneChunk(startDay, endDay, previousSummary || null);
+      if (error) return { days: [], error };
+      allDays.push(...chunkDays);
+      previousSummary = chunkDays.map((d) => `${d.day}일: ${d.label}`).join(" / ");
+    }
+    return { days: allDays, error: null };
   } catch (err) {
     console.error("[GeminiService] Trip generation error:", err);
     return { days: [], error: `네트워크 오류: ${err.message}` };
