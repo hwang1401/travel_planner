@@ -23,6 +23,7 @@ import ConfirmDialog from "./common/ConfirmDialog";
 import Toast from "./common/Toast";
 import EmptyState from "./common/EmptyState";
 import ScheduleSkeleton from "./common/ScheduleSkeleton";
+import IconContainer from "./common/IconContainer";
 
 /* Dialog imports */
 import DetailDialog from "./dialogs/DetailDialog";
@@ -40,7 +41,6 @@ import { getItemCoords } from "../data/locations";
 /* Schedule components */
 import PlaceCard from "./schedule/PlaceCard";
 import TravelTimeConnector from "./schedule/TravelTimeConnector";
-// IconContainer removed — action sheet uses direct Icon placement
 import AddPlacePage from "./schedule/AddPlacePage";
 import PasteInfoPage from "./schedule/PasteInfoPage";
 import { getDistance, getTravelInfo } from "../utils/distance";
@@ -673,16 +673,16 @@ export default function TravelPlanner() {
     }}>
       {/* Header — 탭 섹션과 동일 배경, 하단 보더로 구분 */}
       <div style={{
-        padding: "12px 16px 12px 8px",
+        padding: `${SPACING.lg} ${SPACING.xl} ${SPACING.lg} ${SPACING.md}`,
         background: "var(--color-surface-container-lowest)",
         borderBottom: "1px solid var(--color-outline-variant)",
-        display: "flex", alignItems: "center", gap: "4px", flexShrink: 0,
+        display: "flex", alignItems: "center", gap: SPACING.sm, flexShrink: 0,
       }}>
         <Button variant="ghost-neutral" size="sm" iconOnly="chevronLeft"
           onClick={() => navigate("/")}
           style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: SPACING.md }}>
             <h1 style={{ margin: 0, fontSize: "var(--typo-body-2-n---bold-size)", fontWeight: "var(--typo-body-2-n---bold-weight)", lineHeight: "var(--typo-body-2-n---bold-line-height)", letterSpacing: "var(--typo-body-2-n---bold-letter-spacing)", color: "var(--color-on-surface)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {tripName}
             </h1>
@@ -724,7 +724,7 @@ export default function TravelPlanner() {
       }}>
         {/* Day tabs row */}
         <div style={{
-          display: "flex", gap: 0, padding: "0 12px",
+          display: "flex", gap: 0, padding: `0 ${SPACING.lg}`,
           alignItems: "center",
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -736,7 +736,7 @@ export default function TravelPlanner() {
                 size="md"
               />
             ) : (
-              <div style={{ padding: "10px 4px", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
+              <div style={{ padding: "var(--spacing-sp100) var(--spacing-sp40)", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
                 날짜를 추가해 주세요
               </div>
             )}
@@ -760,8 +760,8 @@ export default function TravelPlanner() {
 
         {/* Day info panel — 인라인 이름 편집 또는 제목 + ··· + 추가 */}
         {current && (
-          <div style={{ padding: "10px 16px 12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ padding: `var(--spacing-sp100) ${SPACING.xl} ${SPACING.lg}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: SPACING.md }}>
               {canEdit && editingDayIdx === toOrigIdx(selectedDay) ? (
                 /* 인라인 이름 편집: 입력 + 완료 + 취소 */
                 <>
@@ -782,13 +782,13 @@ export default function TravelPlanner() {
                     }}
                     style={{
                       flex: 1, minWidth: 0,
-                      padding: "8px 12px",
+                      padding: `${SPACING.md} ${SPACING.lg}`,
                       fontSize: "var(--typo-body-2-n---bold-size)",
                       fontWeight: "var(--typo-body-2-n---bold-weight)",
                       color: "var(--color-on-surface)",
                       background: "var(--color-surface-container-lowest)",
                       border: "1px solid var(--color-outline-variant)",
-                      borderRadius: "var(--radius-md)",
+                      borderRadius: RADIUS.md,
                       outline: "none",
                     }}
                     placeholder="날짜 이름"
@@ -885,7 +885,7 @@ export default function TravelPlanner() {
             setSelectedDay(selectedDay + 1);
           }
         }}
-        style={{ flex: 1, overflowY: "auto", padding: "12px 16px 32px", touchAction: "pan-y" }}>
+        style={{ flex: 1, overflowY: "auto", padding: `${SPACING.lg} ${SPACING.xl} var(--spacing-sp320)`, touchAction: "pan-y" }}>
 
         {/* Empty trip state */}
         {!current && (
@@ -1016,7 +1016,7 @@ export default function TravelPlanner() {
       {/* Day Info Dialog */}
       {dayInfoTab && current && <DayInfoDialog dayNum={current.day} tab={dayInfoTab} onClose={() => setDayInfoTab(null)} color="var(--color-primary)" />}
 
-      {/* "추가하기" Action Sheet — 아이콘 직접 배치, 색상으로 구분 */}
+      {/* "추가하기" Action Sheet — IconContainer로 아이콘 래핑 */}
       {showAddSheet && canEdit && (
         <BottomSheet onClose={() => setShowAddSheet(false)} maxHeight="auto" title="추가하기">
           <div style={{
@@ -1046,11 +1046,7 @@ export default function TravelPlanner() {
                 onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-surface-container-lowest)"}
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
               >
-                <Icon name={action.icon} size={20} style={{
-                  flexShrink: 0,
-                  marginTop: "2px",
-                  color: action.iconColor,
-                }} />
+                <IconContainer name={action.icon} size={20} iconColor={action.iconColor} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{
                     margin: 0,

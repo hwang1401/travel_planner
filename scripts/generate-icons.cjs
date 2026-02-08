@@ -103,7 +103,7 @@ async function generate() {
     .toFile(path.join(OUT_DIR, "apple-touch-icon.png"));
   console.log("Created: apple-touch-icon.png");
 
-  // ── iOS Splash Screens (using high-res splash logo) ──
+  // ── iOS Splash Screens: primary 배경 (index.html / React SplashScreen과 동일) ──
   const splashMeta = await sharp(SPLASH_LOGO_SRC).metadata();
   console.log(`Splash logo: ${splashMeta.width}x${splashMeta.height}`);
 
@@ -123,7 +123,7 @@ async function generate() {
 
     const bg = Buffer.from(
       `<svg width="${screen.w}" height="${screen.h}">
-        <rect width="${screen.w}" height="${screen.h}" fill="${BG_COLOR}"/>
+        <rect width="${screen.w}" height="${screen.h}" fill="${THEME_COLOR}"/>
       </svg>`
     );
 

@@ -4,7 +4,7 @@
  */
 import Icon from './Icon';
 
-export default function IconContainer({ name, size = 20, variant = "square", style }) {
+export default function IconContainer({ name, size = 20, variant = "square", iconColor, style }) {
   const isRound = variant === "round";
   return (
     <div
@@ -20,7 +20,7 @@ export default function IconContainer({ name, size = 20, variant = "square", sty
         ...style,
       }}
     >
-      <Icon name={name} size={size} />
+      <Icon name={name} size={size} style={iconColor ? { color: iconColor } : undefined} />
     </div>
   );
 }

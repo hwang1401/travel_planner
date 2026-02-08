@@ -1,6 +1,8 @@
 /**
  * ── NumberCircle ──
  * 타임라인 번호 원. primary 단일 색.
+ * TravelPlanner 타임라인에서는 타임테이블 스타일로 전환되어 미사용.
+ * 번호가 필요한 UI(AddPlacePage, FullMapDialog 등)에서는 이 컴포넌트 사용.
  *
  * 숫자 정중앙:
  *  - fontSize: size * 0.5 (22px → 11px)

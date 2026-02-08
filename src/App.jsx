@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import SplashScreen from './components/SplashScreen';
@@ -6,11 +7,26 @@ import HomePage from './components/HomePage';
 import TravelPlanner from './components/TravelPlanner';
 import InvitePage from './components/InvitePage';
 
+const MIN_SPLASH_MS = 1500;
+
 function AppRoutes() {
   const { user, loading } = useAuth();
+  const startRef = useRef(Date.now());
+  const [splashDone, setSplashDone] = useState(false);
 
-  // Show splash while checking session
-  if (loading) return <SplashScreen />;
+  // 스플래시: 어떤 상황에서도 한 번만, 최소 1.5초 노출
+  useEffect(() => {
+    if (loading) return;
+    const elapsed = Date.now() - startRef.current;
+    const remaining = Math.max(0, MIN_SPLASH_MS - elapsed);
+    if (remaining === 0) setSplashDone(true);
+    else {
+      const t = setTimeout(() => setSplashDone(true), remaining);
+      return () => clearTimeout(t);
+    }
+  }, [loading]);
+
+  if (!splashDone) return <SplashScreen />;
 
   // Not authenticated → login
   if (!user) return <LoginPage />;

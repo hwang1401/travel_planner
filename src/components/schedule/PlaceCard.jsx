@@ -5,10 +5,10 @@
  *   [시간 38px] [8px] [3px 컬러바] [8px] [제목 + 부가정보] [chevron]
  *
  * 좌우 패딩 없음 — 부모 컨테이너가 수평 여백 담당.
- * 행 간 구분: border-bottom + 세로 패딩 14px.
+ * 행 간 구분: border-bottom + 세로 패딩(SPACING.xl).
  */
 import Icon from '../common/Icon';
-import { getTypeConfig } from '../../styles/tokens';
+import { getTypeConfig, SPACING } from '../../styles/tokens';
 
 export default function PlaceCard({ item, order, isNow, isClickable, onClick, isLast }) {
   if (!item) return null;
@@ -24,7 +24,7 @@ export default function PlaceCard({ item, order, isNow, isClickable, onClick, is
         display: "flex",
         alignItems: "flex-start",
         gap: "var(--spacing-sp80)",
-        padding: "14px 0",
+        padding: `${SPACING.xl} 0`,
         borderBottom: isLast ? "none" : "1px solid var(--color-surface-dim)",
         cursor: isClickable ? "pointer" : "default",
         transition: "background 0.15s",
@@ -48,7 +48,7 @@ export default function PlaceCard({ item, order, isNow, isClickable, onClick, is
         {item.time}
       </span>
 
-      {/* 컬러바: 3px */}
+      {/* 컬러바: 타입 구분용, TYPE_CONFIG 색상 유지 */}
       <div style={{
         width: "3px",
         flexShrink: 0,

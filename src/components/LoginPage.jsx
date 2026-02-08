@@ -19,7 +19,7 @@ export default function LoginPage() {
       paddingTop: 'env(safe-area-inset-top, 0px)',
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     }}>
-      {/* Top: Branding area */}
+      {/* Top: Branding — 스플래시와 동일(primary 배경, 흰색 로고, 슬로건) */}
       <div style={{
         flex: 1,
         display: 'flex',
@@ -28,39 +28,36 @@ export default function LoginPage() {
         justifyContent: 'center',
         padding: '40px 24px 20px',
         minHeight: '50vh',
+        background: 'var(--color-primary)',
       }}>
-        {/* Logo */}
         <img
           src="/icons/logo-splash.png"
           alt="Travelunu"
           style={{
             width: '80px',
             height: 'auto',
-            marginBottom: '24px',
+            marginBottom: '20px',
             objectFit: 'contain',
+            filter: 'brightness(0) invert(1)',
           }}
         />
-
         <h1 style={{
           margin: '0 0 8px',
-          fontSize: 'var(--typo-heading-2-bold-size, 22px)',
-          fontWeight: 'var(--typo-heading-2-bold-weight, 700)',
-          color: 'var(--color-on-surface)',
+          fontSize: '28px',
+          fontWeight: 700,
+          color: 'var(--color-on-primary)',
+          letterSpacing: '-0.5px',
           textAlign: 'center',
         }}>
           Travelunu
         </h1>
-
         <p style={{
           margin: 0,
-          fontSize: 'var(--typo-body-2-n---regular-size, 14px)',
-          fontWeight: 'var(--typo-body-2-n---regular-weight, 400)',
-          color: 'var(--color-on-surface-variant2)',
+          fontSize: '14px',
+          color: 'rgba(255,255,255,0.7)',
           textAlign: 'center',
-          lineHeight: 1.6,
         }}>
-          여행 일정을 만들고<br />
-          함께하는 사람들과 실시간으로 공유하세요
+          함께 만드는 여행 일정
         </p>
       </div>
 

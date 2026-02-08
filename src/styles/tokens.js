@@ -5,6 +5,9 @@
  *
  * RULE: Never hardcode colors, spacing, or font sizes in components.
  *       Always import from here or use CSS var(--token).
+ *
+ * JS에서 디자인 토큰 참조: 이 파일의 SPACING, RADIUS, COLOR를 import하여 사용.
+ * (새 코드·리뷰 반영 시 일관성 유지)
  */
 
 /* ── Spacing (mirrors --spacing-sp*) ── */
