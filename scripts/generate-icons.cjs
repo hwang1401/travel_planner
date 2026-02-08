@@ -44,6 +44,18 @@ async function generateLogo(size, kernel = "lanczos3") {
     .toBuffer();
 }
 
+/** 고해상도 로고(logo-splash)로 아이콘용 로고 생성 — 화질 개선 */
+async function generateLogoFromSplash(size, kernel = "lanczos3") {
+  return sharp(SPLASH_LOGO_SRC)
+    .resize(size, size, {
+      fit: "contain",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+      kernel,
+    })
+    .png()
+    .toBuffer();
+}
+
 /** 로고 이미지를 흰색(RGB=255)으로 바꾸고 알파는 유지 (primary 배경용) */
 async function logoToWhite(pngBuffer) {
   const { data, info } = await sharp(pngBuffer)
@@ -66,12 +78,12 @@ async function generate() {
   const splashDir = path.join(OUT_DIR, "splash");
   if (!fs.existsSync(splashDir)) fs.mkdirSync(splashDir, { recursive: true });
 
-  // ── PWA App Icons (192, 512): primary 배경 + 흰색 로고 ──
+  // ── PWA App Icons (192, 512): primary 배경 + 흰색 로고 (고해상도 소스 사용) ──
   for (const size of [192, 512]) {
     const logoSize = Math.round(size * 0.55);
     const radius = Math.round(size * 0.22);
 
-    const logo = await logoToWhite(await generateLogo(logoSize));
+    const logo = await logoToWhite(await generateLogoFromSplash(logoSize));
 
     const bg = Buffer.from(
       `<svg width="${size}" height="${size}">
@@ -88,10 +100,10 @@ async function generate() {
     console.log(`Created: app-icon-${size}.png`);
   }
 
-  // ── Favicon (32x32): primary 배경 + 흰색 로고 ──
+  // ── Favicon (32x32): primary 배경 + 흰색 로고 (고해상도 소스) ──
   const faviconSize = 32;
   const faviconLogoSize = Math.round(faviconSize * 0.6);
-  const faviconLogo = await logoToWhite(await generateLogo(faviconLogoSize));
+  const faviconLogo = await logoToWhite(await generateLogoFromSplash(faviconLogoSize));
 
   const faviconBg = Buffer.from(
     `<svg width="32" height="32"><rect width="32" height="32" rx="6" fill="${THEME_COLOR}"/></svg>`
@@ -103,9 +115,9 @@ async function generate() {
     .toFile(path.join(PUBLIC_DIR, "favicon.png"));
   console.log("Created: favicon.png");
 
-  // ── Apple Touch Icon (180x180): primary 배경 + 흰색 로고 ──
+  // ── Apple Touch Icon (180x180): primary 배경 + 흰색 로고 (고해상도 소스) ──
   const appleSize = 180;
-  const appleLogo = await logoToWhite(await generateLogo(Math.round(appleSize * 0.55)));
+  const appleLogo = await logoToWhite(await generateLogoFromSplash(Math.round(appleSize * 0.55)));
 
   const appleBg = Buffer.from(
     `<svg width="${appleSize}" height="${appleSize}"><rect width="${appleSize}" height="${appleSize}" fill="${THEME_COLOR}"/></svg>`
