@@ -497,12 +497,43 @@ export default function TravelPlanner() {
           next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec?.items || [])] };
         }
         if (itemIdx !== undefined && itemIdx !== null) {
-          next[dayIdx].sections[sectionIdx].items[itemIdx] = newItem;
+          // 불변 업데이트: day·section·items 복사 후 해당 슬롯만 교체 (저장 후 다이얼로그/리스트 반영 보장)
+          next[dayIdx] = { ...next[dayIdx] };
+          next[dayIdx].sections = { ...next[dayIdx].sections };
+          const sec = next[dayIdx].sections[sectionIdx];
+          const newItems = [...(sec.items || [])];
+          newItems[itemIdx] = newItem;
+          next[dayIdx].sections[sectionIdx] = { ...sec, items: newItems };
+
+          // standalone: _extraDays에도 직접 반영 (merge/로드와 무관하게 수정이 확실히 남도록)
+          if (baseLen === 0 && next._extraDays?.[dayIdx]) {
+            const ed = next._extraDays[dayIdx];
+            const edSections = ed.sections || [];
+            const edSec = edSections[sectionIdx];
+            if (edSec && Array.isArray(edSec.items) && itemIdx < edSec.items.length) {
+              const edNewItems = [...edSec.items];
+              edNewItems[itemIdx] = newItem;
+              const nextExtra = [...next._extraDays];
+              nextExtra[dayIdx] = {
+                ...ed,
+                sections: edSections.map((s, i) => i === sectionIdx ? { ...s, items: edNewItems } : s),
+              };
+              next._extraDays = nextExtra;
+            }
+          }
         }
       }
       return { ...next };
     });
     setEditTarget(null);
+    // 수정 저장 직후 즉시 서버/로컬에 반영 (디바운스 대기 없이)
+    debouncedSaveRef.current?.flush?.();
+    // 수정한 항목이 지금 정보 다이얼로그에 열려 있으면 activeDetail 갱신 (시간표 등 반영)
+    setActiveDetail((prev) => {
+      if (!prev || prev._si !== sectionIdx || prev._ii !== itemIdx) return prev;
+      if (toOrigIdx(prev._di) !== dayIdx) return prev;
+      return { ...prev, ...(newItem.detail || {}), timetable: newItem.detail?.timetable, _item: newItem };
+    });
     const isEdit = itemIdx !== undefined && itemIdx !== null;
     setToast({ message: isEdit ? "일정이 수정되었습니다" : "일정이 추가되었습니다", icon: isEdit ? "edit" : "check" });
   }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget, baseLen]);
@@ -948,6 +979,7 @@ export default function TravelPlanner() {
                     ...detail,
                     name: detail.name || enrichedItem.desc || "",
                     category: detail.category || TYPE_LABELS[enrichedItem.type] || "정보",
+                    timetable: detail.timetable ?? enrichedItem.detail?.timetable,
                     _item: enrichedItem, _si: effectiveSi, _ii: ii, _di: selectedDay,
                   });
                 };
@@ -1026,7 +1058,7 @@ export default function TravelPlanner() {
             gap: "var(--spacing-sp40)",
           }}>
             {[
-              { icon: "pin", iconColor: "var(--color-primary)", label: "장소 추가", desc: "검색해서 장소를 추가해요", onClick: () => { setShowAddSheet(false); setShowAddPlace(true); } },
+              { icon: "pin", iconColor: "var(--color-primary)", label: "직접 일정 추가", desc: "시간·유형·일정명을 직접 입력해요", onClick: () => { setShowAddSheet(false); setShowAddPlace(true); } },
               { icon: "document", iconColor: "var(--color-on-surface-variant)", label: "예약 정보 붙여넣기", desc: "확인메일, 바우처를 복붙하면 AI가 정리", onClick: () => { setShowAddSheet(false); setShowPasteInfo(true); } },
               { icon: "flash", iconColor: "var(--color-on-surface-variant)", label: "AI와 대화하며 계획하기", desc: "여행 스타일을 알려주면 AI가 일정을 제안해요", onClick: () => { setShowAddSheet(false); setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null }); setOpenAiTab(true); } },
             ].map((action, i) => (

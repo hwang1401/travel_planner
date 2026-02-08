@@ -19,6 +19,7 @@ const ICON_MAP = {
   shopping: "/icons/Shopping/Bag.svg",
   briefcase: "/icons/Briefcase.svg",
   navigation: "/icons/Navigation/Navigation 1.svg",
+  plane: "/icons/Paper Plane.svg",
   bookmark: "/icons/Bookmark.svg",
   flash: "/icons/Flash/On.svg",
   lock: "/icons/Lock.svg",

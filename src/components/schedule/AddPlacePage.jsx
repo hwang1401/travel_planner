@@ -10,6 +10,9 @@ import Toast from '../common/Toast';
 import NumberCircle from '../common/NumberCircle';
 import { getPlacePredictions, getPlaceDetails } from '../../lib/googlePlaces.js';
 import { TYPE_CONFIG, TYPE_LABELS, COLOR, SPACING, RADIUS } from '../../styles/tokens';
+import { TIMETABLE_DB, findBestTrain, matchTimetableRoute, findRoutesByStations } from '../../data/timetable';
+import TimetablePreview from '../common/TimetablePreview';
+import StationPickerModal from '../dialogs/StationPickerModal';
 
 /* ── AddPlacePage ──
  * Full-page for adding a single place / schedule item.
@@ -345,12 +348,19 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
   // Form state (filled when result is selected, or manually)
   const [time, setTime] = useState('');
   const [desc, setDesc] = useState('');
-  const [types, setTypes] = useState(['spot']); // 복수 선택
+  const [type, setType] = useState('spot'); // 단일 선택
   const [sub, setSub] = useState('');
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState(null);
   const [lon, setLon] = useState(null);
   const [tip, setTip] = useState('');
+  const [highlights, setHighlights] = useState('');
+
+  // Timetable state (move type)
+  const [loadedTimetable, setLoadedTimetable] = useState(null);
+  const [moveFrom, setMoveFrom] = useState('');
+  const [moveTo, setMoveTo] = useState('');
+  const [showStationPicker, setShowStationPicker] = useState(false);
 
   // Validation: field errors and toast
   const [errors, setErrors] = useState({});
@@ -438,38 +448,36 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
     }, 400);
   }, []);
 
-  // Select a prediction → fetch Place Details, then fly map and switch to form
+  // Select a prediction → 즉시 폼 전환 + 백그라운드에서 Place Details 보강
   const handleSelectResult = useCallback(async (result, idx) => {
+    // 먼저 가진 정보로 즉시 폼 열기 (두 번 누를 필요 없음)
+    setDesc(result.name || '');
+    setAddress(result.fullAddress || result.name || '');
+    setLat(result.lat ?? null);
+    setLon(result.lon ?? null);
+    setSelectedResultIdx(idx);
+    if (result.lat != null && result.lon != null) {
+      setFlyTarget({ coords: [result.lat, result.lon], ts: Date.now() });
+    }
+    setMode('form');
+
+    // placeId가 있으면 백그라운드에서 상세 정보 보강
     if (result.placeId) {
-      setSearching(true);
       try {
         const details = await getPlaceDetails(result.placeId);
         if (details) {
-          const r = {
-            name: details.name,
-            fullAddress: details.formatted_address,
-            lat: details.lat,
-            lon: details.lon,
-          };
-          setSearchResults([r]);
-          setDesc(r.name);
-          setAddress(r.fullAddress || r.name);
-          setLat(r.lat);
-          setLon(r.lon);
-          setSelectedResultIdx(0);
-          setFlyTarget({ coords: [r.lat, r.lon], ts: Date.now() });
-          setMode('form');
+          if (details.name) setDesc(details.name);
+          if (details.formatted_address) setAddress(details.formatted_address);
+          if (details.lat != null) { setLat(details.lat); setLon(details.lon); setFlyTarget({ coords: [details.lat, details.lon], ts: Date.now() }); }
+          if (details.photoUrl) {
+            setSearchResults((prev) => {
+              const next = [...prev];
+              next[idx] = { ...next[idx], photoUrl: details.photoUrl, lat: details.lat, lon: details.lon, name: details.name, fullAddress: details.formatted_address };
+              return next;
+            });
+          }
         }
-      } catch { /* keep list */ }
-      finally { setSearching(false); }
-    } else {
-      setDesc(result.name);
-      setAddress(result.fullAddress || result.name);
-      setLat(result.lat);
-      setLon(result.lon);
-      setSelectedResultIdx(idx);
-      setFlyTarget({ coords: [result.lat, result.lon], ts: Date.now() });
-      setMode('form');
+      } catch { /* 실패해도 기존 정보로 폼 유지 */ }
     }
   }, []);
 
@@ -494,47 +502,77 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
     if (!hasTime || !hasDesc) {
       const nextErrors = {};
       if (!hasTime) nextErrors.time = '시간을 선택해주세요';
-      if (!hasDesc) nextErrors.desc = '장소명을 입력해주세요';
+      if (!hasDesc) nextErrors.desc = '일정명을 입력해주세요';
       setErrors(nextErrors);
       const msg = !hasTime && !hasDesc
-        ? '시간과 장소명을 입력해주세요'
+        ? '시간과 일정명을 입력해주세요'
         : !hasTime
           ? '시간을 선택해주세요'
-          : '장소명을 입력해주세요';
+          : '일정명을 입력해주세요';
       setToast({ message: msg, icon: 'info' });
       return;
     }
     setErrors({});
-    const primaryType = types.length ? types[0] : 'spot';
-    const categoryLabels = types.length ? types.map((t) => TYPE_LABELS[t] || t) : ['정보'];
+    const categoryLabel = TYPE_LABELS[type] || '정보';
+    // Parse highlights (newline-separated)
+    const parsedHighlights = highlights.trim()
+      ? highlights.split('\n').map((l) => l.trim()).filter(Boolean)
+      : null;
+    // Timetable for move type
+    const timetable = (type === 'move' && loadedTimetable?.trains?.length) ? loadedTimetable : null;
+    // Route highlights override manual ones
+    let finalHighlights = parsedHighlights;
+    if (timetable?._routeId) {
+      const route = TIMETABLE_DB.find((r) => r.id === timetable._routeId);
+      if (route?.highlights) finalHighlights = route.highlights;
+    }
     const newItem = {
       time: time.trim(),
       desc: desc.trim(),
-      type: primaryType,
+      type,
       ...(sub.trim() ? { sub: sub.trim() } : {}),
       _custom: true,
       detail: {
         name: desc.trim(),
-        category: categoryLabels[0] || "정보",
-        ...(categoryLabels.length > 1 ? { categories: categoryLabels } : {}),
+        category: categoryLabel,
         ...(address.trim() ? { address: address.trim() } : {}),
         ...(lat != null ? { lat } : {}),
         ...(lon != null ? { lon } : {}),
         ...(tip.trim() ? { tip: tip.trim() } : {}),
+        ...(searchResults[selectedResultIdx ?? 0]?.photoUrl ? { image: searchResults[selectedResultIdx ?? 0].photoUrl } : {}),
+        ...(timetable ? { timetable } : {}),
+        ...(finalHighlights ? { highlights: finalHighlights } : {}),
       },
     };
     onSave(newItem);
     onClose();
   };
 
-  const toggleType = (value) => {
-    setTypes((prev) =>
-      prev.includes(value)
-        ? prev.length > 1
-          ? prev.filter((t) => t !== value)
-          : prev
-        : [...prev, value]
-    );
+  // 출발지+도착지 선택 시 자동 매칭
+  useEffect(() => {
+    if (type !== 'move' || !moveFrom || !moveTo) { setLoadedTimetable(null); return; }
+    const routes = findRoutesByStations(moveFrom, moveTo);
+    if (routes.length > 0) {
+      const route = routes[0];
+      const bestIdx = findBestTrain(route.trains, time);
+      setLoadedTimetable({
+        _routeId: route.id,
+        station: route.station,
+        direction: route.direction,
+        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+      });
+      // 일정명 자동 채움
+      if (!desc.trim()) setDesc(`${moveFrom} → ${moveTo}`);
+    } else {
+      setLoadedTimetable(null);
+    }
+  }, [type, moveFrom, moveTo, time]);
+
+  // 출발지/도착지 선택 완료 핸들러
+  const handleStationSelect = (from, to) => {
+    setMoveFrom(from);
+    setMoveTo(to);
+    if (!desc.trim()) setDesc(`${from} → ${to}`);
   };
 
   // Reset state when page opens
@@ -544,8 +582,9 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
       setSearchQuery('');
       setSearchResults([]);
       setSelectedResultIdx(null);
-      setTime('09:00'); setDesc(''); setTypes(['spot']); setSub('');
+      setTime('09:00'); setDesc(''); setType('spot'); setSub('');
       setAddress(''); setLat(null); setLon(null); setTip('');
+      setHighlights(''); setLoadedTimetable(null); setMoveFrom(''); setMoveTo(''); setShowStationPicker(false);
       setErrors({});
       setToast(null);
       setFlyTarget(null);
@@ -588,7 +627,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
+              onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
               placeholder="장소명, 주소를 검색하세요"
               style={{
                 flex: 1, border: 'none', background: 'none', outline: 'none',
@@ -826,11 +865,11 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
                   </p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.sm }}>
                     {TYPE_OPTIONS.map((opt) => {
-                      const selected = types.includes(opt.value);
+                      const selected = type === opt.value;
                       return (
                         <button key={opt.value}
                           type="button"
-                          onClick={() => toggleType(opt.value)}
+                          onClick={() => setType(opt.value)}
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: SPACING.xs,
                             padding: `${SPACING.sm} ${SPACING.lg}`, borderRadius: RADIUS.full,
@@ -856,9 +895,9 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
                     <TimePicker label="시간" value={time} onChange={setTime} error={errors.time} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <Field label="장소명" size="lg" variant="outlined"
+                    <Field label="일정명" size="lg" variant="outlined"
                       value={desc} onChange={(e) => setDesc(e.target.value)}
-                      placeholder="장소 이름" error={errors.desc} />
+                      placeholder="예: 캐널시티 라멘스타디움" error={errors.desc} />
                   </div>
                 </div>
 
@@ -869,6 +908,67 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
                 <Field as="textarea" label="메모" size="lg" variant="outlined"
                   value={tip} onChange={(e) => setTip(e.target.value)}
                   placeholder="추천 메뉴, 주의사항 등" rows={2} />
+
+                {/* 포인트 (하이라이트) */}
+                <Field as="textarea" label="포인트 (줄바꿈으로 구분)" size="lg" variant="outlined"
+                  value={highlights} onChange={(e) => setHighlights(e.target.value)}
+                  placeholder={"추천 메뉴, 꿀팁 등 핵심 포인트\n예: 후쿠오카 돈코츠 라멘 추천\n예: 면세 카운터 있음 (여권 필수)"} rows={3} />
+
+                {/* 시간표: 교통(move) 전용 — Field와 동일한 단일 필드 스타일 */}
+                {type === 'move' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    <div style={{ paddingBottom: 'var(--spacing-sp40, 4px)', minHeight: 'var(--field-label-row-height, 20px)', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant)' }}>
+                        시간표
+                      </span>
+                    </div>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setShowStationPicker(true)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowStationPicker(true); } }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        width: '100%', height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
+                        border: '1px solid var(--color-outline-variant)', borderRadius: 'var(--radius-md, 8px)',
+                        background: 'var(--color-surface-container-lowest)', cursor: 'pointer',
+                        transition: 'border-color var(--transition-fast)', boxSizing: 'border-box',
+                      }}
+                    >
+                      <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
+                      <span style={{
+                        flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)',
+                        color: (moveFrom && moveTo) ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
+                      }}>
+                        {moveFrom && moveTo ? `${moveFrom} → ${moveTo}` : '출발지 · 도착지 선택'}
+                      </span>
+                      <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
+                    </div>
+
+                    {/* 시간표 미리보기 */}
+                    {moveFrom && moveTo && !loadedTimetable?.trains?.length && (
+                      <p style={{ margin: '8px 0 0', fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', textAlign: 'center' }}>
+                        해당 구간의 시간표가 없습니다
+                      </p>
+                    )}
+                    {loadedTimetable?.trains?.length > 0 && (
+                      <div style={{ marginTop: '8px' }}>
+                        <TimetablePreview timetable={loadedTimetable} variant="compact" />
+                      </div>
+                    )}
+
+                    {/* 모달 */}
+                    {showStationPicker && (
+                      <StationPickerModal
+                        initialFrom={moveFrom}
+                        initialTo={moveTo}
+                        onClose={() => setShowStationPicker(false)}
+                        onSelect={handleStationSelect}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -880,7 +980,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
               borderTop: '1px solid var(--color-outline-variant)',
             }}>
               <Button variant="primary" size="xlg" fullWidth onClick={handleSave}>
-                장소 추가하기
+                일정 추가하기
               </Button>
             </div>
           </div>

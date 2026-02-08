@@ -262,7 +262,437 @@ export const TIMETABLE_DB = [
       "[참고] ゆふいんの森는 인기 많아 미리 예약 추천!",
     ],
   },
+  {
+    id: "osaka_kyoto",
+    label: "오사카 → 교토 (JR 교토선·쾌속)",
+    icon: "car",
+    station: "오사카역",
+    direction: "교토 방면",
+    trains: [
+      { time: "07:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "07:30", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "08:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "08:30", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "09:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "09:30", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "10:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "10:30", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "11:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "12:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "13:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "14:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "15:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "16:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "17:00", name: "쾌속", dest: "교토", note: "약 30분" },
+      { time: "18:00", name: "쾌속", dest: "교토", note: "약 30분" },
+    ],
+    highlights: [
+      "JR 도카이도·산요 본선 (교토선). 오사카역·신오사카역 등에서 승차 가능.",
+      "쾌속 약 30분 · 특급 하루카 약 15분 (별도 요금).",
+      "[참고] 실제 시간표는 JR 서일본 홈페이지 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "kyoto_osaka",
+    label: "교토 → 오사카 (JR 교토선·쾌속)",
+    icon: "car",
+    station: "교토역",
+    direction: "오사카 방면",
+    trains: [
+      { time: "07:15", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "07:45", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "08:15", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "08:45", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "09:15", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "09:45", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "10:15", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "11:00", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "12:00", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "13:00", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "14:00", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "15:00", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "16:00", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "17:00", name: "쾌속", dest: "오사카", note: "약 30분" },
+      { time: "18:00", name: "쾌속", dest: "오사카", note: "약 30분" },
+    ],
+    highlights: [
+      "JR 교토선. 교토역 출발.",
+      "쾌속 약 30분. 실제 시간표는 JR 서일본 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "osaka_namba",
+    label: "오사카 → 난바 (JR 간사이 본선)",
+    icon: "car",
+    station: "JR 오사카역",
+    direction: "난바 방면",
+    trains: [
+      { time: "06:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "06:15", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "07:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "08:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "09:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "10:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "12:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "14:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "16:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "18:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+      { time: "20:00", name: "쾌속·보통", dest: "난바", note: "약 5분" },
+    ],
+    highlights: [
+      "JR 간사이 본선. 오사카역~난바역 약 5분.",
+      "[참고] 실제 배차는 JR 서일본 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "namba_osaka",
+    label: "난바 → 오사카 (JR 간사이 본선)",
+    icon: "car",
+    station: "JR 난바역",
+    direction: "오사카 방면",
+    trains: [
+      { time: "06:10", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+      { time: "07:00", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+      { time: "08:00", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+      { time: "09:00", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+      { time: "10:00", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+      { time: "12:00", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+      { time: "14:00", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+      { time: "16:00", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+      { time: "18:00", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+      { time: "20:00", name: "쾌속·보통", dest: "오사카", note: "약 5분" },
+    ],
+    highlights: [
+      "JR 간사이 본선. 난바역~오사카역 약 5분.",
+      "[참고] 실제 배차는 JR 서일본 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "namba_umeda",
+    label: "난바 → 우메다 (지하철 미도스지선)",
+    icon: "car",
+    station: "난바역",
+    direction: "우메다 방면",
+    trains: [
+      { time: "매 3~5분", name: "미도스지선", dest: "우메다", note: "약 8분" },
+    ],
+    highlights: [
+      "오사카 지하철 미도스지선. 난바~우메다 약 8분.",
+      "[참고] 실제 배차는 오사카 지하철 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "umeda_namba",
+    label: "우메다 → 난바 (지하철 미도스지선)",
+    icon: "car",
+    station: "우메다역",
+    direction: "난바 방면",
+    trains: [
+      { time: "매 3~5분", name: "미도스지선", dest: "난바", note: "약 8분" },
+    ],
+    highlights: [
+      "오사카 지하철 미도스지선. 우메다~난바 약 8분.",
+      "[참고] 실제 배차는 오사카 지하철 등에서 확인하세요.",
+    ],
+  },
+  // ─── 도쿄·관동 ───
+  {
+    id: "tokyo_shin-osaka",
+    label: "도쿄 → 신오사카 (신칸센)",
+    icon: "car",
+    station: "도쿄역",
+    direction: "신오사카 방면",
+    trains: [
+      { time: "06:00", name: "노조미", dest: "신오사카", note: "약 2시간 30분" },
+      { time: "07:00", name: "히카리", dest: "신오사카", note: "약 2시간 50분" },
+      { time: "08:00", name: "노조미", dest: "신오사카", note: "약 2시간 30분" },
+      { time: "09:00", name: "히카리", dest: "신오사카", note: "약 2시간 50분" },
+      { time: "10:00", name: "노조미", dest: "신오사카", note: "약 2시간 30분" },
+      { time: "11:00", name: "히카리", dest: "신오사카", note: "약 2시간 50분" },
+      { time: "12:00", name: "노조미", dest: "신오사카", note: "약 2시간 30분" },
+      { time: "14:00", name: "히카리", dest: "신오사카", note: "약 2시간 50분" },
+      { time: "16:00", name: "노조미", dest: "신오사카", note: "약 2시간 30분" },
+      { time: "18:00", name: "히카리", dest: "신오사카", note: "약 2시간 50분" },
+    ],
+    highlights: [
+      "노조미 = JR패스 불가(별도 요금). 히카리·코다마 = JR패스 이용 가능.",
+      "[참고] 실제 시간표는 JR 도카이 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "shin-osaka_tokyo",
+    label: "신오사카 → 도쿄 (신칸센)",
+    icon: "car",
+    station: "신오사카역",
+    direction: "도쿄 방면",
+    trains: [
+      { time: "06:00", name: "노조미", dest: "도쿄", note: "약 2시간 30분" },
+      { time: "08:00", name: "히카리", dest: "도쿄", note: "약 2시간 50분" },
+      { time: "10:00", name: "노조미", dest: "도쿄", note: "약 2시간 30분" },
+      { time: "12:00", name: "히카리", dest: "도쿄", note: "약 2시간 50분" },
+      { time: "14:00", name: "노조미", dest: "도쿄", note: "약 2시간 30분" },
+      { time: "16:00", name: "히카리", dest: "도쿄", note: "약 2시간 50분" },
+      { time: "18:00", name: "노조미", dest: "도쿄", note: "약 2시간 30분" },
+    ],
+    highlights: [
+      "노조미 = JR패스 불가. 히카리·코다마 = JR패스 이용 가능.",
+      "[참고] 실제 시간표는 JR 도카이 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "shinagawa_shibuya",
+    label: "시나가와 → 시부야 (JR 야마노테)",
+    icon: "car",
+    station: "시나가와역",
+    direction: "시부야·신주쿠 방면",
+    trains: [
+      { time: "07:00", name: "야마노테선", dest: "시부야", note: "약 15분" },
+      { time: "07:15", name: "야마노테선", dest: "시부야", note: "약 15분" },
+      { time: "08:00", name: "야마노테선", dest: "시부야", note: "약 15분" },
+      { time: "09:00", name: "야마노테선", dest: "시부야", note: "약 15분" },
+      { time: "10:00", name: "야마노테선", dest: "시부야", note: "약 15분" },
+      { time: "12:00", name: "야마노테선", dest: "시부야", note: "약 15분" },
+      { time: "15:00", name: "야마노테선", dest: "시부야", note: "약 15분" },
+      { time: "18:00", name: "야마노테선", dest: "시부야", note: "약 15분" },
+    ],
+    highlights: [
+      "JR 야마노테선. 시나가와~시부야 약 15분. 배차 빈번.",
+      "[참고] 실제 배차는 JR 동일본 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "shibuya_shinjuku",
+    label: "시부야 → 신주쿠 (JR 야마노테)",
+    icon: "car",
+    station: "시부야역",
+    direction: "신주쿠·이케부쿠로 방면",
+    trains: [
+      { time: "07:00", name: "야마노테선", dest: "신주쿠", note: "약 12분" },
+      { time: "08:00", name: "야마노테선", dest: "신주쿠", note: "약 12분" },
+      { time: "10:00", name: "야마노테선", dest: "신주쿠", note: "약 12분" },
+      { time: "12:00", name: "야마노테선", dest: "신주쿠", note: "약 12분" },
+      { time: "15:00", name: "야마노테선", dest: "신주쿠", note: "약 12분" },
+      { time: "18:00", name: "야마노테선", dest: "신주쿠", note: "약 12분" },
+    ],
+    highlights: [
+      "JR 야마노테선. 시부야~신주쿠 약 12분.",
+      "[참고] 실제 배차는 JR 동일본 등에서 확인하세요.",
+    ],
+  },
+  // ─── 오사카 추가 ───
+  {
+    id: "namba_denden",
+    label: "난바 → 덴덴타운 (지하철 사카이스지선)",
+    icon: "car",
+    station: "난바역",
+    direction: "덴덴타운 방면",
+    trains: [
+      { time: "08:00", name: "사카이스지선", dest: "덴덴타운", note: "약 20분" },
+      { time: "09:00", name: "사카이스지선", dest: "덴덴타운", note: "약 20분" },
+      { time: "10:00", name: "사카이스지선", dest: "덴덴타운", note: "약 20분" },
+      { time: "12:00", name: "사카이스지선", dest: "덴덴타운", note: "약 20분" },
+      { time: "15:00", name: "사카이스지선", dest: "덴덴타운", note: "약 20분" },
+      { time: "18:00", name: "사카이스지선", dest: "덴덴타운", note: "약 20분" },
+    ],
+    highlights: [
+      "오사카 지하철 사카이스지선. 난바~덴덴타운 약 20분.",
+      "[참고] 실제 배차는 오사카 지하철 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "denden_namba",
+    label: "덴덴타운 → 난바 (지하철 사카이스지선)",
+    icon: "car",
+    station: "덴덴타운역",
+    direction: "난바 방면",
+    trains: [
+      { time: "09:00", name: "사카이스지선", dest: "난바", note: "약 20분" },
+      { time: "11:00", name: "사카이스지선", dest: "난바", note: "약 20분" },
+      { time: "14:00", name: "사카이스지선", dest: "난바", note: "약 20분" },
+      { time: "17:00", name: "사카이스지선", dest: "난바", note: "약 20분" },
+      { time: "19:00", name: "사카이스지선", dest: "난바", note: "약 20분" },
+    ],
+    highlights: [
+      "오사카 지하철 사카이스지선. 덴덴타운~난바 약 20분.",
+      "[참고] 실제 배차는 오사카 지하철 등에서 확인하세요.",
+    ],
+  },
+  // ─── 교토 추가 ───
+  {
+    id: "kyoto_arashiyama",
+    label: "교토 → 아라시야마 (JR 사가노선)",
+    icon: "car",
+    station: "교토역",
+    direction: "아라시야마·사가노 방면",
+    trains: [
+      { time: "08:30", name: "사가노선", dest: "교조지", note: "아라시야마 근처, 약 15분" },
+      { time: "09:30", name: "사가노선", dest: "교조지", note: "약 15분" },
+      { time: "10:30", name: "사가노선", dest: "교조지", note: "약 15분" },
+      { time: "12:00", name: "사가노선", dest: "교조지", note: "약 15분" },
+      { time: "14:00", name: "사가노선", dest: "교조지", note: "약 15분" },
+      { time: "16:00", name: "사가노선", dest: "교조지", note: "약 15분" },
+    ],
+    highlights: [
+      "JR 사가노선(산인본선). 교토~아라시야마 인근 교조지 약 15분. JR패스 이용 가능.",
+      "[참고] 아라시야마역은 한큐/케이후쿠 등 다른 노선도 있음. 실제 시간표는 JR 서일본 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "arashiyama_kyoto",
+    label: "아라시야마 → 교토 (JR 사가노선)",
+    icon: "car",
+    station: "교조지역",
+    direction: "교토 방면",
+    trains: [
+      { time: "10:00", name: "사가노선", dest: "교토", note: "약 15분" },
+      { time: "12:00", name: "사가노선", dest: "교토", note: "약 15분" },
+      { time: "14:00", name: "사가노선", dest: "교토", note: "약 15분" },
+      { time: "16:00", name: "사가노선", dest: "교토", note: "약 15분" },
+      { time: "18:00", name: "사가노선", dest: "교토", note: "약 15분" },
+    ],
+    highlights: [
+      "JR 사가노선. 교조지~교토 약 15분. JR패스 이용 가능.",
+      "[참고] 실제 배차는 JR 서일본 등에서 확인하세요.",
+    ],
+  },
+  // ─── 삿포로·홋카이도 ───
+  {
+    id: "sapporo_shin-chitose",
+    label: "삿포로 → 신치토세공항 (JR rapid)",
+    icon: "car",
+    station: "삿포로역",
+    direction: "신치토세공항 방면",
+    trains: [
+      { time: "06:30", name: "공항 rapid", dest: "신치토세공항", note: "약 37분" },
+      { time: "07:00", name: "공항 rapid", dest: "신치토세공항", note: "약 37분" },
+      { time: "08:00", name: "공항 rapid", dest: "신치토세공항", note: "약 37분" },
+      { time: "09:00", name: "공항 rapid", dest: "신치토세공항", note: "약 37분" },
+      { time: "10:00", name: "공항 rapid", dest: "신치토세공항", note: "약 37분" },
+      { time: "12:00", name: "공항 rapid", dest: "신치토세공항", note: "약 37분" },
+      { time: "15:00", name: "공항 rapid", dest: "신치토세공항", note: "약 37분" },
+      { time: "18:00", name: "공항 rapid", dest: "신치토세공항", note: "약 37분" },
+    ],
+    highlights: [
+      "JR 홋카이도 공항 rapid. 삿포로~신치토세공항 약 37분.",
+      "[참고] 실제 시간표는 JR 홋카이도 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "shin-chitose_sapporo",
+    label: "신치토세공항 → 삿포로 (JR rapid)",
+    icon: "car",
+    station: "신치토세공항역",
+    direction: "삿포로 방면",
+    trains: [
+      { time: "08:00", name: "공항 rapid", dest: "삿포로", note: "약 37분" },
+      { time: "09:00", name: "공항 rapid", dest: "삿포로", note: "약 37분" },
+      { time: "10:00", name: "공항 rapid", dest: "삿포로", note: "약 37분" },
+      { time: "12:00", name: "공항 rapid", dest: "삿포로", note: "약 37분" },
+      { time: "14:00", name: "공항 rapid", dest: "삿포로", note: "약 37분" },
+      { time: "16:00", name: "공항 rapid", dest: "삿포로", note: "약 37분" },
+      { time: "18:00", name: "공항 rapid", dest: "삿포로", note: "약 37분" },
+    ],
+    highlights: [
+      "JR 홋카이도 공항 rapid. 신치토세공항~삿포로 약 37분.",
+      "[참고] 실제 시간표는 JR 홋카이도 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "sapporo_otaru",
+    label: "삿포로 → 오타루 (JR 하코다테본선)",
+    icon: "car",
+    station: "삿포로역",
+    direction: "오타루 방면",
+    trains: [
+      { time: "08:00", name: "쾌속", dest: "오타루", note: "약 30분" },
+      { time: "09:00", name: "쾌속", dest: "오타루", note: "약 30분" },
+      { time: "10:00", name: "쾌속", dest: "오타루", note: "약 30분" },
+      { time: "12:00", name: "쾌속", dest: "오타루", note: "약 30분" },
+      { time: "14:00", name: "쾌속", dest: "오타루", note: "약 30분" },
+      { time: "16:00", name: "쾌속", dest: "오타루", note: "약 30분" },
+      { time: "18:00", name: "쾌속", dest: "오타루", note: "약 30분" },
+    ],
+    highlights: [
+      "JR 홋카이도 하코다테본선. 삿포로~오타루 약 30분.",
+      "[참고] 실제 시간표는 JR 홋카이도 등에서 확인하세요.",
+    ],
+  },
+  {
+    id: "otaru_sapporo",
+    label: "오타루 → 삿포로 (JR 하코다테본선)",
+    icon: "car",
+    station: "오타루역",
+    direction: "삿포로 방면",
+    trains: [
+      { time: "09:00", name: "쾌속", dest: "삿포로", note: "약 30분" },
+      { time: "11:00", name: "쾌속", dest: "삿포로", note: "약 30분" },
+      { time: "13:00", name: "쾌속", dest: "삿포로", note: "약 30분" },
+      { time: "15:00", name: "쾌속", dest: "삿포로", note: "약 30분" },
+      { time: "17:00", name: "쾌속", dest: "삿포로", note: "약 30분" },
+      { time: "19:00", name: "쾌속", dest: "삿포로", note: "약 30분" },
+    ],
+    highlights: [
+      "JR 홋카이도 하코다테본선. 오타루~삿포로 약 30분.",
+      "[참고] 실제 시간표는 JR 홋카이도 등에서 확인하세요.",
+    ],
+  },
 ];
+
+/* ── 지역 매핑 (역명 → 지역) ── */
+const REGION_MAP = {
+  '후쿠오카': '규슈', '하카타': '규슈', '구마모토': '규슈', '아소': '규슈',
+  '유후인': '규슈', '후쿠오카공항': '규슈', '아소산': '규슈', '쿠사센리': '규슈', '쿠루메': '규슈',
+  '구마모토 노면전차': '규슈',
+  '오사카': '간사이', '교토': '간사이', '난바': '간사이', '우메다': '간사이',
+  '신오사카': '간사이', '덴덴타운': '간사이', '아라시야마': '간사이',
+  '도쿄': '간토', '시나가와': '간토', '시부야': '간토', '신주쿠': '간토',
+  '삿포로': '홋카이도', '신치토세공항': '홋카이도', '오타루': '홋카이도',
+};
+
+/**
+ * DB에서 고유 역명 목록을 지역별 그룹으로 추출.
+ * @returns {{ region: string, stations: string[] }[] }
+ */
+export function getStationsByRegion() {
+  const set = new Set();
+  TIMETABLE_DB.forEach((r) => {
+    const m = (r.label || '').match(/^(.+?)\s*→\s*(.+?)(?:\s*\(|$)/);
+    if (m) { set.add(m[1].trim()); set.add(m[2].trim()); }
+  });
+  const all = [...set].sort();
+  const groups = {};
+  all.forEach((s) => {
+    const region = REGION_MAP[s] || '기타';
+    if (!groups[region]) groups[region] = [];
+    groups[region].push(s);
+  });
+  const order = ['규슈', '간사이', '간토', '홋카이도', '기타'];
+  return order.filter((r) => groups[r]).map((r) => ({ region: r, stations: groups[r] }));
+}
+
+/**
+ * DB에서 고유 역명(출발지/도착지) 목록을 추출 (flat).
+ */
+export function getStationList() {
+  const set = new Set();
+  TIMETABLE_DB.forEach((r) => {
+    const m = (r.label || '').match(/^(.+?)\s*→\s*(.+?)(?:\s*\(|$)/);
+    if (m) { set.add(m[1].trim()); set.add(m[2].trim()); }
+  });
+  return [...set].sort();
+}
+
+/**
+ * 출발지+도착지로 매칭되는 노선 목록 반환.
+ */
+export function findRoutesByStations(from, to) {
+  if (!from || !to) return [];
+  return TIMETABLE_DB.filter((r) => {
+    const m = (r.label || '').match(/^(.+?)\s*→\s*(.+?)(?:\s*\(|$)/);
+    if (!m) return false;
+    return m[1].trim() === from && m[2].trim() === to;
+  });
+}
 
 export function findBestTrain(trains, targetTime) {
   if (!targetTime || !trains.length) return 0;
@@ -280,4 +710,54 @@ export function findBestTrain(trains, targetTime) {
     if (score < bestDiff) { bestDiff = score; bestIdx = i; }
   });
   return bestIdx;
+}
+
+/**
+ * Parse move desc to [from, to] normalized names.
+ * Supports: "하카타역 → 구마모토역", "오사카-교토", "오사카역에서 교토역으로", "오사카 to 교토"
+ * @param {string} desc
+ * @returns {{ from: string, to: string } | null}
+ */
+function parseMoveDesc(desc) {
+  if (!desc || typeof desc !== 'string') return null;
+  const trimmed = desc.trim();
+  // 1) 화살표·하이픈·to 구분
+  let parts = trimmed.split(/\s*[→\-－～]\s*|\s+to\s+/i).map((s) => s.replace(/\s*역\s*$/, '').trim()).filter(Boolean);
+  if (parts.length >= 2) return { from: parts[0], to: parts[1] };
+  // 2) "A에서 B으로", "A에서 B로 이동", "A에서 B까지" (한글/일본어 표현) — 끝에 "이동" 등 허용
+  const fromToMatch = trimmed.match(/(.+?)\s*(?:에서|から)\s*(.+?)(?:\s*(?:으로|로|까지|へ)\s*.*)?$/);
+  if (fromToMatch) {
+    const from = fromToMatch[1].replace(/\s*역\s*$/, '').trim();
+    const to = fromToMatch[2].replace(/\s*역\s*$/, '').trim();
+    if (from && to) return { from, to };
+  }
+  return null;
+}
+
+/**
+ * Match move item desc to a TIMETABLE_DB route. Returns first route whose label
+ * contains from and to in that order (e.g. "하카타 → 구마모토").
+ * @param {string} desc - e.g. "하카타역 → 구마모토역"
+ * @returns {{ routeId: string, route: object } | null}
+ */
+/** 괄호 안 이름 추출 — "후쿠오카(하카타)" → "하카타", DB 라벨 매칭용 */
+function normForLabel(name) {
+  const inParen = name.match(/\(([^)]+)\)/);
+  return (inParen ? inParen[1] : name).trim();
+}
+
+export function matchTimetableRoute(desc) {
+  const parsed = parseMoveDesc(desc);
+  if (!parsed) return null;
+  const { from, to } = parsed;
+  const fromNorm = normForLabel(from);
+  const toNorm = normForLabel(to);
+  const route = TIMETABLE_DB.find((r) => {
+    const label = r.label || '';
+    const iFrom = label.indexOf(fromNorm) !== -1 ? label.indexOf(fromNorm) : label.indexOf(from);
+    const iTo = label.indexOf(toNorm) !== -1 ? label.indexOf(toNorm) : label.indexOf(to);
+    return iFrom !== -1 && iTo !== -1 && iFrom < iTo;
+  });
+  if (!route) return null;
+  return { routeId: route.id, route };
 }

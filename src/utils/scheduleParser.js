@@ -26,11 +26,11 @@
  * Markdown tables (| ... |) are ignored.
  */
 
-const VALID_TYPES = new Set(["food", "spot", "shop", "move", "stay", "info"]);
+const VALID_TYPES = new Set(["food", "spot", "shop", "move", "flight", "stay", "info"]);
 
 const TYPE_LABELS = {
   food: "식사", spot: "관광", shop: "쇼핑",
-  move: "이동", stay: "숙소", info: "정보",
+  move: "이동", flight: "항공", stay: "숙소", info: "정보",
 };
 
 export { TYPE_LABELS };

@@ -12,7 +12,7 @@ export default function ImageViewer({ src, alt, onClose }) {
     <div
       onClick={onClose}
       style={{
-        position: "fixed", inset: 0, zIndex: "var(--z-viewer)",
+        position: "fixed", inset: 0, zIndex: "var(--z-viewer, 10000)",
         background: "rgba(0,0,0,0.92)",
         display: "flex", alignItems: "center", justifyContent: "center",
         animation: "fadeIn 0.15s ease",

@@ -40,35 +40,23 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
                 gap: '8px',
                 padding: '4px 6px',
                 borderRadius: 'var(--radius-md, 8px)',
-                background: t.picked ? 'var(--color-warning-container)' : 'transparent',
+                background: t.picked ? 'var(--color-primary-container)' : 'transparent',
                 fontWeight: t.picked ? 700 : 400,
               }}
             >
               <span style={{
                 width: '38px',
                 flexShrink: 0,
-                color: t.picked ? 'var(--color-warning)' : 'var(--color-on-surface-variant)',
+                color: t.picked ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
               }}>
                 {t.time}
               </span>
               <span style={{
                 flex: 1,
-                color: t.picked ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant)',
+                color: t.picked ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant)',
               }}>
                 {t.name}
               </span>
-              {t.picked && (
-                <span style={{
-                  fontSize: 'var(--typo-caption-3-bold-size)',
-                  background: 'var(--color-warning-container)',
-                  color: 'var(--color-on-warning-container)',
-                  padding: '1px 5px',
-                  borderRadius: '4px',
-                  fontWeight: 'var(--typo-caption-3-bold-weight)',
-                }}>
-                  탑승 예정
-                </span>
-              )}
             </div>
           ))}
         </div>
@@ -127,7 +115,7 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
           >
             {String(t.time).replace(/\s+분\s*$/, '분').trim()}
           </span>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--spacing-sp80)' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <span style={{
               fontSize: 'var(--typo-label-2-medium-size)',
               fontWeight: t.picked ? 'var(--typo-label-2-bold-weight)' : 'var(--typo-label-2-medium-weight)',
@@ -138,19 +126,6 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
             }}>
               {t.name}
             </span>
-            {t.picked && (
-              <span style={{
-                flexShrink: 0,
-                padding: '2px 6px',
-                borderRadius: 'var(--radius-sm)',
-                background: 'color-mix(in srgb, var(--color-primary) 14%, transparent)',
-                fontSize: 'var(--typo-caption-3-bold-size)',
-                fontWeight: 'var(--typo-caption-3-bold-weight)',
-                color: accent,
-              }}>
-                탑승 예정
-              </span>
-            )}
           </div>
           <div style={{
             flex: 1,

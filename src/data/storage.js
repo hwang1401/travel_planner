@@ -23,7 +23,8 @@ function applyDayCustom(day, dayCustom, overrides) {
   const newSections = d.sections.map((sec, si) => {
     const secCustom = dayCustom.sections?.[si];
     if (!secCustom) return { ...sec, items: (sec.items || []).filter(Boolean) };
-    const items = (secCustom.items || sec.items || []).filter(Boolean);
+    // overlay가 있으면 항상 overlay items 사용 (수정 반영 보장; 빈 배열이어도 base로 되돌리지 않음)
+    const items = Array.isArray(secCustom.items) ? secCustom.items.filter(Boolean) : (sec.items || []).filter(Boolean);
     return { ...sec, items };
   });
 
@@ -208,7 +209,7 @@ export function generateDaySummary(day) {
     .filter(Boolean);
 
   // 2) Parse costs by category
-  const costCategories = { food: 0, move: 0, other: 0 }; // food→식비, move→교통, spot/shop→기타
+  const costCategories = { food: 0, move: 0, flight: 0, other: 0 }; // food→식비, move→교통, flight→항공, spot/shop→기타
 
   allItems.forEach((item) => {
     let cost = 0;
@@ -220,19 +221,21 @@ export function generateDaySummary(day) {
     if (item.sub) {
       const subCost = parseYen(item.sub);
       if (subCost > 0 && cost === 0) cost = subCost;
-      // For move type, sub often has the cost
-      if (item.type === "move" && subCost > 0) cost = subCost;
+      // For move/flight type, sub often has the cost
+      if ((item.type === "move" || item.type === "flight") && subCost > 0) cost = subCost;
     }
 
     if (cost > 0) {
       if (item.type === "food") costCategories.food += cost;
       else if (item.type === "move") costCategories.move += cost;
+      else if (item.type === "flight") costCategories.flight += cost;
       else costCategories.other += cost;
     }
   });
 
   const costParts = [];
   if (costCategories.move > 0) costParts.push(`교통 ~${costCategories.move.toLocaleString()}엔`);
+  if (costCategories.flight > 0) costParts.push(`항공 ~${costCategories.flight.toLocaleString()}엔`);
   if (costCategories.food > 0) costParts.push(`식비 ~${costCategories.food.toLocaleString()}엔`);
   if (costCategories.other > 0) costParts.push(`입장/쇼핑 ~${costCategories.other.toLocaleString()}엔`);
 

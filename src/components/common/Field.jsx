@@ -134,11 +134,12 @@ export default function Field({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', minWidth: '60px', ...customStyle }} className={className}>
-      {/* Label */}
+      {/* Label — 고정 높이로 여러 필드 나란히 있을 때 입력란 수평 정렬 */}
       {label && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '4px',
           paddingBottom: 'var(--spacing-sp40, 4px)',
+          minHeight: 'var(--field-label-row-height, 20px)',
         }}>
           <span style={{
             fontSize: 'var(--typo-caption-2-bold-size)',

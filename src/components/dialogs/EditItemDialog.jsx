@@ -1,17 +1,19 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import Field from '../common/Field';
 import Tab from '../common/Tab';
 import AddressSearch from '../common/AddressSearch';
-import BottomSheet from '../common/BottomSheet';
+import { useScrollLock } from '../../hooks/useScrollLock';
 import { MultiImagePicker } from '../common/ImagePicker';
 import { uploadImage, generateImagePath } from '../../services/imageService';
-import { TIMETABLE_DB, findBestTrain } from '../../data/timetable';
+import { TIMETABLE_DB, findBestTrain, matchTimetableRoute } from '../../data/timetable';
 import TimetablePreview from '../common/TimetablePreview';
 import { readFileAsText, detectConflicts } from '../../utils/scheduleParser';
 import { analyzeScheduleWithAI, getAIRecommendation } from '../../services/geminiService';
 import ImportPreviewDialog from './ImportPreviewDialog';
+import TimetableSearchDialog from './TimetableSearchDialog';
 
 /* ── Edit Item Dialog (일정 추가/수정) ── */
 export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color, tripId, currentDay, onBulkImport, initialTab = 0, aiOnly = false }) {
@@ -24,7 +26,6 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const [address, setAddress] = useState(item?.detail?.address || "");
   const [detailLat, setDetailLat] = useState(item?.detail?.lat || null);
   const [detailLon, setDetailLon] = useState(item?.detail?.lon || null);
-  const [detailName, setDetailName] = useState(item?.detail?.name || "");
   const [detailTip, setDetailTip] = useState(item?.detail?.tip || "");
   const [detailPrice, setDetailPrice] = useState(item?.detail?.price || "");
   const [detailHours, setDetailHours] = useState(item?.detail?.hours || "");
@@ -43,7 +44,27 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   // Timetable state
   const currentRouteId = item?.detail?.timetable?._routeId || "";
   const [selectedRoute, setSelectedRoute] = useState(currentRouteId);
-  const [loadedTimetable, setLoadedTimetable] = useState(item?.detail?.timetable || null);
+  // 시간표: trains가 있을 때만 유효한 로드로 간주 (빈 객체면 자동 매칭 대상)
+  const [loadedTimetable, setLoadedTimetable] = useState(
+    () => (item?.detail?.timetable?.trains?.length ? item.detail.timetable : null)
+  );
+  const [showTimetableSearch, setShowTimetableSearch] = useState(false);
+
+  // 교통(move): desc/시간 바뀌면 맞는 노선 자동 매칭 → 시간표 리스트 표시 (검색은 필요할 때만)
+  useEffect(() => {
+    if (type !== 'move' || !desc.trim() || loadedTimetable?.trains?.length) return;
+    const matched = matchTimetableRoute(desc.trim());
+    if (matched) {
+      const bestIdx = findBestTrain(matched.route.trains, time);
+      setLoadedTimetable({
+        _routeId: matched.routeId,
+        station: matched.route.station,
+        direction: matched.route.direction,
+        trains: matched.route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+      });
+      setSelectedRoute(matched.routeId);
+    }
+  }, [type, desc, time, loadedTimetable]);
 
   /* ── Image handlers ── */
   const handleAddImage = useCallback(async (file) => {
@@ -179,11 +200,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     { value: "spot", label: "관광" },
     { value: "shop", label: "쇼핑" },
     { value: "move", label: "→ 이동" },
+    { value: "flight", label: "항공" },
     { value: "stay", label: "숙소" },
     { value: "info", label: "정보" },
   ];
 
-  const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "교통" };
+  const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
 
   // Generate time options (00:00 to 23:30 in 30-min intervals)
   const timeOptions = [];
@@ -208,10 +230,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     setSelectedRoute(routeId);
   };
 
+  useScrollLock();
+
   const handleSave = () => {
     if (!time.trim() || !desc.trim()) return;
     const hasImages = detailImages.length > 0;
-    const hasDetailContent = detailName.trim() || address.trim() || detailTip.trim() || hasImages || detailPrice.trim() || detailHours.trim() || detailHighlights.trim();
+    const hasDetailContent = address.trim() || detailTip.trim() || hasImages || detailPrice.trim() || detailHours.trim() || detailHighlights.trim();
 
     const newItem = {
       time: time.trim(),
@@ -234,11 +258,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       if (route?.highlights) highlights = route.highlights;
     }
 
-    if (hasDetailContent || timetable) {
+    // move는 시간표만 있어도 detail 생성 (저장 후 다시 열었을 때 지정 반영)
+    if (hasDetailContent || timetable || (type === "move" && loadedTimetable?.trains?.length)) {
       // Determine representative image
       const mainImg = detailMainImage || detailImages[0] || '';
       newItem.detail = {
-        name: detailName.trim() || desc.trim(),
+        name: desc.trim(),
         category: catMap[type] || "관광",
         ...(address.trim() ? { address: address.trim() } : {}),
         ...(detailLat != null ? { lat: detailLat } : {}),
@@ -256,14 +281,42 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     onSave(newItem, dayIdx, sectionIdx, itemIdx);
   };
 
-  return (
-    <BottomSheet
-      onClose={onClose}
-      maxHeight="85vh"
-      minHeight={isNew ? "85vh" : undefined}
-      title={aiOnly ? "AI와 대화하며 계획하기" : (isNew ? "일정 추가" : "일정 수정")}
-    >
+  const title = aiOnly ? "AI와 대화하며 계획하기" : (isNew ? "일정 추가" : "일정 수정");
 
+  const fullScreenModal = (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      display: 'flex', flexDirection: 'column',
+      background: 'var(--color-surface-container-lowest)',
+      overflow: 'hidden',
+    }}>
+      {/* 헤더 — 여백 확보, 닫기 버튼 */}
+      <header style={{
+        flexShrink: 0,
+        paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
+        paddingBottom: '16px',
+        paddingLeft: '16px',
+        paddingRight: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        borderBottom: '1px solid var(--color-outline-variant)',
+        background: 'var(--color-surface)',
+      }}>
+        <h2 style={{
+          margin: 0,
+          flex: 1,
+          fontSize: 'var(--typo-body-1-n---bold-size)',
+          fontWeight: 'var(--typo-body-1-n---bold-weight)',
+          color: 'var(--color-on-surface)',
+        }}>
+          {title}
+        </h2>
+        <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
+      </header>
+
+      {/* 스크롤 영역: 탭 + 본문 */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {/* Tabs (only show for new items; 숨김 when aiOnly) */}
         {isNew && !aiOnly && (
           <div style={{ flexShrink: 0 }}>
@@ -568,72 +621,80 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
             )}
           </div>
         ) : (
-        /* ── Single item form tab ── */
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px", display: "flex", flexDirection: "column", gap: "12px" }}>
-          {/* Time + Type row */}
-          <div style={{ display: "flex", gap: "10px" }}>
+        /* ── Single item form tab ──
+         * 순서: 일정명 → 유형·시간 → 주소 → 부가정보 → 메모 → 포인트 → (수정 시만 영업시간·가격) → 이미지 → 시간표
+         */
+        <div style={{ padding: "16px 20px 24px", display: "flex", flexDirection: "column", gap: "12px" }}>
+          {/* 일정명 */}
+          <Field label="일정명" required size="lg" variant="outlined"
+            value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="예: 캐널시티 라멘스타디움" />
+
+          {/* 유형 + 시간 row */}
+          <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
+            <Field as="select" label="유형" size="lg" variant="outlined"
+              value={type} onChange={(e) => setType(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+              {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Field>
             <Field as="select" label="시간" required size="lg" variant="outlined"
-              value={time} onChange={(e) => setTime(e.target.value)} style={{ flex: 1 }}>
+              value={time} onChange={(e) => setTime(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
               <option value="">시간 선택</option>
               {timeOptions.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </Field>
-            <Field as="select" label="유형" size="lg" variant="outlined"
-              value={type} onChange={(e) => setType(e.target.value)} style={{ flex: 1 }}>
-              {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </Field>
           </div>
 
-          {/* Desc */}
-          <Field label="일정명" required size="lg" variant="outlined"
-            value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="예: 캐널시티 라멘스타디움" />
-
-          {/* Sub */}
-          <Field label="부가 정보" size="lg" variant="outlined"
-            value={sub} onChange={(e) => setSub(e.target.value)} placeholder="예: 도보 5분 · 1,000엔" />
-
-          {/* Section: 상세 정보 */}
-          <div style={{ borderTop: "1px solid var(--color-outline-variant)", paddingTop: "12px" }}>
-            <p style={{ margin: "0 0 8px", fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant2)", letterSpacing: "0.5px" }}>상세 정보</p>
-          </div>
-
-          {/* Detail name */}
-          <Field label="장소명 (상세)" size="lg" variant="outlined"
-            value={detailName} onChange={(e) => setDetailName(e.target.value)} placeholder="미입력 시 일정명 사용" />
-
-          {/* Address */}
+          {/* 주소 — 선택 시 장소 사진이 있으면 이미지 목록에 추가(수정·삭제 가능) */}
           <AddressSearch
             label="주소"
             value={address}
-            onChange={(addr, lat, lon) => { setAddress(addr); setDetailLat(lat || null); setDetailLon(lon || null); }}
+            onChange={(addr, lat, lon, photoUrl) => {
+              setAddress(addr);
+              setDetailLat(lat ?? null);
+              setDetailLon(lon ?? null);
+              if (photoUrl) {
+                setDetailImages((prev) => {
+                  if (prev.includes(photoUrl)) return prev;
+                  return [photoUrl, ...prev.filter(Boolean)].slice(0, 5);
+                });
+                setDetailMainImage(photoUrl);
+              }
+            }}
             placeholder="주소 또는 장소 검색"
             size="lg"
           />
 
-          {/* Hours + Price */}
-          <div style={{ display: "flex", gap: "10px" }}>
-            <Field label="영업시간" size="lg" variant="outlined"
-              value={detailHours} onChange={(e) => setDetailHours(e.target.value)} placeholder="11:00~23:00" style={{ flex: 1 }} />
-            <Field label="가격" size="lg" variant="outlined"
-              value={detailPrice} onChange={(e) => setDetailPrice(e.target.value)} placeholder="~1,000엔" style={{ flex: 1 }} />
-          </div>
+          {/* 부가정보 */}
+          <Field label="부가정보" size="lg" variant="outlined"
+            value={sub} onChange={(e) => setSub(e.target.value)} placeholder="예: 도보 5분 · 1,000엔" />
 
-          {/* Tip */}
-          <Field as="textarea" label="팁 / 메모" size="lg" variant="outlined"
+          {/* 메모 */}
+          <Field as="textarea" label="메모" size="lg" variant="outlined"
             value={detailTip} onChange={(e) => setDetailTip(e.target.value)} placeholder="참고사항 입력" rows={2} />
 
-          {/* Highlights */}
+          {/* 포인트 */}
           <Field as="textarea" label="포인트 (줄바꿈으로 구분)" size="lg" variant="outlined"
             value={detailHighlights} onChange={(e) => setDetailHighlights(e.target.value)}
             placeholder={"추천 메뉴, 꿀팁 등 핵심 포인트\n예: 후쿠오카 돈코츠 라멘 추천\n예: 면세 카운터 있음 (여권 필수)"} rows={3} />
 
-          {/* Images */}
+          {/* 영업시간·가격 — 수정 시에만 표시 (생성 시에는 없음) */}
+          {!isNew && (
+            <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
+              <Field label="영업시간" size="lg" variant="outlined"
+                value={detailHours} onChange={(e) => setDetailHours(e.target.value)} placeholder="11:00~23:00" style={{ flex: 1, minWidth: 0 }} />
+              <Field label="가격" size="lg" variant="outlined"
+                value={detailPrice} onChange={(e) => setDetailPrice(e.target.value)} placeholder="~1,000엔" style={{ flex: 1, minWidth: 0 }} />
+            </div>
+          )}
+
+          {/* Images: 라벨 높이 Field와 통일. 불러온 이미지도 수정/삭제 가능 */}
           {tripId ? (
             <div>
-              <p style={{ margin: '0 0 8px', fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant)' }}>
-                이미지 ({detailImages.length}/5)
-              </p>
+              <div style={{ paddingBottom: 'var(--spacing-sp40, 4px)', minHeight: 'var(--field-label-row-height, 20px)', display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant)' }}>
+                  이미지 ({detailImages.length}/5)
+                </span>
+              </div>
               <MultiImagePicker
                 images={detailImages}
                 mainImage={detailMainImage}
@@ -650,74 +711,101 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
               placeholder="/images/filename.jpg" />
           )}
 
-          {/* Timetable loader - only for move type */}
+          {/* Timetable: move 전용 — Field와 동일한 단일 필드 스타일, 탭 시 자동매칭 또는 검색 모달 */}
           {type === "move" && (
             <>
-              <div style={{ borderTop: "1px solid var(--color-outline-variant)", paddingTop: "12px" }}>
-                <p style={{ margin: "0 0 8px", fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant2)", letterSpacing: "0.5px" }}>시간표 불러오기</p>
+              <div style={{ paddingBottom: "var(--spacing-sp40, 4px)", minHeight: "var(--field-label-row-height, 20px)", display: "flex", alignItems: "center" }}>
+                <span style={{ fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant)" }}>시간표</span>
               </div>
-              <Field as="select" label="노선 선택" size="lg" variant="outlined"
-                value={selectedRoute} onChange={(e) => setSelectedRoute(e.target.value)}>
-                <option value="">시간표 없음</option>
-                {TIMETABLE_DB.map((r) => (
-                  <option key={r.id} value={r.id}>{r.label}</option>
-                ))}
-              </Field>
-              <Button variant={selectedRoute ? "primary" : "neutral"} size="md" iconLeft="sync"
-                onClick={() => handleLoadTimetable(selectedRoute)}
-                disabled={!selectedRoute}
-                fullWidth
-                style={{ padding: "10px", height: "auto" }}>
-                {loadedTimetable ? "시간표 다시 불러오기" : "시간표 불러오기"}
-                {time.trim() ? ` (${time.trim()} 기준)` : ""}
-              </Button>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setShowTimetableSearch(true)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowTimetableSearch(true); } }}
+                style={{
+                  display: "flex", alignItems: "center", gap: "8px",
+                  width: "100%", height: "var(--height-lg, 36px)", padding: "0 var(--spacing-sp140, 14px)",
+                  border: "1px solid var(--color-outline-variant)", borderRadius: "var(--radius-md, 8px)",
+                  background: "var(--color-surface-container-lowest)", cursor: "pointer",
+                  transition: "border-color var(--transition-fast)", boxSizing: "border-box",
+                }}
+              >
+                <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
+                <span style={{
+                  flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  fontSize: "var(--typo-label-1-n---regular-size)", fontWeight: "var(--typo-label-1-n---regular-weight)",
+                  color: loadedTimetable?.trains?.length ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
+                }}>
+                  {loadedTimetable?.trains?.length
+                    ? (TIMETABLE_DB.find((r) => r.id === loadedTimetable._routeId)?.label || "노선 선택됨")
+                    : "노선·역명 검색 (예: 하카타, 오사카)"}
+                </span>
+                <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
+              </div>
+              {loadedTimetable?.trains?.length > 0 && (
+                <div style={{ marginTop: "8px" }}>
+                  <TimetablePreview timetable={loadedTimetable} variant="compact" />
+                </div>
+              )}
 
-              {/* Preview loaded timetable (공통 컴포넌트) */}
-              {loadedTimetable && loadedTimetable.trains && (
-                <TimetablePreview timetable={loadedTimetable} variant="compact" />
+              {showTimetableSearch && (
+                <TimetableSearchDialog
+                  onClose={() => setShowTimetableSearch(false)}
+                  onSelect={(routeId) => { handleLoadTimetable(routeId); setShowTimetableSearch(false); }}
+                />
               )}
             </>
           )}
         </div>
         )}
+      </div>
 
-        {/* Actions (only for single item tab or edit mode) — 상단 여백으로 콘텐츠와 구분 */}
-        {(activeTab === 0 || !isNew) && (
-          <div style={{ padding: "20px 20px 16px", display: "flex", gap: "8px", flexShrink: 0 }}>
-            {!isNew && onDelete && (
-              <Button variant="ghost-danger" size="lg" iconLeft="trash" onClick={() => onDelete(dayIdx, sectionIdx, itemIdx, item)}>
-                삭제
-              </Button>
-            )}
-            <Button variant="primary" size="lg" onClick={handleSave} fullWidth
-              disabled={!(time.trim() && desc.trim())}
-              style={{ flex: 1 }}>
-              {isNew ? "추가" : "저장"}
+      {/* 하단 고정: 삭제 + 저장 (직접입력 탭 또는 수정 모드) */}
+      {(activeTab === 0 || !isNew) && (
+        <div style={{
+          flexShrink: 0,
+          padding: "16px 20px calc(16px + env(safe-area-inset-bottom, 0px))",
+          display: "flex",
+          gap: "8px",
+          borderTop: "1px solid var(--color-outline-variant)",
+          background: "var(--color-surface)",
+        }}>
+          {!isNew && onDelete && (
+            <Button variant="ghost-danger" size="lg" iconLeft="trash" onClick={() => onDelete(dayIdx, sectionIdx, itemIdx, item)}>
+              삭제
             </Button>
-          </div>
-        )}
+          )}
+          <Button variant="primary" size="lg" onClick={handleSave} fullWidth
+            disabled={!(time.trim() && desc.trim())}
+            style={{ flex: 1 }}>
+            {isNew ? "추가" : "저장"}
+          </Button>
+        </div>
+      )}
 
-        {/* Import Preview Dialog (from file tab) */}
-        {importPreview && (
-          <ImportPreviewDialog
-            items={importPreview.items}
-            errors={importPreview.errors}
-            conflicts={importPreview.conflicts}
-            dayLabel={currentDay?.label || `Day`}
-            existingCount={currentDay?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0}
-            onReplace={() => {
-              onBulkImport?.(importPreview.items, "replace");
-              setImportPreview(null);
-              onClose();
-            }}
-            onAppend={() => {
-              onBulkImport?.(importPreview.items, "append");
-              setImportPreview(null);
-              onClose();
-            }}
-            onCancel={() => setImportPreview(null)}
-          />
-        )}
-    </BottomSheet>
+      {/* Import Preview Dialog (from file tab) */}
+      {importPreview && (
+        <ImportPreviewDialog
+          items={importPreview.items}
+          errors={importPreview.errors}
+          conflicts={importPreview.conflicts}
+          dayLabel={currentDay?.label || `Day`}
+          existingCount={currentDay?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0}
+          onReplace={() => {
+            onBulkImport?.(importPreview.items, "replace");
+            setImportPreview(null);
+            onClose();
+          }}
+          onAppend={() => {
+            onBulkImport?.(importPreview.items, "append");
+            setImportPreview(null);
+            onClose();
+          }}
+          onCancel={() => setImportPreview(null)}
+        />
+      )}
+    </div>
   );
+
+  return createPortal(fullScreenModal, document.body);
 }

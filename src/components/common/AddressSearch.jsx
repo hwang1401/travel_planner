@@ -103,8 +103,8 @@ export default function AddressSearch({
     try {
       const details = await getPlaceDetails(result.placeId);
       if (details) {
-        const label = details.name || details.formatted_address;
-        if (onChange) onChange(label, details.lat, details.lon);
+        const addr = details.formatted_address || details.name;
+        if (onChange) onChange(addr, details.lat, details.lon, details.photoUrl);
         setQuery('');
       } else {
         if (onChange) onChange(result.name, null, null);
@@ -132,11 +132,16 @@ export default function AddressSearch({
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative', ...customStyle }}>
-      {/* Label */}
+      {/* Label — Field와 동일한 높이로 수평 정렬 */}
       {label && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingBottom: 'var(--spacing-sp40, 4px)' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '4px',
+          paddingBottom: 'var(--spacing-sp40, 4px)',
+          minHeight: 'var(--field-label-row-height, 20px)',
+        }}>
           <span style={{
             fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 'var(--typo-caption-2-bold-weight)',
+            lineHeight: 'var(--typo-caption-2-bold-line-height)',
             color: 'var(--color-on-surface-variant)',
           }}>
             {label}

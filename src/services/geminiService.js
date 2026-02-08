@@ -4,6 +4,7 @@
  */
 
 import { getRAGContext } from './ragService.js';
+import { matchTimetableRoute, findBestTrain } from '../data/timetable.js';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
@@ -103,7 +104,7 @@ const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
 [
   {
     "time": "HH:MM",
-    "type": "food|spot|shop|move|stay|info",
+    "type": "food|spot|shop|move|flight|stay|info",
     "desc": "일정 제목 (간결하게)",
     "sub": "부가 설명 (가격, 소요시간 등)",
     "detail": {
@@ -121,7 +122,8 @@ const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
 - food: 식사, 카페, 간식
 - spot: 관광지, 명소, 전망
 - shop: 쇼핑, 기념품, 드럭스토어
-- move: 이동 (전철, 버스, 택시, 도보)
+- move: 이동 (전철, 버스, 택시, 도보). 비행기/항공은 type: flight로 구분하세요.
+- flight: 항공 (비행기)
 - stay: 숙소 체크인/아웃
 - info: 기타 정보
 
@@ -214,28 +216,41 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus, a
     }
 
     // Normalize items
-    const TYPE_CAT = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "정보" };
+    const TYPE_CAT = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
     const items = parsed
       .filter((item) => item && item.desc)
       .map((item) => {
-        const itemType = ["food", "spot", "shop", "move", "stay", "info"].includes(item.type) ? item.type : "info";
+        const itemType = ["food", "spot", "shop", "move", "flight", "stay", "info"].includes(item.type) ? item.type : "info";
+        const timeStr = (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0");
+        const detailFromAI = item.detail && Object.keys(item.detail).some((k) => item.detail[k])
+          ? {
+              name: item.desc,
+              category: TYPE_CAT[itemType] || "정보",
+              ...(item.detail.address ? { address: item.detail.address } : {}),
+              ...(item.detail.timetable ? { hours: item.detail.timetable } : {}),
+              ...(item.detail.tip ? { tip: item.detail.tip } : {}),
+              ...(Array.isArray(item.detail.highlights) && item.detail.highlights.length > 0 ? { highlights: item.detail.highlights } : {}),
+            }
+          : null;
+        // For move: attach transport timetable from our DB if desc matches a route
+        if (itemType === "move" && detailFromAI) {
+          const matched = matchTimetableRoute(item.desc);
+          if (matched) {
+            const bestIdx = findBestTrain(matched.route.trains, timeStr);
+            detailFromAI.timetable = {
+              _routeId: matched.routeId,
+              station: matched.route.station,
+              direction: matched.route.direction,
+              trains: matched.route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+            };
+          }
+        }
         return {
-          time: (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0"),
+          time: timeStr,
           type: itemType,
           desc: item.desc,
           sub: item.sub || "",
-          ...(item.detail && Object.keys(item.detail).some((k) => item.detail[k])
-            ? {
-                detail: {
-                  name: item.desc,
-                  category: TYPE_CAT[itemType] || "정보",
-                  ...(item.detail.address ? { address: item.detail.address } : {}),
-                  ...(item.detail.timetable ? { hours: item.detail.timetable } : {}),
-                  ...(item.detail.tip ? { tip: item.detail.tip } : {}),
-                  ...(Array.isArray(item.detail.highlights) && item.detail.highlights.length > 0 ? { highlights: item.detail.highlights } : {}),
-                },
-              }
-            : {}),
+          ...(detailFromAI ? { detail: detailFromAI } : {}),
           _extra: true,
           _custom: true,
         };
@@ -280,7 +295,7 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
   "items": [
     {
       "time": "HH:MM",
-      "type": "food|spot|shop|move|stay|info",
+      "type": "food|spot|shop|move|flight|stay|info",
       "desc": "일정 제목 (간결하게)",
       "sub": "부가 설명 (가격, 소요시간 등)",
       "detail": {
@@ -298,7 +313,8 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
 - food: 식사, 카페, 간식
 - spot: 관광지, 명소, 전망
 - shop: 쇼핑, 기념품, 드럭스토어
-- move: 이동 (전철, 버스, 택시, 도보)
+- move: 이동 (전철, 버스, 택시, 도보). 비행기/항공은 type: flight로 구분하세요.
+- flight: 항공 (비행기)
 - stay: 숙소 체크인/아웃
 - info: 기타 정보
 
@@ -381,11 +397,11 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
     const message = parsed.message || "";
     const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
 
-    const TYPE_CAT2 = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "정보" };
+    const TYPE_CAT2 = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
     const items = rawItems
       .filter((item) => item && item.desc)
       .map((item) => {
-        const itemType = ["food", "spot", "shop", "move", "stay", "info"].includes(item.type) ? item.type : "info";
+        const itemType = ["food", "spot", "shop", "move", "flight", "stay", "info"].includes(item.type) ? item.type : "info";
         return {
           time: (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0"),
           type: itemType,
@@ -432,7 +448,7 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
           "items": [
             {
               "time": "HH:MM",
-              "type": "food|spot|shop|move|stay|info",
+              "type": "food|spot|shop|move|flight|stay|info",
               "desc": "일정 제목",
               "sub": "부가 설명 (가격, 소요시간 등)",
               "detail": {
@@ -462,7 +478,8 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 - food: 식사, 카페, 간식
 - spot: 관광지, 명소, 전망
 - shop: 쇼핑, 기념품, 드럭스토어
-- move: 이동 (전철, 버스, 택시, 도보)
+- move: 이동 (전철, 버스, 택시, 도보). 비행기/항공은 type: flight로 구분하세요.
+- flight: 항공 (비행기)
 - stay: 숙소 체크인/아웃
 - info: 기타 정보
 
@@ -533,25 +550,48 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
         title: sec.title || "일정",
         items: (sec.items || [])
           .filter((it) => it && it.desc)
-          .map((it) => ({
-            time: (it.time || "").padStart(it.time?.includes(":") ? 5 : 0, "0"),
-            type: ["food", "spot", "shop", "move", "stay", "info"].includes(it.type) ? it.type : "info",
-            desc: it.desc,
-            sub: it.sub || "",
-            ...(it.detail && Object.keys(it.detail).some((k) => it.detail[k])
-              ? {
-                  detail: {
-                    name: it.desc,
-                    category: ({ food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "정보" })[it.type] || "관광",
-                    ...(it.detail.address ? { address: it.detail.address } : {}),
-                    ...(it.detail.tip ? { tip: it.detail.tip } : {}),
-                    ...(Array.isArray(it.detail.highlights) && it.detail.highlights.length > 0 ? { highlights: it.detail.highlights } : {}),
-                  },
+          .map((it) => {
+            const timeStr = (it.time || "").padStart(it.time?.includes(":") ? 5 : 0, "0");
+            const typeVal = ["food", "spot", "shop", "move", "flight", "stay", "info"].includes(it.type) ? it.type : "info";
+            let detail = null;
+            if (it.detail && Object.keys(it.detail).some((k) => it.detail[k])) {
+              const lat = it.detail.lat != null ? Number(it.detail.lat) : null;
+              const lon = it.detail.lon != null ? Number(it.detail.lon) : null;
+              detail = {
+                name: it.desc,
+                category: ({ food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" })[typeVal] || "관광",
+                ...(it.detail.address ? { address: it.detail.address } : {}),
+                ...(it.detail.tip ? { tip: it.detail.tip } : {}),
+                ...(Array.isArray(it.detail.highlights) && it.detail.highlights.length > 0 ? { highlights: it.detail.highlights } : {}),
+                ...(lat != null && lon != null && !Number.isNaN(lat) && !Number.isNaN(lon) ? { lat, lon } : {}),
+              };
+            }
+            // 교통(move): desc만 있어도 시간표 매칭 시도 — AI가 detail 없이 move만 줄 수 있음
+            if (typeVal === "move") {
+              const matched = matchTimetableRoute(it.desc);
+              if (matched) {
+                if (!detail) {
+                  detail = { name: it.desc, category: "교통" };
                 }
-              : {}),
-            _extra: true,
-            _custom: true,
-          })),
+                const bestIdx = findBestTrain(matched.route.trains, timeStr);
+                detail.timetable = {
+                  _routeId: matched.routeId,
+                  station: matched.route.station,
+                  direction: matched.route.direction,
+                  trains: matched.route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+                };
+              }
+            }
+            return {
+              time: timeStr,
+              type: typeVal,
+              desc: it.desc,
+              sub: it.sub || "",
+              ...(detail ? { detail } : {}),
+              _extra: true,
+              _custom: true,
+            };
+          }),
       }));
       const dayNum = dayOffset + i + 1;
       let dateStr = "";
