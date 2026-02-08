@@ -209,7 +209,7 @@ export default function ImportPreviewDialog({
           <Button
             variant="neutral" size="md"
             onClick={onCancel}
-            style={{ flex: 1 }}
+            style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}
           >
             취소
           </Button>
@@ -217,7 +217,7 @@ export default function ImportPreviewDialog({
             <Button
               variant="neutral" size="md"
               onClick={onAppend}
-              style={{ flex: 1 }}
+              style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}
             >
               추가
             </Button>

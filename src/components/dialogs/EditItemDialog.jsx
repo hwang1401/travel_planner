@@ -315,7 +315,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                         key={i}
                         onClick={() => { setChatInput(example); setTimeout(() => chatInputRef.current?.focus(), 50); }}
                         style={{
-                          background: "var(--color-surface-container-low)",
+                          background: "var(--color-surface-container-lowest)",
                           border: "1px solid var(--color-outline-variant)",
                           borderRadius: "var(--radius-md, 8px)",
                           padding: "10px 14px", cursor: "pointer",
@@ -324,7 +324,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                           textAlign: "left", transition: "background 0.15s",
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-primary-container)"}
-                        onMouseLeave={(e) => e.currentTarget.style.background = "var(--color-surface-container-low)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "var(--color-surface-container-lowest)"}
                       >
                         "{example}"
                       </button>
@@ -346,7 +346,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                       : "var(--radius-md, 8px) var(--radius-md, 8px) var(--radius-md, 8px) 2px",
                     background: msg.role === "user"
                       ? "var(--color-primary)"
-                      : "var(--color-surface-container-low)",
+                      : "var(--color-surface-container-lowest)",
                     color: msg.role === "user"
                       ? "var(--color-on-primary)"
                       : "var(--color-on-surface)",
@@ -406,7 +406,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                   <div style={{
                     padding: "12px 16px",
                     borderRadius: "var(--radius-md, 8px) var(--radius-md, 8px) var(--radius-md, 8px) 2px",
-                    background: "var(--color-surface-container-low)",
+                    background: "var(--color-surface-container-lowest)",
                     display: "flex", alignItems: "center", gap: "6px",
                   }}>
                     <div style={{ display: "flex", gap: "4px" }}>
@@ -454,7 +454,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                   padding: "10px 14px",
                   borderRadius: "var(--radius-md, 8px)",
                   border: "1px solid var(--color-outline-variant)",
-                  background: "var(--color-surface-container-low)",
+                  background: "var(--color-surface-container-lowest)",
                   fontSize: "var(--typo-caption-1-regular-size)",
                   color: "var(--color-on-surface)",
                   outline: "none", fontFamily: "inherit",
@@ -520,13 +520,13 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                     width: "100%", padding: "40px 20px",
                     border: "2px dashed var(--color-outline-variant)",
                     borderRadius: "var(--radius-md, 8px)",
-                    background: "var(--color-surface-container-low)",
+                    background: "var(--color-surface-container-lowest)",
                     display: "flex", flexDirection: "column", alignItems: "center",
                     cursor: "pointer",
                     transition: "border-color 0.15s, background 0.15s",
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--color-primary)"; e.currentTarget.style.background = "var(--color-primary-container)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--color-outline-variant)"; e.currentTarget.style.background = "var(--color-surface-container-low)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--color-outline-variant)"; e.currentTarget.style.background = "var(--color-surface-container-lowest)"; }}
                 >
                   <Icon name="file" size={32} style={{ color: "var(--color-on-surface-variant2)", marginBottom: "12px" }} />
                   <p style={{ margin: 0, fontSize: "var(--typo-label-2-bold-size)", fontWeight: "var(--typo-label-2-bold-weight)", color: "var(--color-on-surface)", textAlign: "center" }}>
@@ -554,7 +554,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
 
                 <div style={{
                   width: "100%", padding: "10px 14px",
-                  background: "var(--color-surface-container-low)",
+                  background: "var(--color-surface-container-lowest)",
                   borderRadius: "var(--radius-md, 8px)",
                   border: "1px solid var(--color-outline-variant)",
                   display: "flex", alignItems: "center", gap: "10px",

@@ -690,7 +690,7 @@ export default function TravelPlanner() {
             {!isLegacy && !canEdit && (
               <span style={{
                 padding: "2px 6px", borderRadius: "var(--radius-sm, 4px)",
-                background: "var(--color-surface-container-low)",
+                background: "var(--color-surface-container-lowest)",
                 fontSize: "var(--typo-caption-3-bold-size)",
                 fontWeight: "var(--typo-caption-3-bold-weight)",
                 color: "var(--color-on-surface-variant2)",
@@ -786,7 +786,7 @@ export default function TravelPlanner() {
                       fontSize: "var(--typo-body-2-n---bold-size)",
                       fontWeight: "var(--typo-body-2-n---bold-weight)",
                       color: "var(--color-on-surface)",
-                      background: "var(--color-surface-container-low)",
+                      background: "var(--color-surface-container-lowest)",
                       border: "1px solid var(--color-outline-variant)",
                       borderRadius: "var(--radius-md)",
                       outline: "none",
@@ -983,7 +983,7 @@ export default function TravelPlanner() {
           return summary ? (
             <div style={{
               marginTop: "4px", padding: "11px 14px",
-              background: "var(--color-surface-container-low)", borderRadius: "var(--radius-md, 8px)", border: "1px dashed var(--color-outline-variant)",
+              background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px)", border: "1px dashed var(--color-outline-variant)",
             }}>
               <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", fontWeight: "var(--typo-caption-2-regular-weight)", color: "var(--color-on-surface-variant2)", lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: "6px" }}>
                 <Icon name="pin" size={12} style={{ marginTop: "2px" }} /><span>{summary}</span>
@@ -1043,7 +1043,7 @@ export default function TravelPlanner() {
                   cursor: "pointer",
                   transition: "background var(--transition-fast)",
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-surface-container-low)"}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-surface-container-lowest)"}
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
               >
                 <Icon name={action.icon} size={20} style={{
@@ -1196,7 +1196,7 @@ export default function TravelPlanner() {
                 <div style={{
                   flex: 1, padding: "10px 14px",
                   borderRadius: "var(--radius-md, 8px)",
-                  background: "var(--color-surface-container-low)",
+                  background: "var(--color-surface-container-lowest)",
                   fontSize: "var(--typo-caption-1-regular-size)",
                   color: "var(--color-on-surface-variant2)",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -1309,7 +1309,7 @@ export default function TravelPlanner() {
                             fontSize: "var(--typo-caption-2-regular-size)",
                             color: "var(--color-on-surface-variant2)",
                             padding: "2px 6px", borderRadius: "4px",
-                            background: m.role === "owner" ? "var(--color-primary-container)" : "var(--color-surface-container-low)",
+                            background: m.role === "owner" ? "var(--color-primary-container)" : "var(--color-surface-container-lowest)",
                           }}>
                             {m.role === "owner" ? "소유자" : m.role === "editor" ? "편집자" : "보기"}
                           </span>
@@ -1381,7 +1381,7 @@ export default function TravelPlanner() {
                       style={{
                         width: "30px", height: "30px", borderRadius: "var(--radius-md, 8px)",
                         border: "1px solid var(--color-outline-variant)",
-                        background: i === 0 ? "var(--color-surface-dim)" : "var(--color-surface-container-low)",
+                        background: i === 0 ? "var(--color-surface-dim)" : "var(--color-surface-container-lowest)",
                         cursor: i === 0 ? "default" : "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         opacity: i === 0 ? 0.3 : 1,
@@ -1395,7 +1395,7 @@ export default function TravelPlanner() {
                       style={{
                         width: "30px", height: "30px", borderRadius: "var(--radius-md, 8px)",
                         border: "1px solid var(--color-outline-variant)",
-                        background: i === reorderList.length - 1 ? "var(--color-surface-dim)" : "var(--color-surface-container-low)",
+                        background: i === reorderList.length - 1 ? "var(--color-surface-dim)" : "var(--color-surface-container-lowest)",
                         cursor: i === reorderList.length - 1 ? "default" : "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         opacity: i === reorderList.length - 1 ? 0.3 : 1,

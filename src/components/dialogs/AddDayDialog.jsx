@@ -77,7 +77,7 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
                         : "1px solid var(--color-outline-variant)",
                       background: selected
                         ? "var(--color-primary)"
-                        : exists ? "var(--color-surface-container-low)" : "transparent",
+                        : exists ? "var(--color-surface-container-lowest)" : "transparent",
                       color: selected
                         ? "#fff"
                         : exists ? "var(--color-on-surface-variant2)" : "var(--color-on-surface)",
@@ -112,7 +112,7 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
 
           {/* Actions */}
           <div style={{ display: "flex", gap: "10px" }}>
-            <Button variant="neutral" size="lg" onClick={onCancel} style={{ flex: 1 }}>취소</Button>
+            <Button variant="neutral" size="lg" onClick={onCancel} style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}>취소</Button>
             <Button variant="primary" size="lg" onClick={handleSubmit}
               disabled={!canSubmit} style={{ flex: 1 }}>
               {isDuplicate ? "덮어쓰기" : "추가"}

@@ -384,7 +384,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
           <div style={{
             flex: 1, display: 'flex', alignItems: 'center', gap: '8px',
             padding: '8px 12px', borderRadius: '10px',
-            background: 'var(--color-surface-container-low)',
+            background: 'var(--color-surface-container-lowest)',
             border: '1px solid var(--color-outline-variant)',
           }}>
             <Icon name="pin" size={15} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0 }} />

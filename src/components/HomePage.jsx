@@ -95,7 +95,7 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
         style={{
           position: 'absolute', top: coverImage ? '10px' : '12px', right: '10px',
           width: '28px', height: '28px', borderRadius: '50%',
-          background: coverImage ? 'rgba(0,0,0,0.25)' : 'var(--color-surface-container-low)',
+          background: coverImage ? 'rgba(0,0,0,0.25)' : 'var(--color-surface-container-lowest)',
           backdropFilter: coverImage ? 'blur(8px)' : 'none',
           border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -341,11 +341,11 @@ export default function HomePage() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '4px 10px 4px 4px', borderRadius: '20px',
-                background: 'var(--color-surface-container-low)',
+                background: 'var(--color-surface-container-lowest)',
                 cursor: 'pointer', transition: 'background 0.15s',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-container)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-surface-container-lowest)'; }}
             >
               {profile.avatar_url ? (
                 <img src={profile.avatar_url} alt=""
@@ -540,7 +540,7 @@ function MoreMenuItem({ icon, label, onClick, danger = false }) {
       onMouseEnter={(e) => {
         e.currentTarget.style.background = danger
           ? 'var(--color-error-container, #FEE2E2)'
-          : 'var(--color-surface-container-low)';
+          : 'var(--color-surface-container-lowest)';
       }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
     >

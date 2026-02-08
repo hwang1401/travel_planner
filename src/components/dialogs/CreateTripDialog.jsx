@@ -113,7 +113,7 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
           }}>
             <span style={{
               padding: '4px 10px', borderRadius: '6px',
-              background: selStart ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
+              background: selStart ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
               color: selStart ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
               fontWeight: 'var(--typo-caption-1-bold-weight)',
             }}>
@@ -122,7 +122,7 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
             <span style={{ color: 'var(--color-on-surface-variant2)' }}>→</span>
             <span style={{
               padding: '4px 10px', borderRadius: '6px',
-              background: selEnd ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
+              background: selEnd ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
               color: selEnd ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
               fontWeight: 'var(--typo-caption-1-bold-weight)',
             }}>
@@ -543,7 +543,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                   style={{
                     padding: '5px 12px', borderRadius: '100px',
                     border: '1px solid var(--color-outline-variant)',
-                    background: 'var(--color-surface-container-low)',
+                    background: 'var(--color-surface-container-lowest)',
                     fontSize: 'var(--typo-caption-2-regular-size)',
                     color: 'var(--color-on-surface-variant)',
                     cursor: 'pointer', transition: 'all 0.15s',
@@ -553,7 +553,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                     e.currentTarget.style.borderColor = 'var(--color-primary)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--color-surface-container-low)';
+                    e.currentTarget.style.background = 'var(--color-surface-container-lowest)';
                     e.currentTarget.style.borderColor = 'var(--color-outline-variant)';
                   }}
                 >
@@ -675,7 +675,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                             padding: '10px 14px',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             cursor: 'pointer', userSelect: 'none',
-                            background: isOpen ? 'var(--color-surface-container-low)' : 'transparent',
+                            background: isOpen ? 'var(--color-surface-container-lowest)' : 'transparent',
                             transition: 'background 0.15s',
                           }}
                         >

@@ -91,7 +91,7 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
           style={{
             width: '100%', padding: '14px', borderRadius: '12px',
             border: '1px solid var(--color-outline-variant)',
-            background: 'var(--color-surface-container-low)',
+            background: 'var(--color-surface-container-lowest)',
             fontSize: 'var(--typo-label-2-regular-size)',
             color: 'var(--color-on-surface)',
             resize: 'vertical', fontFamily: 'inherit',

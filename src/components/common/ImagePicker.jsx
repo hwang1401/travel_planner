@@ -128,7 +128,7 @@ export default function ImagePicker({
           style={{
             borderRadius: borderRadius !== undefined ? borderRadius : 'var(--radius-md, 8px)',
             border: borderRadius === '0' ? 'none' : `2px dashed ${dragOver ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
-            background: dragOver ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
+            background: dragOver ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
             width: '100%',
             aspectRatio,
             display: 'flex', flexDirection: 'column',
@@ -267,7 +267,7 @@ export function MultiImagePicker({
             style={{
               borderRadius: 'var(--radius-md, 8px)',
               border: '2px dashed var(--color-outline-variant)',
-              background: 'var(--color-surface-container-low)',
+              background: 'var(--color-surface-container-lowest)',
               aspectRatio: '1/1',
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center',

@@ -141,7 +141,7 @@ export default function AddressSearch({
         display: 'flex', alignItems: 'center', gap: '8px',
         height: s.height, padding: `0 ${s.px}`,
         border: `1px solid ${borderColor}`, borderRadius: s.radius,
-        background: variant === 'filled' ? 'var(--color-surface-container-low)' : 'transparent',
+        background: variant === 'filled' ? 'var(--color-surface-container-lowest)' : 'transparent',
         transition: 'border-color var(--transition-fast)',
       }}>
         <Icon name="search" size={s.iconSize} style={{ flexShrink: 0, opacity: 0.5 }} />
@@ -194,7 +194,7 @@ export default function AddressSearch({
                 borderBottom: i < results.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
                 transition: 'background 0.1s',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-container-low)'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-container-lowest)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
               <Icon name="pin" size={14} style={{ marginTop: '2px', flexShrink: 0, opacity: 0.5 }} />

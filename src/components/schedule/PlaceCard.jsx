@@ -30,7 +30,7 @@ export default function PlaceCard({ item, order, isNow, isClickable, onClick, is
         transition: "background 0.15s",
         background: isNow ? "color-mix(in srgb, var(--color-primary) 4%, transparent)" : "transparent",
       }}
-      onMouseEnter={(e) => { if (isClickable) e.currentTarget.style.background = isNow ? "color-mix(in srgb, var(--color-primary) 8%, transparent)" : "var(--color-surface-container-low)"; }}
+      onMouseEnter={(e) => { if (isClickable) e.currentTarget.style.background = isNow ? "color-mix(in srgb, var(--color-primary) 8%, transparent)" : "var(--color-surface-container-lowest)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = isNow ? "color-mix(in srgb, var(--color-primary) 4%, transparent)" : "transparent"; }}
     >
       {/* 시간: 38px 우측정렬 */}

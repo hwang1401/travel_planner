@@ -85,7 +85,7 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
       }}>
         <span style={{
           padding: '6px 14px', borderRadius: '8px',
-          background: selStart ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
+          background: selStart ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
           color: selStart ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
           fontWeight: 600,
         }}>
@@ -94,7 +94,7 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
         <span style={{ color: 'var(--color-on-surface-variant2)' }}>→</span>
         <span style={{
           padding: '6px 14px', borderRadius: '8px',
-          background: selEnd ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
+          background: selEnd ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
           color: selEnd ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
           fontWeight: 600,
         }}>
@@ -345,7 +345,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                   width: '24px',
                   height: '24px',
                   borderRadius: '50%',
-                  background: isActive ? 'var(--color-primary)' : 'var(--color-surface-container-low)',
+                  background: isActive ? 'var(--color-primary)' : 'var(--color-surface-container-lowest)',
                   border: `2px solid ${isActive ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
                   boxSizing: 'border-box',
                   flexShrink: 0,
@@ -480,7 +480,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                     border: '1px solid var(--color-outline-variant)',
                     cursor: 'pointer', transition: 'all 0.15s',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.background = 'var(--color-surface-container-low)'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.background = 'var(--color-surface-container-lowest)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-outline-variant)'; e.currentTarget.style.background = 'transparent'; }}
                 >
                   <div style={{
@@ -539,7 +539,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               style={{
                 width: '100%', padding: '14px', borderRadius: '12px',
                 border: '1px solid var(--color-outline-variant)',
-                background: 'var(--color-surface-container-low)',
+                background: 'var(--color-surface-container-lowest)',
                 fontSize: 'var(--typo-label-2-regular-size)',
                 color: 'var(--color-on-surface)',
                 resize: 'vertical', fontFamily: 'inherit',
@@ -607,7 +607,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                   style={{
                     padding: '5px 12px', borderRadius: '100px',
                     border: '1px solid var(--color-outline-variant)',
-                    background: 'var(--color-surface-container-low)',
+                    background: 'var(--color-surface-container-lowest)',
                     fontSize: 'var(--typo-caption-2-regular-size)',
                     color: 'var(--color-on-surface-variant)', cursor: 'pointer',
                   }}
@@ -689,7 +689,7 @@ function PreviewAccordion({ days, expandedDay, setExpandedDay }) {
           return (
             <div key={di} style={{ borderBottom: di < days.length - 1 ? '1px solid var(--color-outline-variant)' : 'none' }}>
               <div onClick={() => setExpandedDay(isOpen ? null : di)}
-                style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: isOpen ? 'var(--color-surface-container-low)' : 'transparent' }}>
+                style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: isOpen ? 'var(--color-surface-container-lowest)' : 'transparent' }}>
                 <span style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-surface)' }}>
                   Day {day.day} — {day.label}
                 </span>

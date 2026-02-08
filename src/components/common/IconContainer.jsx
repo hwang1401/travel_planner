@@ -12,7 +12,7 @@ export default function IconContainer({ name, size = 20, variant = "square", sty
         width: "40px",
         height: "40px",
         borderRadius: isRound ? "var(--radius-circle)" : "var(--radius-md)",
-        background: "var(--color-surface-container-low)",
+        background: "var(--color-surface-container-lowest)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

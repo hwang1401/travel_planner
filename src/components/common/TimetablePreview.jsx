@@ -16,7 +16,7 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
   if (variant === 'compact') {
     return (
       <div style={{
-        background: 'var(--color-surface-container-low)',
+        background: 'var(--color-surface-container-lowest)',
         borderRadius: 'var(--radius-md, 8px)',
         border: '1px solid var(--color-outline-variant)',
         padding: '10px 12px',
@@ -88,7 +88,7 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
         alignItems: 'center',
         gap: 'var(--spacing-sp120)',
         padding: 'var(--spacing-sp120) var(--spacing-sp160)',
-        background: COLOR.surfaceLow,
+        background: COLOR.surfaceLowest,
         borderBottom: `1px solid ${COLOR.outlineVariant}`,
         fontSize: 'var(--typo-caption-2-bold-size)',
         fontWeight: 'var(--typo-caption-2-bold-weight)',
@@ -106,7 +106,7 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
             alignItems: 'center',
             gap: 'var(--spacing-sp120)',
             padding: 'var(--spacing-sp120) var(--spacing-sp160)',
-            background: t.picked ? COLOR.surfaceLow : COLOR.surfaceLowest,
+            background: COLOR.surfaceLowest,
             borderBottom: i < trains.length - 1 ? `1px solid ${COLOR.outlineVariant}` : 'none',
             borderLeft: t.picked ? `3px solid ${accent}` : '3px solid transparent',
           }}

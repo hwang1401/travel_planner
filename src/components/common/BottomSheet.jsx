@@ -62,6 +62,7 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
         onTouchMove={(e) => e.stopPropagation()}
         style={{
           width: "100%", maxWidth: "420px", maxHeight, ...(minHeight ? { minHeight } : {}),
+          /* 시트 배경: surface-container-lowest. 내부 블록·버튼은 아웃라인 필수, 기본은 --color-outline-variant. */
           background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0",
           overflow: "hidden",
           overscrollBehavior: "contain",

@@ -76,7 +76,7 @@ export default function Field({
 
   // Background
   const bg = variant === 'filled'
-    ? (disabled ? 'var(--color-surface-container)' : 'var(--color-surface-container-low)')
+    ? (disabled ? 'var(--color-surface-container)' : 'var(--color-surface-container-lowest)')
     : 'transparent';
 
   // Field wrapper style

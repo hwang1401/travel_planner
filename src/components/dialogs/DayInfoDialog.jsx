@@ -48,7 +48,7 @@ export default function DayInfoDialog({ dayNum, tab, onClose, color }) {
                 }}>
                   <div style={{
                     width: "48px", height: "48px", borderRadius: "50%",
-                    background: "var(--color-surface-container-low)", display: "flex",
+                    background: "var(--color-surface-container-lowest)", display: "flex",
                     alignItems: "center", justifyContent: "center", marginBottom: "12px",
                   }}>
                     <Icon name="fire" size={20} style={{ opacity: 0.4 }} />
@@ -105,7 +105,7 @@ export default function DayInfoDialog({ dayNum, tab, onClose, color }) {
             }}>
               <div style={{
                 width: "48px", height: "48px", borderRadius: "50%",
-                background: "var(--color-surface-container-low)", display: "flex",
+                background: "var(--color-surface-container-lowest)", display: "flex",
                 alignItems: "center", justifyContent: "center", marginBottom: "12px",
               }}>
                 <Icon name="home" size={20} style={{ opacity: 0.4 }} />

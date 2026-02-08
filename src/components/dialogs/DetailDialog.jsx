@@ -21,6 +21,9 @@ import { COLOR, SPACING, RADIUS } from '../../styles/tokens';
  *   - 메모: 카드형 (rounded + 배경)
  *   - 미니맵: 정적 이미지, 로드 실패 시 텍스트 링크로 대체
  *   - 높이: 콘텐츠에 맞춰 자동
+ *
+ * 다이얼로그 아웃라인 규칙: 시트 배경과 같은 블록·버튼은 구분을 위해 아웃라인 필수.
+ * 아웃라인은 기본으로 variant 사용 (연한 톤, --color-outline-variant).
  */
 
 /* ── 내부 헬퍼 ── */
@@ -133,7 +136,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               gap: "var(--spacing-sp120)",
               padding: "var(--spacing-sp120) var(--spacing-sp160)",
               borderRadius: "var(--radius-md)",
-              background: "var(--color-surface-container-low)",
+              background: "var(--color-surface-container-lowest)",
               border: "1px solid var(--color-outline-variant)",
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -172,7 +175,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
         {/* ── 이미지: 히어로 또는 캐러셀 ── */}
         {sortedImages.length === 1 && (
           <div onClick={() => setViewImage(sortedImages[0])}
-            style={{ overflow: "hidden", cursor: "zoom-in", background: COLOR.surfaceLow }}>
+            style={{ overflow: "hidden", cursor: "zoom-in", background: COLOR.surfaceLowest }}>
             <img src={sortedImages[0]} alt={detail.name}
               style={{ width: "100%", display: "block", maxHeight: "240px", objectFit: "contain" }} />
           </div>
@@ -187,7 +190,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               <div key={i} onClick={() => setViewImage(img)} style={{
                 flexShrink: 0, width: "75%", scrollSnapAlign: "start",
                 borderRadius: RADIUS.md, overflow: "hidden",
-                cursor: "zoom-in", background: COLOR.surfaceLow,
+                cursor: "zoom-in", background: COLOR.surfaceLowest,
               }}>
                 <img src={img} alt={`${detail.name} ${i + 1}`}
                   style={{ width: "100%", height: "180px", objectFit: "contain", display: "block" }} />
@@ -213,7 +216,8 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
             <div style={{
               padding: "var(--spacing-sp120) var(--spacing-sp160)",
               borderRadius: "var(--radius-md)",
-              background: "var(--color-surface-container-low)",
+              background: "var(--color-surface-container-lowest)",
+              border: "1px solid var(--color-outline-variant)",
             }}>
               <p style={{
                 margin: 0,
@@ -271,7 +275,8 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
                   display: "flex", alignItems: "center", gap: "var(--spacing-sp60)",
                   padding: "var(--spacing-sp120) var(--spacing-sp160)",
                   borderRadius: "var(--radius-md)",
-                  background: "var(--color-surface-container-low)",
+                  background: "var(--color-surface-container-lowest)",
+                  border: "1px solid var(--color-outline-variant)",
                   color: "var(--color-primary)",
                   fontSize: "var(--typo-caption-1-medium-size)",
                   fontWeight: "var(--typo-caption-1-medium-weight)",
@@ -282,7 +287,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               </a>
             ) : (
               <a href={mapUrl} target="_blank" rel="noopener noreferrer"
-                style={{ display: "block", borderRadius: RADIUS.md, overflow: "hidden", border: `1px solid ${COLOR.outlineVariant}` }}>
+                style={{ display: "block", borderRadius: RADIUS.md, overflow: "hidden", border: "1px solid var(--color-outline-variant)" }}>
                 <img
                   src={`https://staticmap.openstreetmap.de/staticmap.php?center=${detail.lat},${detail.lon}&zoom=15&size=400x120&markers=${detail.lat},${detail.lon},red-pushpin`}
                   alt="지도" loading="lazy"
@@ -294,7 +299,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           </SectionWrap>
         )}
 
-        {/* ── 수정 / 삭제 (맨 아래, 동일 아웃라인 형태 + 삭제는 아이콘·텍스트 모두 error 색) ── */}
+        {/* ── 수정 / 삭제 (맨 아래, 아웃라인 variant 기본) ── */}
         {(onEdit || onDelete) && (
           <div style={{ padding: `var(--spacing-sp200) ${px} var(--spacing-sp160)`, display: "flex", gap: "8px", flexShrink: 0 }}>
             {onDelete && (
@@ -309,7 +314,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               <Button variant="neutral" size="md"
                 onClick={() => { onEdit(detail); onClose(); }}
                 iconLeft="edit"
-                style={{ flex: 1 }}>
+                style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}>
                 수정하기
               </Button>
             )}

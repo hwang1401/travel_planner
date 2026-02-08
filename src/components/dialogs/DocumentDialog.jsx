@@ -57,7 +57,7 @@ function LegacyDocumentDialog({ onClose }) {
           {current.caption}
         </p>
         {current.image && (
-          <div onClick={() => setViewImage(current.image)} style={{ borderRadius: "var(--radius-md, 8px)", overflow: "hidden", border: "1px solid var(--color-outline-variant)", background: "var(--color-surface-container-low)", aspectRatio: "595 / 842", width: "100%", cursor: "zoom-in" }}>
+          <div onClick={() => setViewImage(current.image)} style={{ borderRadius: "var(--radius-md, 8px)", overflow: "hidden", border: "1px solid var(--color-outline-variant)", background: "var(--color-surface-container-lowest)", aspectRatio: "595 / 842", width: "100%", cursor: "zoom-in" }}>
             <img src={current.image} alt={current.label} style={{ width: "100%", height: "100%", display: "block", objectFit: "contain" }} />
           </div>
         )}
@@ -186,7 +186,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
                   <div style={{
                     borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
                     border: "1px solid var(--color-outline-variant)",
-                    background: "var(--color-surface-container-low)",
+                    background: "var(--color-surface-container-lowest)",
                     width: "100%",
                   }}>
                     <iframe
@@ -216,7 +216,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
                   <div onClick={() => setViewImage(selectedDoc.imageUrl)} style={{
                     borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
                     border: "1px solid var(--color-outline-variant)",
-                    background: "var(--color-surface-container-low)",
+                    background: "var(--color-surface-container-lowest)",
                     width: "100%", cursor: "zoom-in",
                     maxHeight: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
@@ -225,7 +225,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
                   </div>
                 )
               ) : (
-                <div style={{ borderRadius: "var(--radius-md, 8px)", border: "2px dashed var(--color-outline-variant)", padding: "40px 20px", textAlign: "center", background: "var(--color-surface-container-low)" }}>
+                <div style={{ borderRadius: "var(--radius-md, 8px)", border: "2px dashed var(--color-outline-variant)", padding: "40px 20px", textAlign: "center", background: "var(--color-surface-container-lowest)" }}>
                   <Icon name="file" size={32} style={{ opacity: 0.3 }} />
                   <p style={{ margin: "10px 0 0", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
                     파일이 없습니다
@@ -235,7 +235,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-                <Button variant="neutral" size="md" iconLeft="edit" fullWidth onClick={() => setShowForm(selectedDoc)}>수정</Button>
+                <Button variant="neutral" size="md" iconLeft="edit" fullWidth onClick={() => setShowForm(selectedDoc)} style={{ borderColor: "var(--color-outline-variant)" }}>수정</Button>
                 <Button variant="ghost-danger" size="md" iconLeft="trash" onClick={() => handleDelete(selectedDoc)} style={{ flexShrink: 0 }}>삭제</Button>
               </div>
             </div>
@@ -411,7 +411,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: '10px',
                     padding: '14px 16px',
-                    background: 'var(--color-surface-container-low)',
+                    background: 'var(--color-surface-container-lowest)',
                   }}>
                     <div style={{
                       width: '40px', height: '40px', borderRadius: 'var(--radius-md, 8px)',
@@ -432,7 +432,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
                   </div>
                 ) : (
                   /* Image preview */
-                  <img src={imageUrl} alt="" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-container-low)' }} />
+                  <img src={imageUrl} alt="" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-container-lowest)' }} />
                 )}
                 {/* Actions overlay */}
                 <div style={{
@@ -457,7 +457,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
                 style={{
                   borderRadius: 'var(--radius-md, 8px)',
                   border: '2px dashed var(--color-outline-variant)',
-                  background: 'var(--color-surface-container-low)',
+                  background: 'var(--color-surface-container-lowest)',
                   padding: '24px 16px', textAlign: 'center',
                   cursor: uploading ? 'default' : 'pointer',
                 }}
@@ -481,7 +481,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
 
         {/* Footer */}
         <div style={{ padding: '0 20px 16px', flexShrink: 0, display: 'flex', gap: '8px' }}>
-          <Button variant="neutral" size="lg" onClick={onClose} style={{ flex: 1 }}>
+          <Button variant="neutral" size="lg" onClick={onClose} style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}>
             취소
           </Button>
           <Button variant="primary" size="lg" onClick={handleSave} disabled={!canSave} style={{ flex: 1 }}>

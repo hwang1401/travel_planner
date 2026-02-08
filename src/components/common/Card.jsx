@@ -27,7 +27,7 @@ const VARIANT_STYLES = {
     boxShadow: "none",
   },
   filled: {
-    background: "var(--color-surface-container-low)",
+    background: "var(--color-surface-container-lowest)",
     border: "none",
     boxShadow: "none",
   },
