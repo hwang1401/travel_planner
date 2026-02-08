@@ -261,11 +261,11 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
         {(!onEdit && !onDelete) && <div style={{ height: "var(--spacing-sp120)" }} />}
         </div>
 
-        {/* ── 하단 고정: 삭제 + 수정하기 (수정 모달과 동일 스타일) ── */}
+        {/* ── 하단 고정: 삭제 + 수정하기. 세이프에리어는 BottomSheet 시트가 이미 적용함 → 푸터에서는 제외(중복 시 iOS 하단 여백 두 배) ── */}
         {(onEdit || onDelete) && (
           <div style={{
             flexShrink: 0,
-            padding: "16px 20px calc(16px + env(safe-area-inset-bottom, 0px))",
+            padding: "16px 20px",
             display: "flex",
             gap: "8px",
             borderTop: "1px solid var(--color-outline-variant)",

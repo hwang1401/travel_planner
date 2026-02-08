@@ -486,9 +486,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
               )}
             </div>
 
-            {/* Chat input bar */}
+            {/* Chat input bar — 하단 세이프에리어 확보, 커서가 필드 내부에 보이도록 */}
             <div style={{
-              padding: "12px 16px", flexShrink: 0,
+              padding: "12px 16px",
+              paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+              flexShrink: 0,
               borderTop: "1px solid var(--color-outline-variant)",
               display: "flex", gap: "8px", alignItems: "flex-end",
               background: "var(--color-surface-container-lowest)",
@@ -506,8 +508,9 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 placeholder="어디를 가고 싶나요?"
                 rows={1}
                 style={{
-                  flex: 1, resize: "none",
+                  flex: 1, minWidth: 0, resize: "none",
                   padding: "10px 14px",
+                  boxSizing: "border-box",
                   borderRadius: "var(--radius-md, 8px)",
                   border: "1px solid var(--color-outline-variant)",
                   background: "var(--color-surface-container-lowest)",

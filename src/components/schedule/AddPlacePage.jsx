@@ -892,8 +892,8 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
                   </div>
                 </div>
 
-                {/* 시간 · 장소명 (한 줄, 필드 베이스라인 맞춤) */}
-                <div style={{ display: 'flex', gap: SPACING.md, alignItems: 'flex-end' }}>
+                {/* 시간 · 장소명 (한 줄). flex-start로 맞춰야 헬퍼 나와도 '시간'이 아래로 밀리지 않음 */}
+                <div style={{ display: 'flex', gap: SPACING.md, alignItems: 'flex-start' }}>
                   <div style={{ width: '120px', flexShrink: 0 }}>
                     <TimePicker label="시간" value={time} onChange={setTime} error={errors.time} />
                   </div>

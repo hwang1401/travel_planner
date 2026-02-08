@@ -134,12 +134,11 @@ export default function Field({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', minWidth: '60px', ...customStyle }} className={className}>
-      {/* Label — 고정 높이로 여러 필드 나란히 있을 때 입력란 수평 정렬 */}
+      {/* Label — 입력 박스와 같은 왼쪽 시작(0). TimePicker와 동일하게 라벨/필드 왼쪽 정렬 */}
       {label && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '4px',
           paddingBottom: 'var(--spacing-sp40, 4px)',
-          minHeight: 'var(--field-label-row-height, 20px)',
         }}>
           <span style={{
             fontSize: 'var(--typo-caption-2-bold-size)',
@@ -272,9 +271,9 @@ export default function Field({
         </div>
       )}
 
-      {/* Helper/Error: 예약 공간으로 항상 한 줄 높이 확보 → 나올 때 정렬 안 무너짐 */}
-      <div style={{ minHeight: '20px', paddingTop: 'var(--spacing-sp40, 4px)' }}>
-        {helper && !error && (
+      {/* Helper/Error: 있을 때만 표시. 라벨/입력과 같은 왼쪽(0) 정렬 */}
+      {helper && !error && (
+        <div style={{ paddingTop: 'var(--spacing-sp40, 4px)' }}>
           <span style={{
             fontSize: 'var(--typo-caption-1-regular-size)',
             fontWeight: 'var(--typo-caption-1-regular-weight)',
@@ -282,8 +281,10 @@ export default function Field({
           }}>
             {helper}
           </span>
-        )}
-        {error && (
+        </div>
+      )}
+      {error && (
+        <div style={{ paddingTop: 'var(--spacing-sp40, 4px)' }}>
           <span style={{
             fontSize: 'var(--typo-caption-1-regular-size)',
             fontWeight: 'var(--typo-caption-1-regular-weight)',
@@ -291,8 +292,8 @@ export default function Field({
           }}>
             {error}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
