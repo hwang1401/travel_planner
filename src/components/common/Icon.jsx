@@ -14,6 +14,7 @@ const ICON_MAP = {
   calendar: "/icons/Calendar.svg",
   pricetag: "/icons/Pricetag.svg",
   file: "/icons/File/File.svg",
+  document: "/icons/File/File.svg",
   home: "/icons/Home.svg",
   shopping: "/icons/Shopping/Bag.svg",
   briefcase: "/icons/Briefcase.svg",
