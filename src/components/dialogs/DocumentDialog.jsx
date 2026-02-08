@@ -236,7 +236,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
               {/* Actions */}
               <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
                 <Button variant="neutral" size="md" iconLeft="edit" fullWidth onClick={() => setShowForm(selectedDoc)}>수정</Button>
-                <Button variant="ghost-neutral" size="md" iconLeft="trash" onClick={() => handleDelete(selectedDoc)} style={{ color: 'var(--color-error)', flexShrink: 0 }}>삭제</Button>
+                <Button variant="ghost-danger" size="md" iconLeft="trash" onClick={() => handleDelete(selectedDoc)} style={{ flexShrink: 0 }}>삭제</Button>
               </div>
             </div>
           )}
@@ -441,7 +441,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
                   background: 'var(--color-surface-container-lowest)',
                 }}>
                   <Button variant="ghost-neutral" size="xsm" iconLeft="edit" onClick={() => fileRef.current?.click()}>변경</Button>
-                  <Button variant="ghost-neutral" size="xsm" iconLeft="trash" onClick={() => setImageUrl('')} style={{ color: 'var(--color-error)' }}>삭제</Button>
+                  <Button variant="ghost-danger" size="xsm" iconLeft="trash" onClick={() => setImageUrl('')}>삭제</Button>
                 </div>
                 {uploading && (
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

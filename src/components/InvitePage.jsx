@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { joinByShareCode } from '../services/memberService';
 import Icon from './common/Icon';
 import Button from './common/Button';
+import PageSplash from './common/PageSplash';
 
 export default function InvitePage() {
   const { shareCode } = useParams();
@@ -70,33 +71,7 @@ export default function InvitePage() {
       paddingTop: 'env(safe-area-inset-top, 0px)',
     }}>
       {status === 'joining' && (
-        <>
-          <div style={{
-            width: '56px', height: '56px', borderRadius: '50%',
-            background: 'var(--color-primary-container)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: '20px',
-          }}>
-            <Icon name="persons" size={28} />
-          </div>
-          <p style={{
-            fontSize: 'var(--typo-body-1-n---bold-size)',
-            fontWeight: 'var(--typo-body-1-n---bold-weight)',
-            color: 'var(--color-on-surface)',
-            marginBottom: '8px',
-          }}>
-            여행에 참여하는 중...
-          </p>
-          <div style={{
-            width: '24px', height: '24px',
-            border: '2.5px solid var(--color-surface-container)',
-            borderTopColor: 'var(--color-primary)',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-            marginTop: '16px',
-          }} />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </>
+        <PageSplash message="여행에 참여하는 중..." showLogo={false} />
       )}
 
       {status === 'success' && (

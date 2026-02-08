@@ -22,6 +22,7 @@ import Tab from "./common/Tab";
 import ConfirmDialog from "./common/ConfirmDialog";
 import Toast from "./common/Toast";
 import EmptyState from "./common/EmptyState";
+import ScheduleSkeleton from "./common/ScheduleSkeleton";
 
 /* Dialog imports */
 import DetailDialog from "./dialogs/DetailDialog";
@@ -73,7 +74,9 @@ export default function TravelPlanner() {
   const [showMap, setShowMap] = useState(false);
   const [editingDayIdx, setEditingDayIdx] = useState(null);
   const [editDayLabel, setEditDayLabel] = useState("");
+  const [showDayMoreMenu, setShowDayMoreMenu] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const dayNameInputRef = useRef(null);
   const [showAddDay, setShowAddDay] = useState(false);
   const [toast, setToast] = useState(null);
   const [showShareSheet, setShowShareSheet] = useState(false);
@@ -236,6 +239,13 @@ export default function TravelPlanner() {
       if (todayIdx !== 0) setSelectedDay(todayIdx);
     }
   }, [DAYS]);
+
+  /* ── 인라인 날짜 이름 편집 시 입력 포커스 ── */
+  useEffect(() => {
+    if (editingDayIdx === null) return;
+    const t = setTimeout(() => dayNameInputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [editingDayIdx]);
 
   /* ── "지금" indicator: flatten all items and find current ── */
   const nowItemKey = useMemo(() => {
@@ -497,57 +507,73 @@ export default function TravelPlanner() {
     setToast({ message: isEdit ? "일정이 수정되었습니다" : "일정이 추가되었습니다", icon: isEdit ? "edit" : "check" });
   }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget, baseLen]);
 
+  /* 삭제 실행 로직 (확인 다이얼로그 바깥에서 재사용) */
+  const performDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
+    updateCustomData((prev) => {
+      const next = { ...prev };
+      if (sectionIdx === -1) {
+        if (next[dayIdx]?.extraItems) {
+          next[dayIdx] = { ...next[dayIdx] };
+          const target = itemRef ?? editTarget?.item;
+          if (target) {
+            const idx = next[dayIdx].extraItems.findIndex((it) =>
+              it.time === target.time && it.desc === target.desc
+            );
+            if (idx >= 0) {
+              next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+              next[dayIdx].extraItems.splice(idx, 1);
+            }
+          } else {
+            next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+            next[dayIdx].extraItems.splice(itemIdx, 1);
+          }
+          if (next[dayIdx].extraItems.length === 0) delete next[dayIdx].extraItems;
+        }
+      } else {
+        if (!next[dayIdx]) next[dayIdx] = {};
+        if (!next[dayIdx].sections) next[dayIdx].sections = {};
+        if (!next[dayIdx].sections[sectionIdx]) {
+          const sourceSec2 = baseLen > 0
+            ? BASE_DAYS[dayIdx]?.sections?.[sectionIdx]
+            : next._extraDays?.[dayIdx - baseLen]?.sections?.[sectionIdx];
+          next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec2?.items || [])] };
+        } else {
+          next[dayIdx].sections[sectionIdx] = { ...next[dayIdx].sections[sectionIdx], items: [...next[dayIdx].sections[sectionIdx].items] };
+        }
+        next[dayIdx].sections[sectionIdx].items.splice(itemIdx, 1);
+      }
+      return { ...next };
+    });
+    setEditTarget(null);
+    setToast({ message: "일정이 삭제되었습니다", icon: "trash" });
+  }, [updateCustomData, editTarget, baseLen]);
+
   const handleDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
     setConfirmDialog({
       title: "일정 삭제",
       message: "이 일정을 삭제하시겠습니까?",
       confirmLabel: "삭제",
       onConfirm: () => {
-        updateCustomData((prev) => {
-          const next = { ...prev };
-          if (sectionIdx === -1) {
-            // Extra item — find by time+desc match
-            if (next[dayIdx]?.extraItems) {
-              next[dayIdx] = { ...next[dayIdx] };
-              const target = itemRef || editTarget?.item;
-              if (target) {
-                const idx = next[dayIdx].extraItems.findIndex((it) =>
-                  it.time === target.time && it.desc === target.desc
-                );
-                if (idx >= 0) {
-                  next[dayIdx].extraItems = [...next[dayIdx].extraItems];
-                  next[dayIdx].extraItems.splice(idx, 1);
-                }
-              } else {
-                next[dayIdx].extraItems = [...next[dayIdx].extraItems];
-                next[dayIdx].extraItems.splice(itemIdx, 1);
-              }
-              // Clean up empty extraItems array
-              if (next[dayIdx].extraItems.length === 0) {
-                delete next[dayIdx].extraItems;
-              }
-            }
-          } else {
-            if (!next[dayIdx]) next[dayIdx] = {};
-            if (!next[dayIdx].sections) next[dayIdx].sections = {};
-            if (!next[dayIdx].sections[sectionIdx]) {
-              const sourceSec2 = baseLen > 0
-                ? BASE_DAYS[dayIdx]?.sections?.[sectionIdx]
-                : next._extraDays?.[dayIdx - baseLen]?.sections?.[sectionIdx];
-              next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec2?.items || [])] };
-            } else {
-              next[dayIdx].sections[sectionIdx] = { ...next[dayIdx].sections[sectionIdx], items: [...next[dayIdx].sections[sectionIdx].items] };
-            }
-            next[dayIdx].sections[sectionIdx].items.splice(itemIdx, 1);
-          }
-          return { ...next };
-        });
-        setEditTarget(null);
+        performDeleteItem(dayIdx, sectionIdx, itemIdx, itemRef);
         setConfirmDialog(null);
-        setToast({ message: "일정이 삭제되었습니다", icon: "trash" });
       },
     });
-  }, [updateCustomData, editTarget]);
+  }, [performDeleteItem]);
+
+  /* 정보 다이얼로그에서 삭제 시: 다이얼로그 닫고 확인 후 삭제 */
+  const handleDeleteFromDetail = useCallback((d) => {
+    if (!d?._item?._custom) return;
+    setActiveDetail(null);
+    setConfirmDialog({
+      title: "일정 삭제",
+      message: "이 일정을 삭제하시겠습니까?",
+      confirmLabel: "삭제",
+      onConfirm: () => {
+        performDeleteItem(toOrigIdx(d._di ?? selectedDay), d._si, d._ii, d._item);
+        setConfirmDialog(null);
+      },
+    });
+  }, [performDeleteItem, toOrigIdx, selectedDay]);
 
   /* ── Bulk Import: replace or append ── */
   const handleBulkImport = useCallback((items, mode) => {
@@ -603,31 +629,9 @@ export default function TravelPlanner() {
     setShowShareSheet(false);
   }, [shareCode]);
 
-  /* ── Loading state ── */
+  /* ── Loading state: 스켈레톤 ── */
   if (!isLegacy && (tripLoading || scheduleLoading)) {
-    return (
-      <div style={{
-        width: "100%", height: "100vh", display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        background: "var(--color-surface)",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-      }}>
-        <div style={{
-          width: "32px", height: "32px",
-          border: "3px solid var(--color-surface-container)",
-          borderTopColor: "var(--color-primary)",
-          borderRadius: "50%",
-          animation: "spin 0.8s linear infinite",
-        }} />
-        <p style={{
-          marginTop: "16px", fontSize: "var(--typo-caption-1-regular-size)",
-          color: "var(--color-on-surface-variant2)",
-        }}>
-          일정을 불러오는 중...
-        </p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    return <ScheduleSkeleton />;
   }
 
   /* ── No access ── */
@@ -667,9 +671,11 @@ export default function TravelPlanner() {
       background: "var(--color-surface)", overflow: "hidden",
       paddingTop: "env(safe-area-inset-top, 0px)",
     }}>
-      {/* Header */}
+      {/* Header — 탭 섹션과 동일 배경, 하단 보더로 구분 */}
       <div style={{
-        padding: "12px 16px 12px 8px", background: "var(--color-surface)",
+        padding: "12px 16px 12px 8px",
+        background: "var(--color-surface-container-lowest)",
+        borderBottom: "1px solid var(--color-outline-variant)",
         display: "flex", alignItems: "center", gap: "4px", flexShrink: 0,
       }}>
         <Button variant="ghost-neutral" size="sm" iconOnly="chevronLeft"
@@ -742,7 +748,8 @@ export default function TravelPlanner() {
               {DAYS.length > 1 && (
                 <Button variant="neutral" size="sm" iconOnly="swap"
                   onClick={handleOpenReorder}
-                  title="순서 변경" />
+                  title="순서 변경"
+                  className="day-reorder-btn" />
               )}
               <Button variant="neutral" size="sm" iconOnly="plus"
                 onClick={() => setShowAddDay(true)}
@@ -751,55 +758,100 @@ export default function TravelPlanner() {
           )}
         </div>
 
-        {/* Day info panel — tightly coupled with tabs */}
+        {/* Day info panel — 인라인 이름 편집 또는 제목 + ··· + 추가 */}
         {current && (
           <div style={{ padding: "10px 16px 12px" }}>
-            {/* Title + meta row */}
-            <div style={{
-              display: "flex", alignItems: "flex-start", gap: "8px",
-            }}>
-              <div
-                style={{ flex: 1, minWidth: 0, cursor: canEdit ? "pointer" : "default" }}
-                onClick={canEdit ? () => { setEditingDayIdx(toOrigIdx(selectedDay)); setEditDayLabel(current.label); } : undefined}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <h2 style={{
-                    margin: 0, fontSize: "var(--typo-body-2-n---bold-size)", fontWeight: "var(--typo-body-2-n---bold-weight)", color: "var(--color-on-surface)",
-                    letterSpacing: "var(--typo-body-2-n---bold-letter-spacing)",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>
-                    {current.label}
-                  </h2>
-                  {canEdit && toOrigIdx(selectedDay) >= baseLen && (
-                    <Button variant="ghost-neutral" size="xsm" iconOnly="trash"
-                      onClick={(e) => { e.stopPropagation(); handleDeleteDay(toOrigIdx(selectedDay)); }}
-                      style={{ opacity: 0.3 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {canEdit && editingDayIdx === toOrigIdx(selectedDay) ? (
+                /* 인라인 이름 편집: 입력 + 완료 + 취소 */
+                <>
+                  <input
+                    ref={dayNameInputRef}
+                    type="text"
+                    value={editDayLabel}
+                    onChange={(e) => setEditDayLabel(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && editDayLabel.trim()) {
+                        handleEditDayLabel(editingDayIdx, editDayLabel);
+                        setEditingDayIdx(null);
+                      }
+                      if (e.key === "Escape") {
+                        setEditDayLabel(current.label);
+                        setEditingDayIdx(null);
+                      }
+                    }}
+                    style={{
+                      flex: 1, minWidth: 0,
+                      padding: "8px 12px",
+                      fontSize: "var(--typo-body-2-n---bold-size)",
+                      fontWeight: "var(--typo-body-2-n---bold-weight)",
+                      color: "var(--color-on-surface)",
+                      background: "var(--color-surface-container-low)",
+                      border: "1px solid var(--color-outline-variant)",
+                      borderRadius: "var(--radius-md)",
+                      outline: "none",
+                    }}
+                    placeholder="날짜 이름"
+                  />
+                  <Button variant="primary" size="xsm" iconOnly="check"
+                    onClick={() => { if (editDayLabel.trim()) handleEditDayLabel(editingDayIdx, editDayLabel); setEditingDayIdx(null); }}
+                    disabled={!editDayLabel.trim()}
+                    style={{ flexShrink: 0 }}
+                    title="저장" />
+                  <Button variant="ghost-neutral" size="xsm" iconOnly="close"
+                    onClick={() => { setEditDayLabel(current.label); setEditingDayIdx(null); }}
+                    style={{ flexShrink: 0 }}
+                    title="취소" />
+                </>
+              ) : (
+                <>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <button
+                      type="button"
+                      style={{
+                        width: "100%", cursor: canEdit ? "pointer" : "default",
+                        display: "flex", alignItems: "center", gap: "6px",
+                        padding: 0, border: "none", background: "none",
+                        textAlign: "left", fontFamily: "inherit",
+                      }}
+                      onClick={canEdit ? () => setShowDayMoreMenu(true) : undefined}
+                      title={canEdit ? "날짜 이름 수정 또는 삭제" : undefined}
+                    >
+                      <h2 style={{
+                        margin: 0, fontSize: "var(--typo-body-2-n---bold-size)", fontWeight: "var(--typo-body-2-n---bold-weight)", color: "var(--color-on-surface)",
+                        letterSpacing: "var(--typo-body-2-n---bold-letter-spacing)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {current.label}
+                      </h2>
+                      {canEdit && (
+                        <Icon name="edit" size={16} style={{ flexShrink: 0, opacity: 0.6 }} />
+                      )}
+                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sp40)", flexWrap: "wrap", marginTop: "var(--spacing-sp20)" }}>
+                      {(current.date || current.stay) && (
+                        <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
+                          {[current.date, current.stay].filter(Boolean).join(" · ")}
+                        </span>
+                      )}
+                      {routeSummary && (
+                        <>
+                          {(current.date || current.stay) && <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-outline-variant)" }}>·</span>}
+                          <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-primary)", fontWeight: 600 }}>
+                            {routeSummary}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {canEdit && (
+                    <Button variant="primary" size="xsm" iconLeft="plus"
+                      onClick={() => setShowAddSheet(true)}
+                      style={{ borderRadius: "16px", flexShrink: 0 }}>
+                      일정 추가
+                    </Button>
                   )}
-                </div>
-                {/* Date + stay + route summary */}
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sp40)", flexWrap: "wrap", marginTop: "var(--spacing-sp20)" }}>
-                  {(current.date || current.stay) && (
-                    <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
-                      {[current.date, current.stay].filter(Boolean).join(" · ")}
-                    </span>
-                  )}
-                  {routeSummary && (
-                    <>
-                      {(current.date || current.stay) && <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-outline-variant)" }}>·</span>}
-                      <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-primary)", fontWeight: 600 }}>
-                        {routeSummary}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-              {/* Add schedule button — compact, right-aligned */}
-              {canEdit && (
-                <Button variant="neutral" size="xsm" iconLeft="plus"
-                  onClick={() => setShowAddSheet(true)}
-                  style={{ borderRadius: "16px", flexShrink: 0 }}>
-                  추가
-                </Button>
+                </>
               )}
             </div>
           </div>
@@ -952,6 +1004,7 @@ export default function TravelPlanner() {
             setEditTarget({ item, sectionIdx: d._si, itemIdx: d._ii, dayIdx: toOrigIdx(d._di ?? selectedDay) });
           }
         } : undefined}
+        onDelete={canEdit && activeDetail?._item?._custom ? handleDeleteFromDetail : undefined}
       />
 
       {/* Document Dialog */}
@@ -975,7 +1028,7 @@ export default function TravelPlanner() {
             {[
               { icon: "pin", iconColor: "var(--color-primary)", label: "장소 추가", desc: "검색해서 장소를 추가해요", onClick: () => { setShowAddSheet(false); setShowAddPlace(true); } },
               { icon: "document", iconColor: "var(--color-on-surface-variant)", label: "예약 정보 붙여넣기", desc: "확인메일, 바우처를 복붙하면 AI가 정리", onClick: () => { setShowAddSheet(false); setShowPasteInfo(true); } },
-              { icon: "flash", iconColor: "var(--color-on-surface-variant)", label: "AI로 일정 채우기", desc: "여행 스타일 알려주면 AI가 자동 생성", onClick: () => { setShowAddSheet(false); setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null }); setOpenAiTab(true); } },
+              { icon: "flash", iconColor: "var(--color-on-surface-variant)", label: "AI와 대화하며 계획하기", desc: "여행 스타일을 알려주면 AI가 일정을 제안해요", onClick: () => { setShowAddSheet(false); setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null }); setOpenAiTab(true); } },
             ].map((action, i) => (
               <div
                 key={i}
@@ -1033,6 +1086,7 @@ export default function TravelPlanner() {
           currentDay={current}
           onBulkImport={handleBulkImport}
           initialTab={openAiTab ? 2 : 0}
+          aiOnly={openAiTab}
         />
       )}
 
@@ -1076,29 +1130,38 @@ export default function TravelPlanner() {
         />
       )}
 
-      {/* Edit Day Name Dialog */}
-      {editingDayIdx !== null && canEdit && (
-        <BottomSheet onClose={() => setEditingDayIdx(null)} maxHeight="auto" zIndex="var(--z-confirm)" title="이름 수정">
+      {/* 날짜 ··· 메뉴: 이름 수정(인라인) / 이 날짜 삭제 */}
+      {showDayMoreMenu && current && canEdit && (
+        <BottomSheet onClose={() => setShowDayMoreMenu(false)} maxHeight="auto" zIndex="var(--z-confirm)" title={current.label}>
           <div style={{ padding: "8px 24px 24px" }}>
-            <Field size="xlg" variant="outlined"
-              value={editDayLabel}
-              onChange={(e) => setEditDayLabel(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && editDayLabel.trim()) { handleEditDayLabel(editingDayIdx, editDayLabel); }
-                if (e.key === "Escape") setEditingDayIdx(null);
+            <button
+              type="button"
+              onClick={() => { setShowDayMoreMenu(false); setEditingDayIdx(toOrigIdx(selectedDay)); setEditDayLabel(current.label); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: "12px",
+                padding: "14px 0", border: "none", background: "none", cursor: "pointer",
+                fontSize: "var(--typo-body-2-n---regular-size)", color: "var(--color-on-surface)",
+                fontFamily: "inherit", textAlign: "left",
               }}
-              placeholder="이름을 입력하세요"
-              style={{ marginBottom: "20px" }}
-            />
-            <div style={{ display: "flex", gap: "10px" }}>
-              <Button variant="neutral" size="lg" onClick={() => setEditingDayIdx(null)} style={{ flex: 1 }}>취소</Button>
-              <Button variant="primary" size="lg"
-                onClick={() => { if (editDayLabel.trim()) handleEditDayLabel(editingDayIdx, editDayLabel); }}
-                disabled={!editDayLabel.trim()}
-                style={{ flex: 1 }}>
-                저장
-              </Button>
-            </div>
+            >
+              <Icon name="edit" size={20} style={{ flexShrink: 0, color: "var(--color-on-surface-variant)" }} />
+              이름 수정
+            </button>
+            {toOrigIdx(selectedDay) >= baseLen && (
+              <button
+                type="button"
+                onClick={() => { setShowDayMoreMenu(false); handleDeleteDay(toOrigIdx(selectedDay)); }}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: "12px",
+                  padding: "14px 0", border: "none", background: "none", cursor: "pointer",
+                  fontSize: "var(--typo-body-2-n---regular-size)", color: "var(--color-error)",
+                  fontFamily: "inherit", textAlign: "left",
+                }}
+              >
+                <Icon name="trash" size={20} style={{ flexShrink: 0, color: "var(--color-error)" }} />
+                이 날짜 삭제
+              </button>
+            )}
           </div>
         </BottomSheet>
       )}

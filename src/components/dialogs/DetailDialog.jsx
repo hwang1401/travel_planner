@@ -5,6 +5,7 @@ import BottomSheet from '../common/BottomSheet';
 import ImageViewer from '../common/ImageViewer';
 import InfoRow from '../common/InfoRow';
 import CategoryBadge from '../common/CategoryBadge';
+import TimetablePreview from '../common/TimetablePreview';
 import { COLOR, SPACING, RADIUS } from '../../styles/tokens';
 
 /**
@@ -45,7 +46,7 @@ const SectionWrap = ({ label, children, px }) => (
 
 /* ── 컴포넌트 ── */
 
-export default function DetailDialog({ detail, onClose, dayColor, onEdit }) {
+export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDelete }) {
   if (!detail) return null;
   const [viewImage, setViewImage] = useState(null);
   const [mapError, setMapError] = useState(false);
@@ -96,7 +97,14 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit }) {
           }}>
             {detail.name}
           </h3>
-          <CategoryBadge category={detail.category} style={{ flexShrink: 0 }} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
+            {(detail.categories && detail.categories.length > 0
+              ? detail.categories
+              : detail.category ? [detail.category] : []
+            ).map((cat) => (
+              <CategoryBadge key={cat} category={cat} />
+            ))}
+          </span>
         </div>
         <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
       </div>
@@ -104,39 +112,60 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit }) {
       {/* ── 스크롤 콘텐츠 ── */}
       <div style={{ overflowY: "auto", overscrollBehavior: "contain" }}>
 
-        {/* ── 퀵 액세스: 주소 + 길찾기 (유일하게 borderBottom 유지) ── */}
+        {/* ── 퀵 액세스: 주소(목적지) + 길찾기 — detail.address가 목적지, 한 블록으로 그룹핑 ── */}
         {detail.address && (
           <div style={{
             padding: `var(--spacing-sp120) ${px}`,
-            display: "flex", alignItems: "center", gap: "var(--spacing-sp80)",
             borderBottom: "1px solid var(--color-outline-variant)",
           }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{
-                margin: 0,
-                fontSize: "var(--typo-caption-1-regular-size)",
-                lineHeight: "var(--typo-caption-1-regular-line-height)",
-                color: "var(--color-on-surface-variant)",
-              }}>
-                {detail.address}
-              </p>
-              {detail.hours && (
+            <p style={{
+              margin: "0 0 var(--spacing-sp80)",
+              fontSize: "var(--typo-caption-2-bold-size)",
+              fontWeight: "var(--typo-caption-2-bold-weight)",
+              color: "var(--color-on-surface-variant2)",
+              letterSpacing: "0.3px",
+            }}>
+              주소
+            </p>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--spacing-sp120)",
+              padding: "var(--spacing-sp120) var(--spacing-sp160)",
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-surface-container-low)",
+              border: "1px solid var(--color-outline-variant)",
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{
-                  margin: "var(--spacing-sp20) 0 0",
-                  fontSize: "var(--typo-caption-2-regular-size)",
-                  color: "var(--color-on-surface-variant2)",
+                  margin: 0,
+                  fontSize: "var(--typo-caption-1-regular-size)",
+                  lineHeight: "var(--typo-caption-1-regular-line-height)",
+                  color: "var(--color-on-surface-variant)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}>
-                  {detail.hours}
+                  {detail.address}
                 </p>
+                {detail.hours && (
+                  <p style={{
+                    margin: "var(--spacing-sp20) 0 0",
+                    fontSize: "var(--typo-caption-2-regular-size)",
+                    color: "var(--color-on-surface-variant2)",
+                  }}>
+                    {detail.hours}
+                  </p>
+                )}
+              </div>
+              {directionsUrl && (
+                <Button variant="primary" size="sm" iconLeft="navigation"
+                  onClick={() => window.open(directionsUrl, "_blank")}
+                  style={{ flexShrink: 0 }}>
+                  길찾기
+                </Button>
               )}
             </div>
-            {directionsUrl && (
-              <Button variant="primary" size="sm" iconLeft="navigation"
-                onClick={() => window.open(directionsUrl, "_blank")}
-                style={{ flexShrink: 0 }}>
-                길찾기
-              </Button>
-            )}
           </div>
         )}
 
@@ -226,73 +255,10 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit }) {
           </SectionWrap>
         )}
 
-        {/* ── 교통 타임테이블 ── */}
+        {/* ── 교통 타임테이블 (공통 컴포넌트) ── */}
         {hasTimetable && (
           <SectionWrap label={`${detail.timetable.station} → ${detail.timetable.direction}`} px={px}>
-            <div style={{
-              borderRadius: RADIUS.md, overflow: "hidden",
-              border: `1px solid ${COLOR.outlineVariant}`,
-            }}>
-              <div style={{
-                display: "flex", padding: `${SPACING.md} ${SPACING.lg}`,
-                background: COLOR.surfaceLow,
-                borderBottom: `1px solid ${COLOR.outlineVariant}`,
-                fontSize: "var(--typo-caption-3-bold-size)",
-                fontWeight: "var(--typo-caption-3-bold-weight)",
-                color: COLOR.onSurfaceVariant,
-              }}>
-                <span style={{ width: "52px", flexShrink: 0 }}>시각</span>
-                <span style={{ flex: 1 }}>열차명</span>
-                <span style={{ flex: 1, textAlign: "right" }}>행선 / 소요</span>
-              </div>
-              {detail.timetable.trains.map((t, i) => (
-                <div key={i} style={{
-                  display: "flex", flexDirection: "column",
-                  padding: `${SPACING.md} ${SPACING.lg}`,
-                  background: t.picked ? COLOR.surfaceLow : COLOR.surfaceLowest,
-                  borderBottom: i < detail.timetable.trains.length - 1 ? `1px solid ${COLOR.outlineVariant}` : "none",
-                  borderLeft: t.picked ? `3px solid ${accentColor}` : "3px solid transparent",
-                }}>
-                  {t.picked && (
-                    <span style={{
-                      alignSelf: "flex-start",
-                      fontSize: "var(--typo-caption-3-bold-size)",
-                      fontWeight: "var(--typo-caption-3-bold-weight)",
-                      color: accentColor, letterSpacing: "0.3px", marginBottom: SPACING.sm,
-                    }}>
-                      탑승 예정
-                    </span>
-                  )}
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={{
-                      width: "52px", flexShrink: 0, fontVariantNumeric: "tabular-nums",
-                      fontSize: t.picked ? "var(--typo-label-1-n---bold-size)" : "var(--typo-caption-1-medium-size)",
-                      fontWeight: t.picked ? "var(--typo-label-1-n---bold-weight)" : "var(--typo-caption-1-medium-weight)",
-                      color: t.picked ? accentColor : COLOR.onSurfaceVariant,
-                    }}>
-                      {t.time}
-                    </span>
-                    <span style={{
-                      flex: 1,
-                      fontSize: t.picked ? "var(--typo-label-2-bold-size)" : "var(--typo-caption-2-medium-size)",
-                      fontWeight: t.picked ? "var(--typo-label-2-bold-weight)" : "var(--typo-caption-2-medium-weight)",
-                      color: COLOR.onSurface,
-                    }}>
-                      {t.name}
-                    </span>
-                    <span style={{
-                      flex: 1, textAlign: "right",
-                      fontSize: "var(--typo-caption-3-regular-size)",
-                      fontWeight: t.picked ? "var(--typo-caption-3-bold-weight)" : "var(--typo-caption-3-regular-weight)",
-                      color: COLOR.onSurfaceVariant2, lineHeight: 1.4,
-                    }}>
-                      <span style={{ display: "block" }}>{t.dest}</span>
-                      <span style={{ fontSize: "var(--typo-caption-3-regular-size)", opacity: 0.8 }}>{t.note}</span>
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <TimetablePreview timetable={detail.timetable} variant="full" accentColor={accentColor} />
           </SectionWrap>
         )}
 
@@ -328,18 +294,29 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit }) {
           </SectionWrap>
         )}
 
-        {/* ── 수정하기 (맨 아래) ── */}
-        {onEdit && (
-          <div style={{ padding: `var(--spacing-sp200) ${px} var(--spacing-sp160)` }}>
-            <Button variant="neutral" size="md" fullWidth
-              onClick={() => { onEdit(detail); onClose(); }}
-              iconLeft="edit">
-              수정하기
-            </Button>
+        {/* ── 수정 / 삭제 (맨 아래, 동일 아웃라인 형태 + 삭제는 아이콘·텍스트 모두 error 색) ── */}
+        {(onEdit || onDelete) && (
+          <div style={{ padding: `var(--spacing-sp200) ${px} var(--spacing-sp160)`, display: "flex", gap: "8px", flexShrink: 0 }}>
+            {onDelete && (
+              <Button variant="danger" size="md"
+                onClick={() => onDelete(detail)}
+                iconLeft="trash"
+                style={{ flex: 1 }}>
+                삭제
+              </Button>
+            )}
+            {onEdit && (
+              <Button variant="neutral" size="md"
+                onClick={() => { onEdit(detail); onClose(); }}
+                iconLeft="edit"
+                style={{ flex: 1 }}>
+                수정하기
+              </Button>
+            )}
           </div>
         )}
 
-        {!onEdit && <div style={{ height: "var(--spacing-sp120)" }} />}
+        {!onEdit && !onDelete && <div style={{ height: "var(--spacing-sp120)" }} />}
       </div>
     </BottomSheet>
   );

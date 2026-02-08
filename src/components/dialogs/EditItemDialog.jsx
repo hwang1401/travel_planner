@@ -8,14 +8,15 @@ import BottomSheet from '../common/BottomSheet';
 import { MultiImagePicker } from '../common/ImagePicker';
 import { uploadImage, generateImagePath } from '../../services/imageService';
 import { TIMETABLE_DB, findBestTrain } from '../../data/timetable';
+import TimetablePreview from '../common/TimetablePreview';
 import { readFileAsText, detectConflicts } from '../../utils/scheduleParser';
 import { analyzeScheduleWithAI, getAIRecommendation } from '../../services/geminiService';
 import ImportPreviewDialog from './ImportPreviewDialog';
 
 /* ── Edit Item Dialog (일정 추가/수정) ── */
-export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color, tripId, currentDay, onBulkImport, initialTab = 0 }) {
+export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color, tripId, currentDay, onBulkImport, initialTab = 0, aiOnly = false }) {
   const isNew = !item;
-  const [activeTab, setActiveTab] = useState(isNew ? initialTab : 0);
+  const [activeTab, setActiveTab] = useState(aiOnly ? 2 : (isNew ? initialTab : 0));
   const [time, setTime] = useState(item?.time || "");
   const [desc, setDesc] = useState(item?.desc || "");
   const [type, setType] = useState(item?.type || "spot");
@@ -260,11 +261,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       onClose={onClose}
       maxHeight="85vh"
       minHeight={isNew ? "85vh" : undefined}
-      title={isNew ? "일정 추가" : "일정 수정"}
+      title={aiOnly ? "AI와 대화하며 계획하기" : (isNew ? "일정 추가" : "일정 수정")}
     >
 
-        {/* Tabs (only show for new items) */}
-        {isNew && (
+        {/* Tabs (only show for new items; 숨김 when aiOnly) */}
+        {isNew && !aiOnly && (
           <div style={{ flexShrink: 0 }}>
             <Tab
               items={[
@@ -280,8 +281,8 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
           </div>
         )}
 
-        {/* Tab content */}
-        {activeTab === 2 && isNew ? (
+        {/* Tab content (aiOnly면 AI 패널만 표시) */}
+        {(activeTab === 2 && isNew) || aiOnly ? (
           /* ── AI Recommendation chat tab ── */
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {/* Chat messages area */}
@@ -671,44 +672,20 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 {time.trim() ? ` (${time.trim()} 기준)` : ""}
               </Button>
 
-              {/* Preview loaded timetable */}
+              {/* Preview loaded timetable (공통 컴포넌트) */}
               {loadedTimetable && loadedTimetable.trains && (
-                <div style={{
-                  background: "var(--color-surface-container-low)", borderRadius: "var(--radius-md, 8px)", border: "1px solid var(--color-outline-variant)",
-                  padding: "10px 12px", fontSize: "var(--typo-caption-2-regular-size)",
-                }}>
-                  <p style={{ margin: "0 0 6px", fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant)" }}>
-                    {loadedTimetable.station} → {loadedTimetable.direction}
-                  </p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    {loadedTimetable.trains.map((t, i) => (
-                      <div key={i} style={{
-                        display: "flex", alignItems: "center", gap: "8px",
-                        padding: "4px 6px", borderRadius: "var(--radius-md, 8px)",
-                        background: t.picked ? "var(--color-warning-container)" : "transparent",
-                        fontWeight: t.picked ? 700 : 400,
-                      }}>
-                        <span style={{ width: "38px", flexShrink: 0, color: t.picked ? "var(--color-warning)" : "var(--color-on-surface-variant)" }}>{t.time}</span>
-                        <span style={{ flex: 1, color: t.picked ? "var(--color-on-surface)" : "var(--color-on-surface-variant)" }}>{t.name}</span>
-                        {t.picked && <span style={{
-                          fontSize: "var(--typo-caption-3-bold-size)", background: "var(--color-warning-container)", color: "var(--color-on-warning-container)",
-                          padding: "1px 5px", borderRadius: "4px", fontWeight: "var(--typo-caption-3-bold-weight)",
-                        }}>탑승 예정</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <TimetablePreview timetable={loadedTimetable} variant="compact" />
               )}
             </>
           )}
         </div>
         )}
 
-        {/* Actions (only for single item tab or edit mode) */}
+        {/* Actions (only for single item tab or edit mode) — 상단 여백으로 콘텐츠와 구분 */}
         {(activeTab === 0 || !isNew) && (
-          <div style={{ padding: "0 20px 16px", display: "flex", gap: "8px", flexShrink: 0 }}>
+          <div style={{ padding: "20px 20px 16px", display: "flex", gap: "8px", flexShrink: 0 }}>
             {!isNew && onDelete && (
-              <Button variant="ghost-neutral" size="lg" onClick={() => onDelete(dayIdx, sectionIdx, itemIdx, item)}>
+              <Button variant="ghost-danger" size="lg" iconLeft="trash" onClick={() => onDelete(dayIdx, sectionIdx, itemIdx, item)}>
                 삭제
               </Button>
             )}

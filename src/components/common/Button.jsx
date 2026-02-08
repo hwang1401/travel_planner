@@ -36,6 +36,7 @@ const SIZE_MAP = {
 const ICON_FILTERS = {
   white:   'brightness(0) invert(1)',
   primary: 'brightness(0) saturate(100%) invert(56%) sepia(60%) saturate(3000%) hue-rotate(225deg) brightness(100%) contrast(100%)',
+  error:   'brightness(0) saturate(100%) invert(25%) sepia(90%) saturate(4000%) hue-rotate(350deg) brightness(95%) contrast(95%)',
   none:    'none',
   faded:   'opacity(0.4)',
 };
@@ -76,6 +77,13 @@ const VARIANT_STYLES = {
     pressed:  { bg: 'var(--color-surface-container)', color: 'var(--color-on-surface-variant)', border: '1px solid var(--color-outline-variant)', iconFilter: 'none' },
     disabled: { bg: 'var(--color-surface-container)', color: 'var(--color-on-surface-variant2)', border: '1px solid var(--color-outline-variant)', iconFilter: 'faded' },
   },
+  /* 아웃라인 삭제 (neutral과 동일 형태, error 색상 + 아이콘 통일) */
+  danger: {
+    default:  { bg: 'var(--color-surface-container-lowest)', color: 'var(--color-error)', border: '1px solid var(--color-error)', iconFilter: 'error' },
+    hovered:  { bg: 'var(--color-error-hovered, rgba(205,40,31,0.06))', color: 'var(--color-error)', border: '1px solid var(--color-error)', iconFilter: 'error' },
+    pressed:  { bg: 'var(--color-error-pressed, rgba(205,40,31,0.12))', color: 'var(--color-error)', border: '1px solid var(--color-error)', iconFilter: 'error' },
+    disabled: { bg: 'var(--color-surface-container)', color: 'var(--color-on-surface-variant2)', border: '1px solid var(--color-outline-variant)', iconFilter: 'faded' },
+  },
 
   /* ─ TRANSPARENT (Ghost) ─ */
   'ghost-neutral': {
@@ -88,6 +96,12 @@ const VARIANT_STYLES = {
     default:  { bg: 'transparent', color: 'var(--color-primary)', border: 'none', iconFilter: 'primary' },
     hovered:  { bg: 'var(--color-primary-hovered)', color: 'var(--color-primary)', border: 'none', iconFilter: 'primary' },
     pressed:  { bg: 'var(--color-primary-pressed)', color: 'var(--color-primary)', border: 'none', iconFilter: 'primary' },
+    disabled: { bg: 'transparent', color: 'var(--color-on-surface-variant2)', border: 'none', iconFilter: 'faded' },
+  },
+  'ghost-danger': {
+    default:  { bg: 'transparent', color: 'var(--color-error)', border: 'none', iconFilter: 'error' },
+    hovered:  { bg: 'var(--color-error-hovered, rgba(205,40,31,0.06))', color: 'var(--color-error)', border: 'none', iconFilter: 'error' },
+    pressed:  { bg: 'var(--color-error-pressed, rgba(205,40,31,0.12))', color: 'var(--color-error)', border: 'none', iconFilter: 'error' },
     disabled: { bg: 'transparent', color: 'var(--color-on-surface-variant2)', border: 'none', iconFilter: 'faded' },
   },
 };

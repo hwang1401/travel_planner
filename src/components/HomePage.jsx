@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Icon from './common/Icon';
@@ -8,12 +8,15 @@ import Toast from './common/Toast';
 import ConfirmDialog from './common/ConfirmDialog';
 import CreateTripDialog from './dialogs/CreateTripDialog';
 import CreateTripWizard from './trip/CreateTripWizard';
+import TripListSkeleton from './common/TripListSkeleton';
 import { loadTrips, createTrip, updateTrip, deleteTrip, duplicateTrip, getShareCode, formatDateRange } from '../services/tripService';
 import { getShareLink } from '../services/memberService';
 import { loadCustomData, mergeData } from '../data/storage';
 import { BASE_DAYS } from '../data/days';
 import BottomSheet from './common/BottomSheet';
 import { COLOR, SPACING, RADIUS } from '../styles/tokens';
+
+const MIN_SPLASH_MS = 400;
 
 /* ── Trip Card Component ── */
 function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge, memberCount, onClick, onMore }) {
@@ -37,6 +40,7 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
             <img
               src={coverImage}
               alt=""
+              loading="lazy"
               style={{
                 position: 'absolute', inset: 0, width: '100%', height: '100%',
                 objectFit: 'cover',
@@ -117,12 +121,14 @@ export default function HomePage() {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [moreMenu, setMoreMenu] = useState(null);
   const [legacyHidden, setLegacyHidden] = useState(() => localStorage.getItem('legacy_trip_hidden') === 'true');
+  const splashStartRef = useRef(null);
 
   /* ── Total trip count ── */
   const totalTrips = trips.length + (legacyHidden ? 0 : 1);
 
-  /* ── Load trips from Supabase ── */
+  /* ── Load trips from Supabase (최소 스플래시 시간 적용으로 깜빡임 방지) ── */
   const fetchTrips = useCallback(async () => {
+    splashStartRef.current = Date.now();
     try {
       const data = await loadTrips();
       setTrips(data);
@@ -130,7 +136,9 @@ export default function HomePage() {
       console.error('Failed to load trips:', err);
       setToast({ message: '여행 목록을 불러오지 못했습니다', icon: 'info' });
     } finally {
-      setLoading(false);
+      const elapsed = Date.now() - (splashStartRef.current || 0);
+      const delay = Math.max(0, MIN_SPLASH_MS - elapsed);
+      setTimeout(() => setLoading(false), delay);
     }
   }, []);
 
@@ -372,23 +380,14 @@ export default function HomePage() {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, padding: '0 20px 100px', overflowY: 'auto' }}>
-        {/* Loading skeleton */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: loading ? 0 : '0 20px 100px', overflowY: loading ? 'hidden' : 'auto' }}>
+        {/* 로딩 시 스켈레톤 */}
         {loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {[1, 2].map((i) => (
-              <div key={i} style={{
-                height: '140px', borderRadius: 'var(--radius-md, 8px)',
-                background: 'var(--color-surface-container-low)',
-                animation: 'pulse 1.5s ease-in-out infinite',
-              }} />
-            ))}
-            <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
-          </div>
+          <TripListSkeleton />
         )}
 
         {!loading && (
-          <>
+          <div style={{ animation: 'fadeIn 0.35s ease' }}>
             {/* Legacy trip card */}
             {!legacyHidden && (
               <TripCard
@@ -428,7 +427,7 @@ export default function HomePage() {
                 />
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
@@ -545,7 +544,7 @@ function MoreMenuItem({ icon, label, onClick, danger = false }) {
       }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
     >
-      <Icon name={icon} size={18} style={{ opacity: 0.6 }} />
+      <Icon name={icon} size={18} style={danger ? { flexShrink: 0, color: 'var(--color-error)' } : { flexShrink: 0, opacity: 0.6 }} />
       <span style={{
         fontSize: 'var(--typo-label-2-medium-size)',
         fontWeight: 'var(--typo-label-2-medium-weight)',

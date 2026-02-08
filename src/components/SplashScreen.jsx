@@ -1,24 +1,24 @@
 /*
  * ── Splash Screen ──
- * Shows app branding during initial session check.
- * Displayed while AuthContext is loading.
+ * 앱 초기 세션 체크 시 표시. AuthContext loading 중에만 노출.
+ * 규칙: primary(푸른/보라) 배경일 때는 흰색 로고 사용.
  */
-
 
 export default function SplashScreen() {
   return (
-    <div style={{
-      width: '100%',
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--color-primary)',
-      paddingTop: 'env(safe-area-inset-top, 0px)',
-      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-    }}>
-      {/* Logo */}
+    <div
+      style={{
+        width: '100%',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--color-primary)',
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
       <img
         src="/icons/logo-splash.png"
         alt="Travelunu"
@@ -28,47 +28,40 @@ export default function SplashScreen() {
           marginBottom: '20px',
           objectFit: 'contain',
           filter: 'brightness(0) invert(1)',
-          animation: 'fadeIn 0.6s ease',
         }}
       />
-
-      {/* App name */}
-      <h1 style={{
-        margin: '0 0 8px',
-        fontSize: '28px',
-        fontWeight: 700,
-        color: 'var(--color-on-primary)',
-        letterSpacing: '-0.5px',
-        animation: 'fadeIn 0.6s ease 0.15s both',
-      }}>
+      <h1
+        style={{
+          margin: '0 0 8px',
+          fontSize: '28px',
+          fontWeight: 700,
+          color: 'var(--color-on-primary)',
+          letterSpacing: '-0.5px',
+        }}
+      >
         Travelunu
       </h1>
-
-      <p style={{
-        margin: 0,
-        fontSize: '14px',
-        color: 'rgba(255,255,255,0.7)',
-        animation: 'fadeIn 0.6s ease 0.3s both',
-      }}>
+      <p
+        style={{
+          margin: 0,
+          fontSize: '14px',
+          color: 'rgba(255,255,255,0.7)',
+        }}
+      >
         함께 만드는 여행 일정
       </p>
-
-      {/* Loading indicator */}
-      <div style={{
-        marginTop: '48px',
-        width: '24px',
-        height: '24px',
-        border: '2.5px solid rgba(255,255,255,0.3)',
-        borderTopColor: 'var(--color-on-primary)',
-        borderRadius: '50%',
-        animation: 'spin 0.8s linear infinite',
-      }} />
-
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      <div
+        style={{
+          marginTop: '40px',
+          width: '28px',
+          height: '28px',
+          border: '2.5px solid rgba(255,255,255,0.3)',
+          borderTopColor: 'rgba(255,255,255,0.95)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }}
+      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

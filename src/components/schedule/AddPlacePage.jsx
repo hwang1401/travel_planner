@@ -78,6 +78,91 @@ function FitResults({ positions }) {
   return null;
 }
 
+/* ── 커스텀 시간 선택 UI ── */
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = [0, 15, 30, 45];
+
+function TimePicker({ value, onChange, label }) {
+  const [h, m] = (value || '').match(/^(\d{1,2}):(\d{2})$/)
+    ? value.split(':').map(Number)
+    : [9, 0];
+  const safeH = Math.min(23, Math.max(0, h));
+  const safeM = MINUTES.includes(m) ? m : MINUTES[0];
+
+  const update = (newH, newM) => {
+    const hh = String(newH ?? safeH).padStart(2, '0');
+    const mm = String(newM ?? safeM).padStart(2, '0');
+    onChange(`${hh}:${mm}`);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      {label && (
+        <label style={{
+          fontSize: 'var(--typo-caption-2-regular-size)',
+          color: 'var(--color-on-surface-variant2)',
+          fontWeight: 500,
+        }}>
+          {label}
+        </label>
+      )}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '10px 12px',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--color-outline-variant)',
+        background: 'var(--color-surface-container-lowest)',
+      }}>
+        <select
+          value={safeH}
+          onChange={(e) => update(Number(e.target.value), safeM)}
+          style={{
+            flex: 1,
+            border: 'none',
+            background: 'transparent',
+            fontSize: 'var(--typo-label-2-regular-size)',
+            color: 'var(--color-on-surface)',
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            outline: 'none',
+          }}
+          aria-label="시"
+        >
+          {HOURS.map((hour) => (
+            <option key={hour} value={hour}>
+              {String(hour).padStart(2, '0')}시
+            </option>
+          ))}
+        </select>
+        <span style={{ color: 'var(--color-outline)', fontSize: '14px' }}>:</span>
+        <select
+          value={safeM}
+          onChange={(e) => update(safeH, Number(e.target.value))}
+          style={{
+            flex: 1,
+            border: 'none',
+            background: 'transparent',
+            fontSize: 'var(--typo-label-2-regular-size)',
+            color: 'var(--color-on-surface)',
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            outline: 'none',
+          }}
+          aria-label="분"
+        >
+          {MINUTES.map((min) => (
+            <option key={min} value={min}>
+              {String(min).padStart(2, '0')}분
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
   // View mode: 'search' (showing results) | 'form' (detail entry)
   const [mode, setMode] = useState('search');
@@ -93,7 +178,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
   // Form state (filled when result is selected, or manually)
   const [time, setTime] = useState('');
   const [desc, setDesc] = useState('');
-  const [type, setType] = useState('spot');
+  const [types, setTypes] = useState(['spot']); // 복수 선택
   const [sub, setSub] = useState('');
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState(null);
@@ -107,30 +192,95 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
   // Default center (Tokyo area — will be overridden by search results)
   const defaultCenter = [35.68, 139.76];
 
-  // Nominatim search
+  // 장소 검색: 쿼리 정규화, 유관검색어(역 등) 보정, 클라이언트 랭킹
+  const normalizeQuery = (q) => q.trim().replace(/\s+/g, ' ');
+  /** "하카타역" → "하카타 역" 처럼 역/정거장 붙은 검색어를 API에 맞게 보정 */
+  const queryForApi = (q) => {
+    const t = normalizeQuery(q);
+    if (!t) return t;
+    // 끝에 "역"이 붙어 있으면 앞에 공백 추가 (하카타역 → 하카타 역) → 역/정거장 결과 우선
+    const withSpaceBeforeYeok = t.replace(/([가-힣a-zA-Z0-9])(역)(?=\s|$|,)/g, '$1 $2');
+    return withSpaceBeforeYeok || t;
+  };
+  /** 검색 의도: 역/정거장 찾기인지 */
+  const hasStationIntent = (q) => /역\s*$|역$/.test(normalizeQuery(q).replace(/\s+/g, ''));
+  /** 결과 목록을 쿼리 의도에 맞게 정렬 (유사 검색어·역 우선, 하카타타츠미 등 하락) */
+  const rankSearchResults = (results, query) => {
+    const q = normalizeQuery(query);
+    const qNorm = q.replace(/\s+/g, '').toLowerCase();
+    const baseForStation = qNorm.replace(/역\s*$/, '').replace(/역$/, ''); // "하카타"
+    const wantStation = hasStationIntent(query);
+
+    const score = (r) => {
+      const name = (r.name || '').toLowerCase();
+      const full = (r.fullAddress || '').toLowerCase();
+      const typeCat = `${r.type || ''} ${r.category || ''}`.toLowerCase();
+      const text = `${name} ${full} ${typeCat}`;
+      let s = 0;
+      // 역 의도일 때: 역/station 포함이면 가산
+      if (wantStation && baseForStation) {
+        if (/\역|station|railway|train|駅/.test(text)) s += 3;
+        if (name.includes(baseForStation) && /\역|station|駅/.test(text)) s += 2;
+        // "하카타역" 검색인데 이름이 "하카타타츠미"처럼 역이 없고 다른 단어면 감점
+        if (name.startsWith(baseForStation) && name.length > baseForStation.length + 1 && !/역|station|駅/.test(name))
+          s -= 2;
+      }
+      // 이름이 쿼리(또는 보정 쿼리)로 시작하면 가산
+      const qApi = queryForApi(query).toLowerCase().replace(/\s+/g, ' ');
+      if (name.startsWith(qApi.replace(/\s/g, '')) || name.startsWith(qApi)) s += 2;
+      if (name.includes(qNorm) || name.includes(q.replace(/\s/g, ''))) s += 1;
+      if (full.includes(qNorm)) s += 0.5;
+      return s;
+    };
+    return [...results].sort((a, b) => score(b) - score(a));
+  };
+
+  const mapNominatim = (r) => ({
+    name: r.display_name?.split(',').slice(0, 2).join(', ').trim() || r.name || '',
+    fullAddress: r.display_name || '',
+    lat: parseFloat(r.lat),
+    lon: parseFloat(r.lon),
+    type: r.type || '',
+    category: r.class || '',
+  });
+  const mapPhotonFeature = (f) => {
+    const props = f.properties || {};
+    const coords = f.geometry?.coordinates;
+    const lat = coords?.[1] != null ? coords[1] : null;
+    const lon = coords?.[0] != null ? coords[0] : null;
+    const parts = [props.street, props.name, props.city, props.state, props.country].filter(Boolean);
+    const fullAddress = parts.length ? parts.join(', ') : props.name || '';
+    const name = props.name || fullAddress?.split(',').slice(0, 2).join(', ').trim() || '';
+    return { name, fullAddress, lat, lon, type: props.osm_value || '', category: props.osm_key || '' };
+  };
+
   const handleSearch = useCallback((query) => {
     setSearchQuery(query);
     setSelectedResultIdx(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) { setSearchResults([]); return; }
+    const q = normalizeQuery(query);
+    if (!q) { setSearchResults([]); return; }
 
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&addressdetails=1`
-        );
+        const qApi = queryForApi(q);
+        const encoded = encodeURIComponent(qApi);
+        let results = [];
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encoded}&limit=10&addressdetails=1`;
+        const res = await fetch(nominatimUrl);
         const data = await res.json();
-        const results = data.map((r) => ({
-          name: r.display_name?.split(',').slice(0, 2).join(', ').trim() || r.name || '',
-          fullAddress: r.display_name || '',
-          lat: parseFloat(r.lat),
-          lon: parseFloat(r.lon),
-          type: r.type || '',
-          category: r.class || '',
-        }));
+        results = (data || []).map(mapNominatim).filter((r) => r.lat != null && r.lon != null);
+
+        if (results.length === 0) {
+          const photonUrl = `https://photon.komoot.io/api/?q=${encoded}&limit=10`;
+          const photonRes = await fetch(photonUrl);
+          const photonData = await photonRes.json();
+          const features = photonData?.features || [];
+          results = features.map(mapPhotonFeature).filter((r) => r.lat != null && r.lon != null);
+        }
+        results = rankSearchResults(results, q);
         setSearchResults(results);
-        // Switch to search mode
         setMode('search');
       } catch { setSearchResults([]); }
       finally { setSearching(false); }
@@ -165,15 +315,18 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
 
   const handleSave = () => {
     if (!canSave) return;
+    const primaryType = types.length ? types[0] : 'spot';
+    const categoryLabels = types.length ? types.map((t) => TYPE_LABELS[t] || t) : ['정보'];
     const newItem = {
       time: time.trim(),
       desc: desc.trim(),
-      type,
+      type: primaryType,
       ...(sub.trim() ? { sub: sub.trim() } : {}),
       _custom: true,
       detail: {
         name: desc.trim(),
-        category: TYPE_LABELS[type] || "정보",
+        category: categoryLabels[0] || "정보",
+        ...(categoryLabels.length > 1 ? { categories: categoryLabels } : {}),
         ...(address.trim() ? { address: address.trim() } : {}),
         ...(lat != null ? { lat } : {}),
         ...(lon != null ? { lon } : {}),
@@ -184,6 +337,16 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
     onClose();
   };
 
+  const toggleType = (value) => {
+    setTypes((prev) =>
+      prev.includes(value)
+        ? prev.length > 1
+          ? prev.filter((t) => t !== value)
+          : prev
+        : [...prev, value]
+    );
+  };
+
   // Reset state when page opens
   useEffect(() => {
     if (open) {
@@ -191,7 +354,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
       setSearchQuery('');
       setSearchResults([]);
       setSelectedResultIdx(null);
-      setTime(''); setDesc(''); setType('spot'); setSub('');
+      setTime('09:00'); setDesc(''); setTypes(['spot']); setSub('');
       setAddress(''); setLat(null); setLon(null); setTip('');
       setFlyTarget(null);
       setMapReady(false);
@@ -450,13 +613,14 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
 
             {/* Form fields */}
             <div style={{ padding: 'var(--spacing-sp120) var(--spacing-sp200) var(--spacing-sp240)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sp160)' }}>
-              {/* Type selector */}
+              {/* Type selector (복수 선택) */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {TYPE_OPTIONS.map((opt) => {
-                  const selected = type === opt.value;
+                  const selected = types.includes(opt.value);
                   return (
                     <button key={opt.value}
-                      onClick={() => setType(opt.value)}
+                      type="button"
+                      onClick={() => toggleType(opt.value)}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: '3px',
                         padding: '5px 10px', borderRadius: '100px',
@@ -477,9 +641,8 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
 
               {/* Time + Name */}
               <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ width: '90px', flexShrink: 0 }}>
-                  <Field label="시간" size="lg" variant="outlined" type="time"
-                    value={time} onChange={(e) => setTime(e.target.value)} />
+                <div style={{ width: '120px', flexShrink: 0 }}>
+                  <TimePicker label="시간" value={time} onChange={setTime} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <Field label="장소명" size="lg" variant="outlined"

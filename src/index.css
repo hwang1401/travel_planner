@@ -81,3 +81,26 @@ body {
 .leaflet-popup-content {
   margin: var(--spacing-sp100) var(--spacing-sp120) !important;
 }
+
+/* Day 순서 변경 버튼: 아이콘 가시성 (밝은 배경에서도 잘 보이도록) */
+.day-reorder-btn img {
+  filter: brightness(0);
+  opacity: 0.85;
+}
+
+/* ── Skeleton (로딩 스켈레톤) ── */
+@keyframes skeletonShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-container) 0%,
+    var(--color-surface-container-low, #e8e8e8) 50%,
+    var(--color-surface-container) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.2s ease-in-out infinite;
+  border-radius: var(--radius-sm, 4px);
+}
