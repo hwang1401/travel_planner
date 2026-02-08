@@ -66,6 +66,8 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
             overflowY: 'auto',
             flex: 1,
             minHeight: 0,
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
           }}
         >
           {!(query || '').trim() ? (

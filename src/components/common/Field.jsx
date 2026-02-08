@@ -272,9 +272,9 @@ export default function Field({
         </div>
       )}
 
-      {/* Helper text (hidden when error is set) */}
-      {helper && !error && (
-        <div style={{ paddingTop: 'var(--spacing-sp40, 4px)' }}>
+      {/* Helper/Error: 예약 공간으로 항상 한 줄 높이 확보 → 나올 때 정렬 안 무너짐 */}
+      <div style={{ minHeight: '20px', paddingTop: 'var(--spacing-sp40, 4px)' }}>
+        {helper && !error && (
           <span style={{
             fontSize: 'var(--typo-caption-1-regular-size)',
             fontWeight: 'var(--typo-caption-1-regular-weight)',
@@ -282,11 +282,8 @@ export default function Field({
           }}>
             {helper}
           </span>
-        </div>
-      )}
-      {/* Error text */}
-      {error && (
-        <div style={{ paddingTop: 'var(--spacing-sp40, 4px)' }}>
+        )}
+        {error && (
           <span style={{
             fontSize: 'var(--typo-caption-1-regular-size)',
             fontWeight: 'var(--typo-caption-1-regular-weight)',
@@ -294,8 +291,8 @@ export default function Field({
           }}>
             {error}
           </span>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

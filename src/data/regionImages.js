@@ -1,7 +1,10 @@
 /**
  * Region image fallback when no place photo is available.
  * Maps region key (from address/trip) to a default image URL.
- * Add URLs as needed (e.g. from your assets or a CDN).
+ *
+ * 현재 모든 URL이 비어 있어 getRegionImageForAddress()는 항상 null을 반환합니다.
+ * 실제 이미지를 쓰려면 아래 값을 채우거나, 사용처(DetailDialog)에서 이 fallback을
+ * 제거해 두고 Google Places 사진·업로드 이미지만 사용할 수 있습니다.
  */
 export const REGION_IMAGE_MAP = {
   osaka: '',   // e.g. '/images/regions/osaka.jpg' or external URL

@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-import { getPlacePhotoForItem } from '../../lib/googlePlaces';
-import { getRegionImageForAddress } from '../../data/regionImages';
+import { useState } from 'react';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import BottomSheet from '../common/BottomSheet';
@@ -56,33 +54,15 @@ const SectionWrap = ({ label, children, px }) => (
 export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDelete }) {
   if (!detail) return null;
   const [viewImage, setViewImage] = useState(null);
-  const [fetchedImageUrl, setFetchedImageUrl] = useState(null);
-  const [imageLoading, setImageLoading] = useState(false);
   const accentColor = dayColor || COLOR.primary;
 
-  /* Lazy-fetch place photo when we have address/coords but no image (e.g. AI schedule) */
-  useEffect(() => {
-    const hasLocation = (detail.address && detail.address.trim()) || (detail.lat != null && detail.lon != null);
-    const hasNoImage = !detail.image && (!detail.images || !detail.images.length);
-    if (!hasLocation || !hasNoImage) return;
-    setImageLoading(true);
-    getPlacePhotoForItem({ detail })
-      .then((url) => { if (url) setFetchedImageUrl(url); })
-      .catch(() => {})
-      .finally(() => setImageLoading(false));
-  }, [detail?.address, detail?.lat, detail?.lon, detail?.image, detail?.images]);
-
-  /* Images: stored + optionally fetched */
+  /* Images: stored only (no auto-fetch) */
   const images = detail.images && Array.isArray(detail.images) && detail.images.length > 0
     ? detail.images
     : detail.image ? [detail.image] : [];
-  const sortedImages = detail.image && images.length > 1
+  const displayImages = detail.image && images.length > 1
     ? [detail.image, ...images.filter((img) => img !== detail.image)]
     : images;
-  const regionFallback = getRegionImageForAddress(detail?.address);
-  const displayImages = sortedImages.length > 0
-    ? sortedImages
-    : (fetchedImageUrl ? [fetchedImageUrl] : (regionFallback ? [regionFallback] : []));
 
   /* URLs */
   const directionsUrl = detail.address
@@ -133,18 +113,14 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
         </div>
 
-        {/* ── 스크롤 콘텐츠 (하단 고정 버튼과 갭 확보) ── */}
+        {/* ── 스크롤 콘텐츠 (PWA/iOS 세부 스크롤, 하단 갭만 최소로) ── */}
         <div style={{
           flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain",
-          ...((onEdit || onDelete) ? { paddingBottom: "24px" } : {}),
+          WebkitOverflowScrolling: "touch", touchAction: "pan-y",
+          ...((onEdit || onDelete) ? { paddingBottom: "12px" } : {}),
         }}>
 
-        {/* ── 이미지: 헤더 바로 아래 (저장된 이미지 + 주소/좌표로 가져온 이미지) ── */}
-        {imageLoading && displayImages.length === 0 && (
-          <div style={{ padding: "var(--spacing-sp200)", textAlign: "center", color: "var(--color-on-surface-variant)" }}>
-            이미지 불러오는 중…
-          </div>
-        )}
+        {/* ── 이미지: 헤더 바로 아래 (저장된 이미지만) ── */}
         {displayImages.length === 1 && (
           <div onClick={() => setViewImage(displayImages[0])}
             style={{

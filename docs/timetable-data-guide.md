@@ -2,6 +2,9 @@
 
 `src/data/timetable.js`의 `TIMETABLE_DB`에 노선을 추가하면, 이동(move) 일정의 **설명(desc)** 과 자동 매칭되어 시간표가 붙습니다.
 
+> **기준 시점·업데이트**  
+> 현재 `TIMETABLE_DB`의 열차 시각은 **2026년 2월 기준** 수동 정리 데이터입니다. 노선·시즌·요일에 따라 실제 다이어가 바뀌므로, 공식 JR·사철·버스 사이트 등으로 반드시 확인하는 것을 권장합니다. 정기적으로 데이터를 검토·갱신해야 하며, 장기적으로는 `docs/plan-timetable-data-acquisition.md` 및 `docs/gtfs-timetable-pipeline.md`에 정리된 GTFS 파이프라인 등으로 전환하는 것을 권장합니다.
+
 ---
 
 ## 1. 용도

@@ -816,8 +816,11 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
         {/* ── Detail form (after selecting a place) ── */}
         {mode === 'form' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            {/* 스크롤 영역: 헤더 + 폼만. 버튼은 밖에 두어 하단 고정 */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+            {/* 스크롤 영역: 헤더 + 폼 (PWA/iOS 세부 스크롤) */}
+            <div style={{
+              flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
+              WebkitOverflowScrolling: 'touch', touchAction: 'pan-y',
+            }}>
               {/* Selected place header */}
               {desc && (
                 <div style={{

@@ -203,7 +203,7 @@ export default function AddressSearch({
               key={i}
               onMouseDown={() => handleSelect(r)}
               style={{
-                display: 'flex', alignItems: 'flex-start', gap: '8px',
+                display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '10px 14px', cursor: 'pointer',
                 borderBottom: i < results.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
                 transition: 'background 0.1s',
@@ -211,16 +211,15 @@ export default function AddressSearch({
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-container-lowest)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              <Icon name="pin" size={14} style={{ marginTop: '2px', flexShrink: 0, opacity: 0.5 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{
-                  margin: 0, fontSize: 'var(--typo-label-2-medium-size)',
-                  fontWeight: 'var(--typo-label-2-medium-weight)', color: 'var(--color-on-surface)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {r.name}
-                </p>
-              </div>
+              <span style={{
+                flex: 1, minWidth: 0,
+                fontSize: 'var(--typo-label-2-medium-size)',
+                fontWeight: 'var(--typo-label-2-medium-weight)', color: 'var(--color-on-surface)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {r.name}
+              </span>
+              <Icon name="chevronRight" size={14} style={{ opacity: 0.25, flexShrink: 0 }} />
             </div>
           ))}
         </div>

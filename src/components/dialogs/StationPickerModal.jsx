@@ -130,7 +130,7 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={step === 1 ? '역명 검색 (예: 하카타)' : '도착지 검색'}
-              autoFocus
+              autoComplete="off"
               style={{
                 flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none',
                 fontSize: 'var(--typo-label-1-n---regular-size)',
@@ -190,19 +190,11 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
                     fontSize: 'var(--typo-body-2-size)',
                     fontWeight: 500,
                     cursor: 'pointer', fontFamily: 'inherit',
-                    display: 'flex', alignItems: 'center', gap: '12px',
+                    display: 'flex', alignItems: 'center', gap: '8px',
                     borderBottom: i < g.stations.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
                   }}>
-                  <div style={{
-                    width: '28px', height: '28px', borderRadius: '50%',
-                    background: 'var(--color-surface-container-high)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <Icon name="navigation" size={13} style={{ color: 'var(--color-on-surface-variant)' }} />
-                  </div>
                   <span style={{ flex: 1 }}>{s}</span>
-                  <Icon name="chevronRight" size={12} style={{ opacity: 0.15, flexShrink: 0 }} />
+                  <Icon name="chevronRight" size={12} style={{ opacity: 0.2, flexShrink: 0 }} />
                 </button>
               ))}
             </div>

@@ -315,8 +315,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
       </header>
 
-      {/* 스크롤 영역: 탭 + 본문 */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      {/* 스크롤 영역: 탭 + 본문 (PWA/iOS에서 세부 스크롤 확실히 동작) */}
+      <div style={{
+        flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column',
+        WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', touchAction: 'pan-y',
+      }}>
         {/* Tabs (only show for new items; 숨김 when aiOnly) */}
         {isNew && !aiOnly && (
           <div style={{ flexShrink: 0 }}>

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS rag_places (
   region TEXT NOT NULL,
   name_ko TEXT NOT NULL,
   name_ja TEXT,
+  -- RAG은 장소(음식/관광/쇼핑/숙소/정보)만. 앱 일정 타입에는 flight, move도 있음(rag_places에는 없음).
   type TEXT NOT NULL CHECK (type IN ('food', 'spot', 'shop', 'stay', 'info')),
   description TEXT,
   address TEXT,

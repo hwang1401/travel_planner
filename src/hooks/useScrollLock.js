@@ -5,11 +5,9 @@ let savedScrollY = 0;
 let savedStyles = null;
 
 /**
- * Body scroll lock hook that works on iOS without breaking input focus.
- * Uses overflow:hidden + touch-action instead of position:fixed to avoid
- * iOS Safari input caret positioning bugs.
- * Supports nested modals via reference counting.
- * @param {boolean} enabled - pass false to skip locking (default: true)
+ * Body scroll lock: 배경만 스크롤 막고, 모달/시트 내부 overflow 영역은 스크롤 허용.
+ * body에 touch-action 주지 않음 → 내부 스크롤 영역이 터치 스크롤 가능.
+ * iOS 등에서 세부 스크롤/전체 스크롤 구분이 잘 되도록 함.
  */
 export function useScrollLock(enabled = true) {
   useEffect(() => {
@@ -21,36 +19,34 @@ export function useScrollLock(enabled = true) {
       const html = document.documentElement;
       savedStyles = {
         bodyOverflow: body.style.overflow,
-        bodyTouchAction: body.style.touchAction,
         htmlOverflow: html.style.overflow,
       };
-
       body.style.overflow = 'hidden';
-      body.style.touchAction = 'none';
       html.style.overflow = 'hidden';
     }
     lockCount++;
 
-    // Prevent touchmove on document level for iOS
     const preventScroll = (e) => {
-      // Allow scrolling inside elements that have overflow (modal content)
       let target = e.target;
       while (target && target !== document.body) {
         const style = window.getComputedStyle(target);
-        const overflowY = style.overflowY;
-        if (overflowY === 'auto' || overflowY === 'scroll') {
+        const oy = style.overflowY;
+        const ox = style.overflowX;
+        const scrollable = oy === 'auto' || oy === 'scroll' || ox === 'auto' || ox === 'scroll';
+        if (scrollable) {
           const { scrollTop, scrollHeight, clientHeight } = target;
-          // Allow scroll if content is scrollable and not at boundary
           if (scrollHeight > clientHeight) {
-            const atTop = scrollTop <= 0;
-            const atBottom = scrollTop + clientHeight >= scrollHeight;
-            const isScrollingUp = e.touches?.[0]?.clientY > (preventScroll._lastY || 0);
-            preventScroll._lastY = e.touches?.[0]?.clientY;
-            if ((atTop && isScrollingUp) || (atBottom && !isScrollingUp)) {
+            const atTop = scrollTop <= 2;
+            const atBottom = scrollTop + clientHeight >= scrollHeight - 2;
+            const py = e.touches?.[0]?.clientY ?? 0;
+            const lastY = preventScroll._lastY ?? py;
+            preventScroll._lastY = py;
+            const movingUp = py < lastY;
+            if ((atTop && movingUp) || (atBottom && !movingUp)) {
               e.preventDefault();
               return;
             }
-            return; // Allow normal scrolling within the element
+            return;
           }
         }
         target = target.parentElement;
@@ -58,7 +54,6 @@ export function useScrollLock(enabled = true) {
       e.preventDefault();
     };
     preventScroll._lastY = 0;
-
     document.addEventListener('touchmove', preventScroll, { passive: false });
 
     return () => {
@@ -68,10 +63,8 @@ export function useScrollLock(enabled = true) {
         const body = document.body;
         const html = document.documentElement;
         body.style.overflow = savedStyles.bodyOverflow;
-        body.style.touchAction = savedStyles.bodyTouchAction;
         html.style.overflow = savedStyles.htmlOverflow;
         savedStyles = null;
-        // Restore scroll position
         window.scrollTo(0, savedScrollY);
       }
     };
