@@ -135,7 +135,7 @@ export default function ImagePicker({
             alignItems: 'center', justifyContent: 'center',
             gap: '8px',
             cursor: disabled || uploading ? 'default' : 'pointer',
-            transition: 'border-color 0.15s, background 0.15s',
+            transition: 'border-color var(--transition-fast), background var(--transition-fast)',
             opacity: disabled ? 0.5 : 1,
           }}
         >

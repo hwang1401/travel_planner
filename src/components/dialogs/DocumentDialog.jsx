@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
+import EmptyState from '../common/EmptyState';
 import Field from '../common/Field';
 import BottomSheet from '../common/BottomSheet';
 import ImageViewer from '../common/ImageViewer';
@@ -42,13 +43,7 @@ function LegacyDocumentDialog({ onClose }) {
   const current = LEGACY_TABS[tab];
 
   return (
-    <BottomSheet onClose={onClose} maxHeight="85vh">
-      <div style={{ padding: "6px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h3 style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
-          여행 서류
-        </h3>
-        <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
-      </div>
+    <BottomSheet onClose={onClose} maxHeight="85vh" title="여행 서류">
       <div style={{ display: "flex", gap: "6px", padding: "14px 20px 0" }}>
         {LEGACY_TABS.map((t, i) => (
           <Button key={i} variant={tab === i ? "primary" : "neutral"} size="md"
@@ -121,14 +116,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
   }, [fetchDocs]);
 
   return (
-    <BottomSheet onClose={onClose} maxHeight="85vh">
-      {/* Header */}
-      <div style={{ padding: "6px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h3 style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
-          여행 서류
-        </h3>
-        <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
-      </div>
+    <BottomSheet onClose={onClose} maxHeight="85vh" title="여행 서류">
 
       {/* Loading */}
       {loading && (
@@ -140,20 +128,12 @@ function DynamicDocumentDialog({ onClose, tripId }) {
 
       {/* Empty state */}
       {!loading && docs.length === 0 && (
-        <div style={{ padding: '48px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--color-surface-container-low)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="file" size={28} style={{ opacity: 0.3 }} />
-          </div>
-          <p style={{ margin: 0, fontSize: 'var(--typo-label-2-bold-size)', fontWeight: 'var(--typo-label-2-bold-weight)', color: 'var(--color-on-surface-variant2)' }}>
-            아직 등록된 문서가 없습니다
-          </p>
-          <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', lineHeight: 1.5 }}>
-            항공권, 호텔 바우처 등<br />여행 서류를 추가해보세요
-          </p>
-          <Button variant="primary" size="md" iconLeft="plus" onClick={() => setShowForm('add')} style={{ marginTop: '4px' }}>
-            문서 추가
-          </Button>
-        </div>
+        <EmptyState
+          icon="file"
+          title="아직 등록된 문서가 없습니다"
+          description={"항공권, 호텔 바우처 등\n여행 서류를 추가해보세요"}
+          actions={{ label: "문서 추가", variant: "primary", iconLeft: "plus", onClick: () => setShowForm('add') }}
+        />
       )}
 
       {/* Document tabs */}

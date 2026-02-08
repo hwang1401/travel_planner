@@ -6,6 +6,8 @@ import Button from '../common/Button';
 import Tab from '../common/Tab';
 import DetailDialog from '../dialogs/DetailDialog';
 import { getItemCoords } from '../../data/locations';
+import { TYPE_CONFIG, TYPE_LABELS } from '../../styles/tokens';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 /* ── Map helper: create numbered day icon ── */
 function createDayIcon(color, label) {
@@ -51,128 +53,119 @@ function FlyToPoint({ coords, zoom }) {
 
 /* ── Full Map Dialog ── */
 export default function FullMapDialog({ days, onClose }) {
+  useScrollLock();
   const [selectedDay, setSelectedDay] = useState(0);
   const [flyTarget, setFlyTarget] = useState(null);
-  const [selectedPin, setSelectedPin] = useState(null);
+  const [selectedItemIdx, setSelectedItemIdx] = useState(null);
   const [cardExpanded, setCardExpanded] = useState(true);
   const [mapDetail, setMapDetail] = useState(null);
   const markerRefs = useRef({});
+  const timelineRef = useRef(null);
 
   const day = days[selectedDay];
 
-  // Collect pins for selected day (allow revisits as new pins)
-  const dayPins = [];
+  // ── Build allItems: every item with coords/detail ──
+  const allItems = [];
   if (day) {
     let orderNum = 1;
-    let lastCoordKey = null;
+    const seenCoords = new Set();
     day.sections.forEach((sec) => {
       (sec.items || []).filter(Boolean).forEach((item) => {
         const loc = getItemCoords(item, selectedDay);
-        if (loc) {
-          const coordKey = loc.coords[0] + "," + loc.coords[1];
-          if (coordKey !== lastCoordKey) {
-            const hasDetail = item.detail && (item.detail.image || item.detail.images?.length || item.detail.tip || item.detail.address || item.detail.timetable);
-            dayPins.push({
-              coords: loc.coords,
-              label: loc.label,
-              desc: item.desc,
-              time: item.time,
-              color: "var(--color-primary)",
-              dayNum: day.day,
-              order: orderNum++,
-              _detail: hasDetail ? item.detail : null,
-            });
-          }
-          lastCoordKey = coordKey;
-        }
-      });
-    });
-  }
+        const coords = loc ? loc.coords : null;
+        const coordKey = coords ? `${coords[0]},${coords[1]}` : null;
+        const isNewCoord = coordKey && !seenCoords.has(coordKey);
+        if (isNewCoord) seenCoords.add(coordKey);
+        const order = coords ? (isNewCoord ? orderNum++ : orderNum - 1) : null;
+        const detail = item.detail || {};
+        const hasDetail = !!(detail.image || detail.images?.length || detail.tip || detail.address || detail.timetable || detail.hours || detail.price);
+        const enrichedDetail = hasDetail ? {
+          ...detail,
+          name: detail.name || item.desc,
+          category: detail.category || TYPE_LABELS[item.type] || "정보",
+        } : null;
 
-  // Merge overlapping pins
-  const mapPins = [];
-  dayPins.forEach((pin) => {
-    const existing = mapPins.find((p) => p.coords[0] === pin.coords[0] && p.coords[1] === pin.coords[1]);
-    if (existing) {
-      existing.orders.push(pin.order);
-      existing.mapLabel = existing.orders.join("·");
-      existing.descs.push({ time: pin.time, desc: pin.desc });
-    } else {
-      mapPins.push({
-        ...pin,
-        orders: [pin.order],
-        mapLabel: String(pin.order),
-        descs: [{ time: pin.time, desc: pin.desc }],
-      });
-    }
-  });
-
-  const positions = dayPins.map((p) => p.coords);
-
-  // Build timeline items
-  const timelineItems = [];
-  const shownPinOrders = new Set();
-  let pinCursor = 0;
-  if (day) {
-    let lastCoordKey = null;
-    day.sections.forEach((sec) => {
-      (sec.items || []).filter(Boolean).forEach((item) => {
-        const loc = getItemCoords(item, selectedDay);
-        let pinOrder = null;
-        let coords = null;
-        let hasPin = false;
-
-        if (loc) {
-          const coordKey = loc.coords[0] + "," + loc.coords[1];
-          coords = loc.coords;
-          if (coordKey !== lastCoordKey && pinCursor < dayPins.length) {
-            pinOrder = dayPins[pinCursor].order;
-            pinCursor++;
-            hasPin = true;
-          } else if (coordKey === lastCoordKey) {
-            hasPin = true;
-            pinOrder = pinCursor > 0 ? dayPins[pinCursor - 1].order : null;
-          }
-          lastCoordKey = coordKey;
-        }
-
-        const isFirstShow = pinOrder && !shownPinOrders.has(pinOrder);
-        if (isFirstShow) shownPinOrders.add(pinOrder);
-        timelineItems.push({
+        allItems.push({
+          item,
+          coords,
+          coordKey,
+          order,
+          isNewCoord,
+          detail: enrichedDetail,
+          hasDetail,
           time: item.time,
           desc: item.desc,
           type: item.type,
-          hasPin,
-          coords,
-          pinOrder,
-          showNumber: isFirstShow,
+          label: loc?.label || item.desc,
         });
       });
     });
   }
 
+  // ── Build mapPins: group by coords for map markers ──
+  const mapPins = [];
+  allItems.forEach((entry, idx) => {
+    if (!entry.coords) return;
+    const existing = mapPins.find((p) => p.coordKey === entry.coordKey);
+    if (existing) {
+      if (!existing.orders.includes(entry.order)) {
+        existing.orders.push(entry.order);
+        existing.mapLabel = existing.orders.join("·");
+      }
+      existing.items.push({ ...entry, itemIdx: idx });
+    } else {
+      mapPins.push({
+        coords: entry.coords,
+        coordKey: entry.coordKey,
+        color: "var(--color-primary)",
+        orders: [entry.order],
+        mapLabel: String(entry.order),
+        label: entry.label,
+        items: [{ ...entry, itemIdx: idx }],
+      });
+    }
+  });
+
+  // Unique coords for polyline / fitBounds (preserve order)
+  const uniquePositions = [];
+  const seenKeys = new Set();
+  allItems.forEach((e) => {
+    if (e.coords && !seenKeys.has(e.coordKey)) {
+      seenKeys.add(e.coordKey);
+      uniquePositions.push(e.coords);
+    }
+  });
+
+  // ── Handlers ──
   const handlePinClick = (pin) => {
-    setSelectedPin(pin);
     setFlyTarget({ coords: pin.coords, ts: Date.now() });
+    // Select first item at this pin
+    if (pin.items.length > 0) {
+      setSelectedItemIdx(pin.items[0].itemIdx);
+    }
   };
 
-  const handleTimelineClick = (item) => {
-    if (!item.hasPin) return;
-    const mp = mapPins.find((p) => p.orders.includes(item.pinOrder));
-    if (mp) {
-      setFlyTarget({ coords: mp.coords, ts: Date.now() });
-      setSelectedPin(mp);
-      const coordKey = mp.coords[0] + "," + mp.coords[1];
+  const handleTimelineClick = (entry, idx) => {
+    setSelectedItemIdx(idx);
+    if (entry.coords) {
+      setFlyTarget({ coords: entry.coords, ts: Date.now() });
+      // Open popup on map — DetailDialog is only opened from popup's "상세" link
       setTimeout(() => {
-        const marker = markerRefs.current[coordKey];
+        const marker = markerRefs.current[entry.coordKey];
         if (marker) marker.openPopup();
       }, 400);
     }
   };
 
+  const handlePopupDetailClick = (entry, e) => {
+    e.stopPropagation();
+    setSelectedItemIdx(entry.itemIdx);
+    if (entry.detail) setMapDetail(entry.detail);
+  };
+
   return (
     <div style={{
-      position: "fixed", inset: 0, zIndex: 2000,
+      position: "fixed", inset: 0, zIndex: "var(--z-dialog)",
       background: "var(--color-surface-container-lowest)", display: "flex", flexDirection: "column",
       animation: "fadeIn 0.2s ease",
       paddingTop: "env(safe-area-inset-top, 0px)",
@@ -188,12 +181,12 @@ export default function FullMapDialog({ days, onClose }) {
         <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
       </div>
 
-      {/* Day tabs — same size as main day tabs (md) */}
+      {/* Day tabs */}
       <div style={{ background: "var(--color-surface-container-lowest)", flexShrink: 0 }}>
         <Tab
           items={days.map((d, i) => ({ label: `D${i + 1}`, value: i }))}
           value={selectedDay}
-          onChange={(v) => { setSelectedDay(v); setSelectedPin(null); setFlyTarget(null); }}
+          onChange={(v) => { setSelectedDay(v); setSelectedItemIdx(null); setFlyTarget(null); }}
           size="md"
         />
       </div>
@@ -210,42 +203,67 @@ export default function FullMapDialog({ days, onClose }) {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {positions.length > 0 && !flyTarget && <FitBounds positions={positions} />}
+          {uniquePositions.length > 0 && !flyTarget && <FitBounds positions={uniquePositions} />}
           {flyTarget && <FlyToPoint coords={flyTarget.coords} zoom={14} key={flyTarget.ts} />}
-          {dayPins.length > 1 && (
-            <Polyline positions={dayPins.map((p) => p.coords)} color="var(--color-primary)" weight={3} opacity={0.5} dashArray="8,6" />
+          {uniquePositions.length > 1 && (
+            <Polyline positions={uniquePositions} color="var(--color-primary)" weight={3} opacity={0.5} dashArray="8,6" />
           )}
           {mapPins.map((pin, pi) => {
-            const coordKey = pin.coords[0] + "," + pin.coords[1];
+            const isSelected = selectedItemIdx != null && pin.items.some((it) => it.itemIdx === selectedItemIdx);
             return (
-            <Marker
-              key={pi}
-              ref={(ref) => { if (ref) markerRefs.current[coordKey] = ref; }}
-              position={pin.coords}
-              icon={createDayIcon(
-                selectedPin && pin.orders.includes(selectedPin.order) ? "var(--color-on-surface)" : "var(--color-primary)",
-                pin.mapLabel
-              )}
-              eventHandlers={{ click: () => handlePinClick(pin) }}
-            >
-              <Popup>
-                <div style={{ fontSize: "var(--typo-caption-1-regular-size)", fontFamily: "var(--font-family-base)", minWidth: "140px" }}>
-                  <strong style={{ fontSize: "var(--typo-label-2-bold-size)" }}>{pin.label}</strong>
-                  {pin.descs.map((d, di) => (
-                    <div key={di} style={{ color: "var(--color-on-surface-variant)", marginTop: "3px" }}>
-                      <span style={{ color: "var(--color-on-surface-variant2)" }}>{d.time}</span> {d.desc}
-                    </div>
-                  ))}
-                    {pin._detail && (
-                    <Button variant="neutral" size="sm" onClick={(e) => { e.stopPropagation(); setMapDetail(pin._detail); }}
-                      fullWidth
-                      style={{ marginTop: "8px" }}>
-                      상세보기
-                    </Button>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
+              <Marker
+                key={pi}
+                ref={(ref) => { if (ref) markerRefs.current[pin.coordKey] = ref; }}
+                position={pin.coords}
+                icon={createDayIcon(
+                  isSelected ? "var(--color-on-surface)" : "var(--color-primary)",
+                  pin.mapLabel
+                )}
+                eventHandlers={{ click: () => handlePinClick(pin) }}
+              >
+                <Popup>
+                  <div style={{
+                    fontSize: "var(--typo-caption-1-regular-size)",
+                    fontFamily: "var(--font-family-base)",
+                    minWidth: "160px",
+                    maxHeight: "200px",
+                    overflowY: "auto",
+                  }}>
+                    <strong style={{ fontSize: "var(--typo-label-2-bold-size)", display: "block", marginBottom: "6px" }}>
+                      {pin.label}
+                    </strong>
+                    {pin.items.map((entry, di) => (
+                      <div key={di} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "4px 0",
+                        borderBottom: di < pin.items.length - 1 ? "1px solid var(--color-surface-dim)" : "none",
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ color: "var(--color-on-surface-variant2)", fontSize: "var(--typo-caption-2-regular-size)" }}>
+                            {entry.time}
+                          </span>
+                          {" "}
+                          <span style={{ color: "var(--color-on-surface)", fontSize: "var(--typo-caption-2-medium-size)", fontWeight: 500 }}>
+                            {entry.desc}
+                          </span>
+                        </div>
+                        {entry.hasDetail && (
+                          <span
+                            onClick={(e) => handlePopupDetailClick(entry, e)}
+                            style={{
+                              flexShrink: 0, marginLeft: "8px",
+                              fontSize: "var(--typo-caption-2-medium-size)",
+                              color: "var(--color-primary)", cursor: "pointer", fontWeight: 500,
+                            }}
+                          >
+                            상세
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Popup>
+              </Marker>
             );
           })}
         </MapContainer>
@@ -261,7 +279,7 @@ export default function FullMapDialog({ days, onClose }) {
       {/* Bottom itinerary card */}
       <div style={{
         background: "var(--color-surface-container-lowest)", borderTop: "1px solid var(--color-outline-variant)", flexShrink: 0,
-        maxHeight: cardExpanded ? "35vh" : "44px", transition: "max-height 0.25s ease",
+        maxHeight: cardExpanded ? "35vh" : "44px", transition: "max-height var(--transition-normal)",
         overflow: "hidden", display: "flex", flexDirection: "column",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}>
@@ -271,6 +289,7 @@ export default function FullMapDialog({ days, onClose }) {
             width: "100%", display: "flex", alignItems: "center",
             padding: "12px 16px", border: "none", borderRadius: 0,
             background: "none", cursor: "pointer", gap: "8px",
+            fontFamily: "inherit",
           }}>
           <span style={{
             flex: 1, textAlign: "left",
@@ -283,59 +302,66 @@ export default function FullMapDialog({ days, onClose }) {
             fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)",
             flexShrink: 0,
           }}>
-            {dayPins.length}곳
+            {mapPins.length}곳
           </span>
           <Icon name={cardExpanded ? "chevronDown" : "chevronUp"} size={16}
             style={{ flexShrink: 0, opacity: 0.5 }} />
         </button>
 
-        {/* Timeline list */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 12px" }}>
-          {timelineItems.map((item, i) => (
-            <div
-              key={i}
-              onClick={() => handleTimelineClick(item)}
-              style={{
-                display: "flex", alignItems: "center", gap: "8px",
-                padding: "7px 8px", borderRadius: "var(--radius-md, 8px)",
-                cursor: item.hasPin ? "pointer" : "default",
-                background: selectedPin && selectedPin.orders && selectedPin.orders.includes(item.pinOrder) ? "var(--color-primary-container)" : "transparent",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => { if (item.hasPin) e.currentTarget.style.background = "var(--color-surface-container-low)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = selectedPin && selectedPin.orders && selectedPin.orders.includes(item.pinOrder) ? "var(--color-primary-container)" : "transparent"; }}
-            >
-              {item.showNumber ? (
-                <div style={{
-                  width: "20px", height: "20px", borderRadius: "50%",
-                  background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: "var(--typo-caption-3-bold-size)", fontWeight: "var(--typo-caption-3-bold-weight)",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                }}>{item.pinOrder}</div>
-              ) : (
-                <div style={{
-                  width: "20px", height: "20px", display: "flex",
-                  alignItems: "center", justifyContent: "center", flexShrink: 0,
+        {/* Timeline list — timetable style: time / colorbar / title */}
+        <div ref={timelineRef} style={{ flex: 1, overflowY: "auto", padding: "0 4px 12px" }}>
+          {allItems.map((entry, i) => {
+            const cfg = TYPE_CONFIG[entry.type] || TYPE_CONFIG.info;
+            const isActive = selectedItemIdx === i;
+            return (
+              <div
+                key={i}
+                onClick={() => handleTimelineClick(entry, i)}
+                style={{
+                  display: "flex", alignItems: "flex-start",
+                  gap: "var(--spacing-sp80)",
+                  padding: "8px 4px",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: entry.coords ? "pointer" : "default",
+                  background: isActive ? "var(--color-primary-container)" : "transparent",
+                  transition: "background 0.15s",
+                }}
+              >
+                {/* Time: 32px right-aligned */}
+                <span style={{
+                  width: "32px", flexShrink: 0, textAlign: "right",
+                  fontSize: "var(--typo-caption-2-bold-size)",
+                  fontWeight: "var(--typo-caption-2-bold-weight)",
+                  color: isActive ? "var(--color-primary)" : "var(--color-on-surface-variant)",
+                  fontVariantNumeric: "tabular-nums",
+                  lineHeight: "18px",
                 }}>
-                  <div style={{
-                    width: item.hasPin ? "6px" : "4px",
-                    height: item.hasPin ? "6px" : "4px",
-                    borderRadius: "50%",
-                    background: item.hasPin ? "var(--color-primary-fixed-dim)" : "var(--color-outline-variant)",
-                  }} />
-                </div>
-              )}
-              <span style={{
-                fontSize: "var(--typo-caption-3-medium-size)", fontWeight: "var(--typo-caption-3-medium-weight)", color: "var(--color-on-surface-variant2)",
-                width: "36px", flexShrink: 0, textAlign: "right",
-                fontVariantNumeric: "tabular-nums",
-              }}>{item.time}</span>
-              <span style={{
-                fontSize: "var(--typo-caption-2-medium-size)", color: item.hasPin ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
-                fontWeight: item.hasPin ? "var(--typo-caption-2-medium-weight)" : "var(--typo-caption-2-regular-weight)",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
-              }}>{item.desc}</span>
-            </div>
-          ))}
+                  {entry.time}
+                </span>
+
+                {/* Color bar: 3px */}
+                <div style={{
+                  width: "3px", flexShrink: 0,
+                  borderRadius: "var(--radius-xsm)",
+                  background: cfg.text,
+                  opacity: entry.coords ? 0.7 : 0.3,
+                  alignSelf: "stretch", minHeight: "18px",
+                }} />
+
+                {/* Title */}
+                <span style={{
+                  flex: 1, minWidth: 0,
+                  fontSize: "var(--typo-caption-2-medium-size)",
+                  fontWeight: entry.coords ? 500 : 400,
+                  color: entry.coords ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
+                  lineHeight: "18px",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {entry.desc}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

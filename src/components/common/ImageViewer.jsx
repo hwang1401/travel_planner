@@ -1,8 +1,10 @@
 import { createPortal } from 'react-dom';
 import Button from './Button';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 /* ── Image Viewer (fullscreen lightbox via Portal) ── */
 export default function ImageViewer({ src, alt, onClose }) {
+  useScrollLock(!!src);
   if (!src) return null;
 
   // Render via Portal so it escapes any parent overflow:hidden / z-index stacking
@@ -10,7 +12,7 @@ export default function ImageViewer({ src, alt, onClose }) {
     <div
       onClick={onClose}
       style={{
-        position: "fixed", inset: 0, zIndex: 9999,
+        position: "fixed", inset: 0, zIndex: "var(--z-viewer)",
         background: "rgba(0,0,0,0.92)",
         display: "flex", alignItems: "center", justifyContent: "center",
         animation: "fadeIn 0.15s ease",
@@ -19,7 +21,7 @@ export default function ImageViewer({ src, alt, onClose }) {
     >
       <Button variant="ghost-neutral" size="lg" iconOnly="close" onClick={onClose}
         style={{
-          position: "absolute", top: "calc(16px + env(safe-area-inset-top, 0px))", right: "calc(16px + env(safe-area-inset-right, 0px))", zIndex: 10000,
+          position: "absolute", top: "calc(16px + env(safe-area-inset-top, 0px))", right: "calc(16px + env(safe-area-inset-right, 0px))", zIndex: 1,
           background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)",
           width: "40px", height: "40px",
         }} />

@@ -142,7 +142,7 @@ export default function AddressSearch({
         height: s.height, padding: `0 ${s.px}`,
         border: `1px solid ${borderColor}`, borderRadius: s.radius,
         background: variant === 'filled' ? 'var(--color-surface-container-low)' : 'transparent',
-        transition: 'border-color 0.15s',
+        transition: 'border-color var(--transition-fast)',
       }}>
         <Icon name="search" size={s.iconSize} style={{ flexShrink: 0, opacity: 0.5 }} />
         <input

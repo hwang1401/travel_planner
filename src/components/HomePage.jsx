@@ -3,79 +3,51 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Icon from './common/Icon';
 import Button from './common/Button';
+import EmptyState from './common/EmptyState';
 import Toast from './common/Toast';
 import ConfirmDialog from './common/ConfirmDialog';
 import CreateTripDialog from './dialogs/CreateTripDialog';
+import CreateTripWizard from './trip/CreateTripWizard';
 import { loadTrips, createTrip, updateTrip, deleteTrip, duplicateTrip, getShareCode, formatDateRange } from '../services/tripService';
 import { getShareLink } from '../services/memberService';
 import { loadCustomData, mergeData } from '../data/storage';
 import { BASE_DAYS } from '../data/days';
 import BottomSheet from './common/BottomSheet';
-
-/* ── Shared card styles ── */
-const cardStyle = {
-  borderRadius: 'var(--radius-md, 8px)', overflow: 'hidden',
-  cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s',
-  background: 'var(--color-surface-container-lowest)',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-};
+import { COLOR, SPACING, RADIUS } from '../styles/tokens';
 
 /* ── Trip Card Component ── */
 function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge, memberCount, onClick, onMore }) {
   return (
-    <div style={{ position: 'relative', marginBottom: '16px' }}>
+    <div style={{ position: 'relative', marginBottom: '12px' }}>
       <div
         onClick={onClick}
-        style={cardStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'; }}
+        style={{
+          borderRadius: 'var(--radius-lg, 12px)', overflow: 'hidden',
+          cursor: 'pointer', transition: 'background var(--transition-fast)',
+          background: 'var(--color-surface-container-lowest)',
+          border: '1px solid var(--color-outline-variant)',
+        }}
       >
-        {/* Cover: image or gradient */}
+        {/* Cover: image or neutral surface */}
         <div style={{
-          height: '88px',
-          background: coverImage ? 'none' : (coverColor || 'linear-gradient(135deg, #3A7DB5, #5BAEE6)'),
-          position: 'relative', padding: '0 16px',
-          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-          paddingBottom: '12px', overflow: 'hidden',
+          height: coverImage ? '100px' : '0',
+          position: 'relative', overflow: 'hidden',
         }}>
           {coverImage && (
-            <>
-              <img
-                src={coverImage}
-                alt=""
-                style={{
-                  position: 'absolute', inset: 0, width: '100%', height: '100%',
-                  objectFit: 'cover',
-                }}
-              />
-              {/* Gradient overlay for chip readability */}
-              <div style={{
-                position: 'absolute', inset: 0,
-                background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.05) 60%)',
-              }} />
-            </>
-          )}
-          {/* Destination chips */}
-          {destinations?.length > 0 && (
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
-              {destinations.map((d, i) => (
-                <span key={i} style={{
-                  padding: '3px 10px', borderRadius: '100px',
-                  background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)',
-                  fontSize: 'var(--typo-caption-3-bold-size)',
-                  fontWeight: 'var(--typo-caption-3-bold-weight)',
-                  color: 'white', lineHeight: 1.4,
-                }}>
-                  {typeof d === 'string' ? d : d}
-                </span>
-              ))}
-            </div>
+            <img
+              src={coverImage}
+              alt=""
+              style={{
+                position: 'absolute', inset: 0, width: '100%', height: '100%',
+                objectFit: 'cover',
+              }}
+            />
           )}
         </div>
 
         {/* Info area */}
         <div style={{ padding: '14px 16px' }}>
-          {/* Title row */}
+          {/* Title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
             <p style={{
               margin: 0,
@@ -101,45 +73,30 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
             )}
           </div>
 
-          {/* Meta row */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          {/* Meta: date + destinations + member count */}
+          <p style={{
+            margin: 0, fontSize: 'var(--typo-caption-2-regular-size)',
+            color: 'var(--color-on-surface-variant2)', lineHeight: 1.5,
           }}>
-            <p style={{
-              margin: 0, fontSize: 'var(--typo-caption-2-regular-size)',
-              color: 'var(--color-on-surface-variant2)',
-              display: 'flex', alignItems: 'center', gap: '4px',
-            }}>
-              <Icon name="calendar" size={12} style={{ opacity: 0.6 }} />
-              {subtitle}
-            </p>
-            {memberCount > 0 && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '3px',
-              }}>
-                <Icon name="person" size={12} style={{ opacity: 0.4 }} />
-                <span style={{
-                  fontSize: 'var(--typo-caption-3-regular-size)',
-                  color: 'var(--color-on-surface-variant2)',
-                }}>
-                  {memberCount}
-                </span>
-              </div>
-            )}
-          </div>
+            {subtitle}
+            {destinations?.length > 0 && ` · ${destinations.map((d) => typeof d === 'string' ? d : d).join(', ')}`}
+            {memberCount > 0 && ` · ${memberCount}명`}
+          </p>
         </div>
       </div>
 
-      {/* More button (top-right on cover) */}
+      {/* More button (top-right) */}
       <button
         onClick={(e) => { e.stopPropagation(); onMore(); }}
         style={{
-          position: 'absolute', top: '10px', right: '10px',
-          width: '30px', height: '30px', borderRadius: '50%',
-          background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)',
+          position: 'absolute', top: coverImage ? '10px' : '12px', right: '10px',
+          width: '28px', height: '28px', borderRadius: '50%',
+          background: coverImage ? 'rgba(0,0,0,0.25)' : 'var(--color-surface-container-low)',
+          backdropFilter: coverImage ? 'blur(8px)' : 'none',
           border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', fontSize: '16px', fontWeight: 700, letterSpacing: '1px',
+          color: coverImage ? 'white' : 'var(--color-on-surface-variant2)',
+          fontSize: '14px', fontWeight: 700, letterSpacing: '1px',
         }}
       >
         ···
@@ -462,37 +419,13 @@ export default function HomePage() {
 
             {/* Empty state — only when truly no trips at all */}
             {totalTrips === 0 && (
-              <div style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                padding: '48px 20px', textAlign: 'center',
-                marginTop: '24px',
-              }}>
-                <div style={{
-                  width: '72px', height: '72px', borderRadius: '50%',
-                  background: 'var(--color-primary-container)', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', marginBottom: '16px',
-                }}>
-                  <Icon name="navigation" size={32} />
-                </div>
-                <p style={{
-                  margin: '0 0 6px',
-                  fontSize: 'var(--typo-body-1-n---bold-size)',
-                  fontWeight: 'var(--typo-body-1-n---bold-weight)',
-                  color: 'var(--color-on-surface)',
-                }}>
-                  새로운 여행을 계획해보세요
-                </p>
-                <p style={{
-                  margin: '0 0 24px', fontSize: 'var(--typo-caption-1-regular-size)',
-                  color: 'var(--color-on-surface-variant2)', lineHeight: 1.6,
-                }}>
-                  아래 버튼을 눌러 여행을 만들고<br />함께할 사람들을 초대할 수 있습니다
-                </p>
-                <Button variant="primary" size="lg" iconLeft="plus"
-                  onClick={() => setShowCreate(true)}
-                  style={{ borderRadius: '12px' }}>
-                  첫 여행 만들기
-                </Button>
+              <div style={{ marginTop: '24px' }}>
+                <EmptyState
+                  icon="navigation"
+                  title="새로운 여행을 계획해보세요"
+                  description={"버튼을 눌러 여행을 만들고\n함께할 사람들을 초대할 수 있습니다"}
+                  actions={{ label: "첫 여행 만들기", variant: "primary", iconLeft: "plus", onClick: () => setShowCreate(true) }}
+                />
               </div>
             )}
           </>
@@ -516,10 +449,8 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Create Trip Dialog */}
-      {showCreate && (
-        <CreateTripDialog onClose={() => setShowCreate(false)} onCreate={handleCreate} />
-      )}
+      {/* Create Trip Wizard (full-screen step wizard) */}
+      <CreateTripWizard open={showCreate} onClose={() => setShowCreate(false)} onCreate={handleCreate} />
 
       {/* Edit Trip Dialog */}
       {editTrip && (

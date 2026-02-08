@@ -87,13 +87,13 @@ export default function ImportPreviewDialog({
             {conflicts.external.length > 0 && (
               <div style={{
                 padding: "10px 12px", marginBottom: "8px",
-                background: "#FFF0F0",
+                background: "var(--color-error-container)",
                 borderRadius: "var(--radius-md, 8px)",
-                border: "1px solid #FECACA",
+                border: "1px solid var(--color-error)",
               }}>
                 <p style={{
                   margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
-                  color: "#B91C1C",
+                  color: "var(--color-on-error-container)",
                   display: "flex", alignItems: "flex-start", gap: "6px",
                 }}>
                   <Icon name="flash" size={12} style={{ marginTop: "2px", flexShrink: 0 }} />
@@ -139,7 +139,7 @@ export default function ImportPreviewDialog({
                     display: "flex", alignItems: "center", gap: "8px",
                     padding: "8px 12px",
                     borderBottom: isLast ? "none" : "1px solid var(--color-surface-dim)",
-                    background: hasExternalConflict ? "#FFF8F8" : "transparent",
+                    background: hasExternalConflict ? "var(--color-error-container)" : "transparent",
                   }}
                 >
                   <span style={{

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import Field from '../common/Field';
 import BottomSheet from '../common/BottomSheet';
 import Button from '../common/Button';
+import Icon from '../common/Icon';
 import ConfirmDialog from '../common/ConfirmDialog';
 
 /* ── Add Day Dialog (Bottom Sheet) ── */
@@ -17,16 +18,6 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
     const maxDay = existingNums.length > 0 ? Math.max(...existingNums) : 0;
     setDayNum(String(maxDay + 1));
   });
-
-  /* Build 1~50 options */
-  const dayOptions = useMemo(() => {
-    const opts = [];
-    for (let i = 1; i <= 50; i++) {
-      const exists = existingNums.includes(i);
-      opts.push({ value: String(i), label: `Day ${i}${exists ? " (존재)" : ""}` });
-    }
-    return opts;
-  }, [existingNums]);
 
   const isDuplicate = existingNums.includes(parseInt(dayNum, 10));
   const canSubmit = label.trim() && dayNum;
@@ -45,28 +36,74 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
     onAdd(label.trim(), "pin", parseInt(dayNum, 10), true /* overwrite */);
   };
 
+  /* Visible range: show a reasonable set around the default */
+  const maxDay = existingNums.length > 0 ? Math.max(...existingNums) : 0;
+  const rangeEnd = Math.max(maxDay + 5, 15);
+
   return (
     <>
-      <BottomSheet onClose={onCancel} maxHeight="auto" zIndex={3000}>
-        <div style={{ padding: "8px 24px 24px" }}>
-          <h3 style={{ margin: "0 0 20px", fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
-            날짜 추가
-          </h3>
+      <BottomSheet onClose={onCancel} maxHeight="auto" zIndex={3000} title="날짜 추가">
+        <div style={{ padding: "8px 20px 24px" }}>
 
-          {/* Day number dropdown */}
+          {/* Day number — inline horizontal chip selector (no nested BottomSheet) */}
           <div style={{ marginBottom: "16px" }}>
-            <Field as="select" label="날짜 번호" required size="lg" variant="outlined"
-              value={dayNum}
-              onChange={(e) => setDayNum(e.target.value)}>
-              {dayOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </Field>
+            <div style={{
+              display: "flex", alignItems: "center", gap: "4px",
+              paddingBottom: "6px",
+            }}>
+              <span style={{
+                fontSize: "var(--typo-caption-2-bold-size)",
+                fontWeight: "var(--typo-caption-2-bold-weight)",
+                color: "var(--color-on-surface-variant)",
+              }}>
+                날짜 번호
+              </span>
+            </div>
+            <div style={{
+              display: "flex", gap: "6px", flexWrap: "wrap",
+            }}>
+              {Array.from({ length: rangeEnd }, (_, i) => i + 1).map((num) => {
+                const exists = existingNums.includes(num);
+                const selected = String(num) === dayNum;
+                return (
+                  <button
+                    key={num}
+                    onClick={() => setDayNum(String(num))}
+                    style={{
+                      minWidth: "44px", height: "36px",
+                      borderRadius: "8px",
+                      border: selected
+                        ? "1.5px solid var(--color-primary)"
+                        : "1px solid var(--color-outline-variant)",
+                      background: selected
+                        ? "var(--color-primary)"
+                        : exists ? "var(--color-surface-container-low)" : "transparent",
+                      color: selected
+                        ? "#fff"
+                        : exists ? "var(--color-on-surface-variant2)" : "var(--color-on-surface)",
+                      fontSize: "var(--typo-label-2-medium-size)",
+                      fontWeight: selected ? 700 : 500,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      gap: "2px",
+                      padding: "0 6px",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {num}
+                    {exists && !selected && (
+                      <span style={{ fontSize: "9px", opacity: 0.5 }}>✓</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Day name */}
           <div style={{ marginBottom: "20px" }}>
-            <Field label="날짜 이름" required size="lg" variant="outlined"
+            <Field label="날짜 이름" size="lg" variant="outlined"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && canSubmit) handleSubmit(); }}

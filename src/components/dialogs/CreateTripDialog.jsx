@@ -8,6 +8,7 @@ import ImagePicker from '../common/ImagePicker';
 import Toast from '../common/Toast';
 import { uploadImage, generateImagePath } from '../../services/imageService';
 import { generateFullTripSchedule } from '../../services/geminiService';
+import { getTypeConfig, RADIUS } from '../../styles/tokens';
 
 /*
  * ── Create Trip Dialog ──
@@ -94,7 +95,7 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
   };
 
   return (
-    <BottomSheet onClose={onClose} maxHeight="auto" zIndex={4000}>
+    <BottomSheet onClose={onClose} maxHeight="auto" zIndex="var(--z-toast)">
       <div style={{ padding: '8px 20px 20px' }}>
         {/* Header */}
         <div style={{ marginBottom: '14px' }}>
@@ -395,18 +396,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
   };
 
   return (
-    <BottomSheet onClose={onClose} maxHeight="92vh">
-      {/* Header */}
-      <div style={{
-        padding: '6px 16px 12px 20px', flexShrink: 0,
-        borderBottom: '1px solid var(--color-outline-variant)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <h3 style={{ margin: 0, fontSize: 'var(--typo-body-1-n---bold-size)', fontWeight: 'var(--typo-body-1-n---bold-weight)', color: 'var(--color-on-surface)' }}>
-          {isEdit ? '여행 수정' : '새 여행 만들기'}
-        </h3>
-        <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
-      </div>
+    <BottomSheet onClose={onClose} maxHeight="92vh" title={isEdit ? '여행 수정' : '새 여행 만들기'}>
 
       {/* Form */}
       <div ref={previewScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -424,9 +414,9 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         {/* ── Section: 여행 정보 ── */}
         <section>
           <p style={{
-            margin: '0 0 12px', fontSize: 'var(--typo-caption-1-bold-size)',
-            fontWeight: 'var(--typo-caption-1-bold-weight)', color: 'var(--color-primary)',
-            display: 'flex', alignItems: 'center', gap: '6px',
+            margin: '0 0 12px', fontSize: 'var(--typo-caption-2-bold-size)',
+            fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant2)',
+            letterSpacing: '0.5px',
           }}>
             여행 정보
           </p>
@@ -479,9 +469,9 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         {/* ── Section: 일정 ── */}
         <section>
           <p style={{
-            margin: '0 0 12px', fontSize: 'var(--typo-caption-1-bold-size)',
-            fontWeight: 'var(--typo-caption-1-bold-weight)', color: 'var(--color-primary)',
-            display: 'flex', alignItems: 'center', gap: '6px',
+            margin: '0 0 12px', fontSize: 'var(--typo-caption-2-bold-size)',
+            fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant2)',
+            letterSpacing: '0.5px',
           }}>
             일정
           </p>
@@ -530,8 +520,9 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         {!isEdit && (
           <section>
             <p style={{
-              margin: '0 0 12px', fontSize: 'var(--typo-caption-1-bold-size)',
-              fontWeight: 'var(--typo-caption-1-bold-weight)', color: 'var(--color-primary)',
+              margin: '0 0 12px', fontSize: 'var(--typo-caption-2-bold-size)',
+              fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant2)',
+              letterSpacing: '0.5px',
             }}>
               AI 일정 자동 생성
             </p>
@@ -673,7 +664,6 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                     const totalItems = allItems.length;
                     const isOpen = expandedDay === di;
                     const TYPE_ICONS = { food: "fire", spot: "pin", shop: "shopping", move: "navigation", stay: "home", info: "flash" };
-                    const TYPE_COLORS = { food: "#C75D20", spot: "#2B6CB0", shop: "#6B46C1", move: "#6B6B67", stay: "#2A7D4F", info: "#8A7E22" };
                     return (
                       <div key={di} style={{
                         borderBottom: di < aiPreview.days.length - 1 ? '1px solid var(--color-outline-variant)' : 'none',
@@ -737,8 +727,8 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                                   {it.time || ''}
                                 </span>
                                 <div style={{
-                                  width: '3px', flexShrink: 0, borderRadius: '2px',
-                                  background: TYPE_COLORS[it.type] || '#999',
+                                  width: '3px', flexShrink: 0, borderRadius: RADIUS.xs,
+                                  background: getTypeConfig(it.type).text,
                                   alignSelf: 'stretch', minHeight: '16px',
                                 }} />
                                 <div style={{ flex: 1, minWidth: 0 }}>

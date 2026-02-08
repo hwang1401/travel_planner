@@ -23,7 +23,7 @@ export default function Toast({ message, icon, duration = 2500, onDone }) {
       bottom: "calc(32px + env(safe-area-inset-bottom, 0px))",
       left: "50%",
       transform: `translateX(-50%) translateY(${exiting ? "20px" : "0"})`,
-      zIndex: 5000,
+      zIndex: "var(--z-toast)",
       background: "var(--color-inverse-surface)",
       color: "var(--color-on-inverse-surface)",
       padding: "10px 20px",
@@ -35,7 +35,7 @@ export default function Toast({ message, icon, duration = 2500, onDone }) {
       fontSize: "var(--typo-label-2-medium-size)",
       fontWeight: "var(--typo-label-2-medium-weight)",
       opacity: exiting ? 0 : 1,
-      transition: "opacity 0.3s ease, transform 0.3s ease",
+      transition: "opacity var(--transition-slow), transform var(--transition-slow)",
       pointerEvents: "none",
       whiteSpace: "nowrap",
     }}>

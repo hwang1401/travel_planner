@@ -106,8 +106,11 @@ const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
     "sub": "부가 설명 (가격, 소요시간 등)",
     "detail": {
       "address": "주소 (있는 경우)",
+      "lat": 33.5894,
+      "lon": 130.4112,
       "timetable": "영업시간 (있는 경우)",
-      "tip": "팁, 주의사항, 메뉴 추천 등 (있는 경우)"
+      "tip": "팁, 주의사항, 메뉴 추천 등 (있는 경우)",
+      "highlights": ["핵심 포인트 1", "핵심 포인트 2"]
     }
   }
 ]
@@ -128,7 +131,9 @@ const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
 5. 시간순으로 정렬해주세요.
 6. 문서가 여행 일정이 아닌 경우에도 최대한 시간대별 활동을 추론해주세요.
 7. detail.timetable은 "영업시간" 문자열입니다 (예: "11:00~23:00").
-8. detail 객체는 address, tip, timetable 중 하나라도 있으면 반드시 포함하세요.`;
+8. detail 객체는 address, tip, timetable 중 하나라도 있으면 반드시 포함하세요.
+9. detail.highlights에는 해당 장소의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 팁 등). food, spot, shop 타입은 반드시 포함.
+10. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요. 유명 장소의 좌표를 알고 있다면 반드시 넣어주세요.`;
 
 /**
  * Analyze document content using Gemini AI and extract schedule items.
@@ -209,6 +214,7 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus } 
                   ...(item.detail.address ? { address: item.detail.address } : {}),
                   ...(item.detail.timetable ? { hours: item.detail.timetable } : {}),
                   ...(item.detail.tip ? { tip: item.detail.tip } : {}),
+                  ...(Array.isArray(item.detail.highlights) && item.detail.highlights.length > 0 ? { highlights: item.detail.highlights } : {}),
                 },
               }
             : {}),
@@ -242,7 +248,10 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
       "sub": "부가 설명 (가격, 소요시간 등)",
       "detail": {
         "address": "주소 (있는 경우)",
-        "tip": "팁, 추천 메뉴, 주의사항 등 (있는 경우)"
+        "lat": 33.5894,
+        "lon": 130.4112,
+        "tip": "팁, 추천 메뉴, 주의사항 등 (있는 경우)",
+        "highlights": ["핵심 포인트 1", "핵심 포인트 2"]
       }
     }
   ]
@@ -264,8 +273,10 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
 5. sub에 예상 비용이나 소요시간을 넣어주세요.
 6. food, spot, shop, stay 타입은 반드시 detail.address를 포함하세요 (실제 주소 또는 구글맵에서 검색 가능한 장소명).
 7. detail 객체는 address가 있으면 반드시 포함하세요.
-6. message에는 추천 코스를 간단히 설명하고, 이모지를 적절히 사용해주세요.
-7. 보통 하루 일정은 5~10개 항목이 적당합니다.`;
+8. message에는 추천 코스를 간단히 설명하고, 이모지를 적절히 사용해주세요.
+9. 보통 하루 일정은 5~10개 항목이 적당합니다.
+10. detail.highlights에는 해당 장소의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등). food, spot, shop 타입은 반드시 포함.
+11. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요.`;
 
 /**
  * Get AI schedule recommendations based on natural language input.
@@ -350,6 +361,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
                   category: TYPE_CAT2[itemType] || "정보",
                   ...(item.detail.address ? { address: item.detail.address } : {}),
                   ...(item.detail.tip ? { tip: item.detail.tip } : {}),
+                  ...(Array.isArray(item.detail.highlights) && item.detail.highlights.length > 0 ? { highlights: item.detail.highlights } : {}),
                 },
               }
             : {}),
@@ -388,7 +400,10 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
               "sub": "부가 설명 (가격, 소요시간 등)",
               "detail": {
                 "address": "주소 (있는 경우)",
-                "tip": "팁이나 추천 (있는 경우)"
+                "lat": 34.6937,
+                "lon": 135.5023,
+                "tip": "팁이나 추천 (있는 경우)",
+                "highlights": ["핵심 포인트 1", "핵심 포인트 2"]
               }
             }
           ]
@@ -424,7 +439,10 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 7. label은 그 날의 핵심 테마를 간결하게 표현하세요.
 8. 식사는 하루 3끼 (아침은 간단하게도 OK), 각 지역 특색 음식 위주로.
 9. detail.tip에는 꿀팁, 추천 메뉴, 할인 정보 등을 넣어주세요.
-10. 여행 첫날이나 마지막날은 이동이 많으므로 일정을 가볍게 잡으세요.`;
+10. 여행 첫날이나 마지막날은 이동이 많으므로 일정을 가볍게 잡으세요.
+11. detail.highlights에는 해당 장소/일정의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등).
+12. food, spot, shop 타입은 반드시 highlights를 포함하세요.
+13. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요.`;
 
 /**
  * Generate a full multi-day trip schedule using AI.
@@ -482,15 +500,11 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
     }
 
     const rawDays = Array.isArray(parsed.days) ? parsed.days : [];
+    const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
 
     // Normalize days into our schedule data format
-    const days = rawDays.map((day, i) => ({
-      day: day.day || i + 1,
-      label: day.label || `Day ${i + 1}`,
-      icon: "pin",
-      date: "",
-      stay: "",
-      sections: (day.sections || []).map((sec) => ({
+    const days = rawDays.map((day, i) => {
+      const sections = (day.sections || []).map((sec) => ({
         title: sec.title || "일정",
         items: (sec.items || [])
           .filter((it) => it && it.desc)
@@ -506,15 +520,41 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
                     category: ({ food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "정보" })[it.type] || "관광",
                     ...(it.detail.address ? { address: it.detail.address } : {}),
                     ...(it.detail.tip ? { tip: it.detail.tip } : {}),
+                    ...(Array.isArray(it.detail.highlights) && it.detail.highlights.length > 0 ? { highlights: it.detail.highlights } : {}),
                   },
                 }
               : {}),
             _extra: true,
             _custom: true,
           })),
-      })),
-      _custom: true,
-    }));
+      }));
+
+      // Compute date string from startDate
+      let dateStr = "";
+      if (startDate) {
+        const base = new Date(startDate);
+        base.setDate(base.getDate() + i);
+        const m = base.getMonth() + 1;
+        const d = base.getDate();
+        const w = WEEKDAY_KR[base.getDay()];
+        dateStr = `${m}/${d} (${w})`;
+      }
+
+      // Extract stay info from stay-type items
+      const allItems = sections.flatMap((s) => s.items);
+      const stayItem = allItems.find((it) => it.type === "stay");
+      const stayStr = stayItem ? stayItem.desc : "";
+
+      return {
+        day: day.day || i + 1,
+        label: day.label || `Day ${i + 1}`,
+        icon: "pin",
+        date: dateStr,
+        stay: stayStr,
+        sections,
+        _custom: true,
+      };
+    });
 
     return { days, error: null };
   } catch (err) {

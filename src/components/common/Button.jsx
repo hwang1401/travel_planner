@@ -144,7 +144,7 @@ export default function Button({
     color: vs.color,
     border: vs.border,
     cursor: disabled ? 'default' : 'pointer',
-    transition: 'all 0.15s ease',
+    transition: 'all var(--transition-fast)',
     flexShrink: 0,
     boxSizing: 'border-box',
     outline: 'none',

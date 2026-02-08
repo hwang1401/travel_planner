@@ -36,11 +36,18 @@ export const LOCATION_COORDS = {
 };
 
 export function getItemCoords(item, dayIdx) {
+  // Priority 1: Stored coordinates (from AddressSearch or AI)
+  if (item.detail?.lat && item.detail?.lon) {
+    const label = item.detail?.name || item.desc || "";
+    return { coords: [item.detail.lat, item.detail.lon], label };
+  }
+
   const desc = item.desc || "";
   const addr = item.detail?.address || "";
   const name = item.detail?.name || "";
   const all = desc + " " + addr + " " + name;
 
+  // Priority 2: Text matching against known locations
   for (const [key, coords] of Object.entries(LOCATION_COORDS)) {
     if (all.includes(key)) return { coords, label: key };
   }

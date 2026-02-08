@@ -1,19 +1,16 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
+import { useScrollLock } from '../../hooks/useScrollLock';
+import Button from './Button';
 
 /* ── Bottom Sheet (reusable wrapper for mobile-style modals) ── */
-export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zIndex = 1000, children }) {
+export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zIndex = 1000, title, children }) {
   const sheetRef = useRef(null);
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startY = useRef(0);
   const currentY = useRef(0);
 
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
+  useScrollLock();
 
   // Drag handlers
   const handleTouchStart = useCallback((e) => {
@@ -65,8 +62,9 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
         onTouchMove={(e) => e.stopPropagation()}
         style={{
           width: "100%", maxWidth: "420px", maxHeight, ...(minHeight ? { minHeight } : {}),
-          background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px) var(--radius-md, 8px) 0 0",
+          background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0",
           overflow: "hidden",
+          overscrollBehavior: "contain",
           animation: isDragging ? 'none' : "bottomSheetUp 0.3s cubic-bezier(0.16,1,0.3,1)",
           display: "flex", flexDirection: "column",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -74,20 +72,47 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
           transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.16,1,0.3,1)',
         }}
       >
-        {/* Drag Handle */}
+        {/* Drag Handle — 가이드 4-5: 36px×4px, 상단 패딩 sp80 */}
         <div
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           style={{
-            padding: "10px 0 2px", display: "flex", justifyContent: "center", flexShrink: 0,
-            cursor: "grab", touchAction: "none",
+            padding: "var(--spacing-sp80) 0 var(--spacing-sp20)",
+            display: "flex",
+            justifyContent: "center",
+            flexShrink: 0,
+            cursor: "grab",
+            touchAction: "none",
           }}
         >
           <div style={{
-            width: "36px", height: "4px", borderRadius: "2px", background: "var(--color-outline-variant)",
+            width: "36px",
+            height: "4px",
+            borderRadius: "var(--radius-xsm)",
+            background: "var(--color-outline-variant)",
           }} />
         </div>
+        {title && (
+          <div style={{
+            padding: "6px var(--spacing-sp200) var(--spacing-sp120)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid var(--color-outline-variant)",
+            flexShrink: 0,
+          }}>
+            <h3 style={{
+              margin: 0,
+              fontSize: "var(--typo-body-1-n---bold-size)",
+              fontWeight: "var(--typo-body-1-n---bold-weight)",
+              color: "var(--color-on-surface)",
+            }}>
+              {title}
+            </h3>
+            <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
+          </div>
+        )}
         {children}
       </div>
     </div>

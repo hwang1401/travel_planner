@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
+import EmptyState from '../common/EmptyState';
 import Tab from '../common/Tab';
 import BottomSheet from '../common/BottomSheet';
 import MapButton from '../map/MapButton';
@@ -57,44 +58,14 @@ export default function ShoppingGuideDialog({ onClose, destinations }) {
   const filtered = region ? (chipIdx === 0 ? region.items : region.items.filter((it) => it.chip === region.chips[chipIdx])) : [];
 
   return (
-    <BottomSheet onClose={onClose} maxHeight="85vh" minHeight="70vh">
-        {/* Header */}
-        <div style={{
-          padding: "6px 16px 0 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <h3 style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
-            여행 가이드
-          </h3>
-          <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
-        </div>
+    <BottomSheet onClose={onClose} maxHeight="85vh" minHeight="70vh" title="여행 가이드">
 
         {guides.length === 0 ? (
-          /* ── Empty: no guide for this destination ── */
-          <div style={{
-            flex: 1, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            padding: "60px 20px", textAlign: "center",
-          }}>
-            <div style={{
-              width: "56px", height: "56px", borderRadius: "50%",
-              background: "var(--color-surface-container-low)", display: "flex",
-              alignItems: "center", justifyContent: "center", marginBottom: "16px",
-            }}>
-              <Icon name="compass" size={24} style={{ opacity: 0.4 }} />
-            </div>
-            <p style={{
-              margin: 0, fontSize: "var(--typo-body-1-n---bold-size)",
-              fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)",
-            }}>
-              아직 가이드가 없습니다
-            </p>
-            <p style={{
-              margin: "8px 0 0", fontSize: "var(--typo-caption-1-regular-size)",
-              color: "var(--color-on-surface-variant2)", lineHeight: 1.5,
-            }}>
-              이 여행지에 대한 가이드는{"\n"}준비 중입니다
-            </p>
-          </div>
+          <EmptyState
+            icon="compass"
+            title="아직 가이드가 없습니다"
+            description={"이 여행지에 대한 가이드는\n준비 중입니다"}
+          />
         ) : (
           <>
             {/* Region Tabs */}
@@ -125,21 +96,10 @@ export default function ShoppingGuideDialog({ onClose, destinations }) {
                 <GuideCard key={`${regionIdx}-${chipIdx}-${i}`} item={item} />
               ))}
               {filtered.length === 0 && (
-                <div style={{
-                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                  padding: "48px 20px", textAlign: "center",
-                }}>
-                  <div style={{
-                    width: "48px", height: "48px", borderRadius: "50%",
-                    background: "var(--color-surface-container-low)", display: "flex",
-                    alignItems: "center", justifyContent: "center", marginBottom: "12px",
-                  }}>
-                    <Icon name="search" size={20} style={{ opacity: 0.4 }} />
-                  </div>
-                  <p style={{ margin: 0, fontSize: "var(--typo-label-2-medium-size)", color: "var(--color-on-surface-variant2)" }}>
-                    해당 카테고리에 항목이 없습니다
-                  </p>
-                </div>
+                <EmptyState
+                  icon="search"
+                  title="해당 카테고리에 항목이 없습니다"
+                />
               )}
             </div>
           </>

@@ -3,247 +3,344 @@ import Icon from '../common/Icon';
 import Button from '../common/Button';
 import BottomSheet from '../common/BottomSheet';
 import ImageViewer from '../common/ImageViewer';
-import MapButton from '../map/MapButton';
-import { CATEGORY_COLORS } from '../../data/guides';
+import InfoRow from '../common/InfoRow';
+import CategoryBadge from '../common/CategoryBadge';
+import { COLOR, SPACING, RADIUS } from '../../styles/tokens';
 
-/* ── Detail Dialog ── */
-export default function DetailDialog({ detail, onClose, dayColor }) {
+/**
+ * ── DetailDialog ──
+ * "바로 꺼내기" — 여행 중 일정 정보를 즉시 확인.
+ *
+ * 구조:
+ *   헤더 (고정) → 주소+길찾기 (퀵 액세스) → 이미지 → 정보 → 메모 → 포인트 → 교통 → 맵 → 수정
+ *
+ * 원칙:
+ *   - 있는 것만 렌더, 빈 섹션은 그리지 않음
+ *   - 섹션 구분: 소형 라벨 + 여백 (구분선은 주소 블록에만)
+ *   - 메모: 카드형 (rounded + 배경)
+ *   - 미니맵: 정적 이미지, 로드 실패 시 텍스트 링크로 대체
+ *   - 높이: 콘텐츠에 맞춰 자동
+ */
+
+/* ── 내부 헬퍼 ── */
+
+const SectionLabel = ({ children }) => (
+  <p style={{
+    margin: "0 0 var(--spacing-sp80)",
+    fontSize: "var(--typo-caption-2-bold-size)",
+    fontWeight: "var(--typo-caption-2-bold-weight)",
+    color: "var(--color-on-surface-variant2)",
+    letterSpacing: "0.3px",
+  }}>
+    {children}
+  </p>
+);
+
+const SectionWrap = ({ label, children, px }) => (
+  <div style={{ padding: `var(--spacing-sp200) ${px} 0` }}>
+    {label && <SectionLabel>{label}</SectionLabel>}
+    {children}
+  </div>
+);
+
+/* ── 컴포넌트 ── */
+
+export default function DetailDialog({ detail, onClose, dayColor, onEdit }) {
   if (!detail) return null;
   const [viewImage, setViewImage] = useState(null);
-  const cat = CATEGORY_COLORS[detail.category] || { bg: "var(--color-surface-container-low)", color: "var(--color-on-surface-variant)", border: "var(--color-outline-variant)" };
+  const [mapError, setMapError] = useState(false);
+  const accentColor = dayColor || COLOR.primary;
 
-  // Support both single image and multi-image
+  /* Images */
   const images = detail.images && Array.isArray(detail.images) && detail.images.length > 0
     ? detail.images
     : detail.image ? [detail.image] : [];
-  // Put main image first
   const sortedImages = detail.image && images.length > 1
     ? [detail.image, ...images.filter((img) => img !== detail.image)]
     : images;
 
-  return (
-    <BottomSheet onClose={onClose} maxHeight="80vh">
-        {/* Header */}
-        <div style={{
-          padding: "6px 16px 12px 20px", flexShrink: 0,
-          borderBottom: "1px solid var(--color-outline-variant)",
-          display: "flex", alignItems: "center", gap: "10px",
-        }}>
-          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-            <h3 style={{
-              margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)",
-              color: "var(--color-on-surface)", letterSpacing: "var(--typo-body-1-n---bold-letter-spacing)",
-              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-            }}>
-              {detail.name}
-            </h3>
-            <span style={{
-              flexShrink: 0, padding: "2px 9px", borderRadius: "var(--radius-md, 8px)",
-              fontSize: "var(--typo-caption-3-bold-size)", fontWeight: "var(--typo-caption-3-bold-weight)",
-              background: cat.bg, color: cat.color, border: `1px solid ${cat.border}`,
-              whiteSpace: "nowrap",
-            }}>
-              {detail.category}
-            </span>
-          </div>
-          <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
-        </div>
+  /* URLs */
+  const directionsUrl = detail.address
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(detail.address)}`
+    : null;
+  const mapUrl = (detail.lat && detail.lon)
+    ? directionsUrl || `https://www.google.com/maps?q=${detail.lat},${detail.lon}`
+    : null;
 
-        {/* Images */}
+  const px = "var(--spacing-sp200)";
+
+  /* Data checks */
+  const hasPrice = !!detail.price;
+  const hasTip = !!detail.tip;
+  const hasHighlights = detail.highlights && detail.highlights.length > 0;
+  const hasTimetable = !!detail.timetable;
+  const hasCoords = !!(detail.lat && detail.lon);
+
+  return (
+    <BottomSheet onClose={onClose} maxHeight="85vh">
+      {/* ── 헤더: 제목 + 뱃지 + 닫기 ── */}
+      <div style={{
+        padding: `var(--spacing-sp120) ${px}`,
+        flexShrink: 0,
+        display: "flex", alignItems: "center", gap: "var(--spacing-sp80)",
+        borderBottom: "1px solid var(--color-outline-variant)",
+      }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "var(--spacing-sp80)" }}>
+          <h3 style={{
+            margin: 0,
+            fontSize: "var(--typo-body-1-n---bold-size)",
+            fontWeight: "var(--typo-body-1-n---bold-weight)",
+            color: "var(--color-on-surface)",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            flex: 1, minWidth: 0,
+          }}>
+            {detail.name}
+          </h3>
+          <CategoryBadge category={detail.category} style={{ flexShrink: 0 }} />
+        </div>
+        <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
+      </div>
+
+      {/* ── 스크롤 콘텐츠 ── */}
+      <div style={{ overflowY: "auto", overscrollBehavior: "contain" }}>
+
+        {/* ── 퀵 액세스: 주소 + 길찾기 (유일하게 borderBottom 유지) ── */}
+        {detail.address && (
+          <div style={{
+            padding: `var(--spacing-sp120) ${px}`,
+            display: "flex", alignItems: "center", gap: "var(--spacing-sp80)",
+            borderBottom: "1px solid var(--color-outline-variant)",
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{
+                margin: 0,
+                fontSize: "var(--typo-caption-1-regular-size)",
+                lineHeight: "var(--typo-caption-1-regular-line-height)",
+                color: "var(--color-on-surface-variant)",
+              }}>
+                {detail.address}
+              </p>
+              {detail.hours && (
+                <p style={{
+                  margin: "var(--spacing-sp20) 0 0",
+                  fontSize: "var(--typo-caption-2-regular-size)",
+                  color: "var(--color-on-surface-variant2)",
+                }}>
+                  {detail.hours}
+                </p>
+              )}
+            </div>
+            {directionsUrl && (
+              <Button variant="primary" size="sm" iconLeft="navigation"
+                onClick={() => window.open(directionsUrl, "_blank")}
+                style={{ flexShrink: 0 }}>
+                길찾기
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* ── 이미지: 히어로 또는 캐러셀 ── */}
         {sortedImages.length === 1 && (
-          <div
-            onClick={() => setViewImage(sortedImages[0])}
-            style={{
-              flexShrink: 0, overflow: "hidden", cursor: "zoom-in",
-              background: "var(--color-surface-container-low)",
-            }}
-          >
-            <img
-              src={sortedImages[0]}
-              alt={detail.name}
-              style={{
-                width: "100%", display: "block",
-                maxHeight: "240px", objectFit: "contain",
-              }}
-            />
+          <div onClick={() => setViewImage(sortedImages[0])}
+            style={{ overflow: "hidden", cursor: "zoom-in", background: COLOR.surfaceLow }}>
+            <img src={sortedImages[0]} alt={detail.name}
+              style={{ width: "100%", display: "block", maxHeight: "240px", objectFit: "contain" }} />
           </div>
         )}
         {sortedImages.length > 1 && (
           <div style={{
-            flexShrink: 0, overflowX: "auto", overflowY: "hidden",
-            display: "flex", gap: "6px", padding: "0 20px",
-            scrollSnapType: "x mandatory",
-            WebkitOverflowScrolling: "touch",
+            overflowX: "auto", overflowY: "hidden",
+            display: "flex", gap: "var(--spacing-sp60)", padding: `var(--spacing-sp120) ${px}`,
+            scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
           }}>
             {sortedImages.map((img, i) => (
-              <div
-                key={i}
-                onClick={() => setViewImage(img)}
-                style={{
-                  flexShrink: 0, width: "75%", scrollSnapAlign: "start",
-                  borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
-                  cursor: "zoom-in",
-                  background: "var(--color-surface-container-low)",
-                }}
-              >
-                <img
-                  src={img}
-                  alt={`${detail.name} ${i + 1}`}
-                  style={{
-                    width: "100%", height: "180px",
-                    objectFit: "contain", display: "block",
-                  }}
-                />
+              <div key={i} onClick={() => setViewImage(img)} style={{
+                flexShrink: 0, width: "75%", scrollSnapAlign: "start",
+                borderRadius: RADIUS.md, overflow: "hidden",
+                cursor: "zoom-in", background: COLOR.surfaceLow,
+              }}>
+                <img src={img} alt={`${detail.name} ${i + 1}`}
+                  style={{ width: "100%", height: "180px", objectFit: "contain", display: "block" }} />
               </div>
             ))}
           </div>
         )}
 
-        {/* Image Viewer */}
         <ImageViewer src={viewImage} alt={detail.name} onClose={() => setViewImage(null)} />
 
-        {/* Content */}
-        <div style={{ overflowY: "auto", padding: "14px 20px 20px" }}>
-
-          {/* Info rows */}
-          <div style={{
-            display: "flex", flexDirection: "column", gap: "10px",
-            padding: "14px", background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px)",
-            border: "1px solid var(--color-outline-variant)", marginBottom: "14px",
-          }}>
-            {detail.address && (
-              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pin" size={14} /></div>
-                <span style={{ flex: 1, fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{detail.address}</span>
-                <MapButton query={detail.address} />
-              </div>
-            )}
-            {detail.hours && (
-              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="clock" size={14} /></div>
-                <span style={{ fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{detail.hours}</span>
-              </div>
-            )}
-            {detail.price && (
-              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="pricetag" size={14} /></div>
-                <span style={{ fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{detail.price}</span>
-              </div>
-            )}
-            {detail.tip && (
-              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <div style={{ width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="bulb" size={14} /></div>
-                <span style={{ fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "18px" }}>{detail.tip}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Timetable */}
-          {detail.timetable && (
-            <div style={{ marginBottom: "14px" }}>
-              <p style={{
-                margin: "0 0 8px", fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)",
-                color: "var(--color-on-surface-variant2)", letterSpacing: "var(--typo-caption-2-bold-letter-spacing)",
-                display: "flex", alignItems: "center", gap: "4px",
-              }}>
-                <Icon name="car" size={14} />{detail.timetable.station} 발차 시간표 — {detail.timetable.direction}
-              </p>
-              <div style={{
-                borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
-                border: "1px solid var(--color-outline-variant)",
-              }}>
-                {/* Table header */}
-                <div style={{
-                  display: "flex", padding: "8px 12px",
-                  background: "var(--color-surface-container-low)", borderBottom: "1px solid var(--color-outline-variant)",
-                  fontSize: "var(--typo-caption-3-bold-size)", fontWeight: "var(--typo-caption-3-bold-weight)", color: "var(--color-on-surface-variant)", letterSpacing: "var(--typo-caption-3-bold-letter-spacing)",
-                }}>
-                  <span style={{ width: "52px", flexShrink: 0 }}>시각</span>
-                  <span style={{ flex: 1 }}>열차명</span>
-                  <span style={{ flex: 1, textAlign: "right" }}>행선 / 소요</span>
-                </div>
-                {/* Table rows */}
-                {detail.timetable.trains.map((t, i) => (
-                  <div key={i} style={{
-                    display: "flex", flexDirection: "column",
-                    padding: t.picked ? "8px 12px 9px" : "7px 12px",
-                    background: t.picked ? "var(--color-warning-container)" : (i % 2 === 0 ? "var(--color-surface-container-lowest)" : "var(--color-surface-container-low)"),
-                    borderBottom: i < detail.timetable.trains.length - 1 ? "1px solid var(--color-outline-variant)" : "none",
-                    borderLeft: t.picked ? "3px solid var(--color-warning)" : "3px solid transparent",
-                  }}>
-                    {t.picked && (
-                      <span style={{
-                        alignSelf: "flex-start",
-                        fontSize: "var(--typo-caption-3-bold-size)", fontWeight: "var(--typo-caption-3-bold-weight)", color: "var(--color-on-warning-container)",
-                        background: "var(--color-warning-container)", padding: "1px 6px", borderRadius: "4px",
-                        letterSpacing: "0.3px", marginBottom: "5px",
-                      }}>
-                        탑승 예정
-                      </span>
-                    )}
-                    <div style={{ display: "flex", alignItems: "center" }}>
-                      <span style={{
-                        width: "52px", flexShrink: 0,
-                        fontSize: t.picked ? "var(--typo-label-1-n---bold-size)" : "var(--typo-caption-1-medium-size)",
-                        fontWeight: t.picked ? "var(--typo-label-1-n---bold-weight)" : "var(--typo-caption-1-medium-weight)",
-                        color: t.picked ? "var(--color-warning)" : "var(--color-on-surface-variant)",
-                        fontVariantNumeric: "tabular-nums",
-                      }}>
-                        {t.time}
-                      </span>
-                      <span style={{
-                        flex: 1,
-                        fontSize: t.picked ? "var(--typo-label-2-bold-size)" : "var(--typo-caption-2-medium-size)",
-                        fontWeight: t.picked ? "var(--typo-label-2-bold-weight)" : "var(--typo-caption-2-medium-weight)",
-                        color: t.picked ? "var(--color-on-warning-container)" : "var(--color-on-surface)",
-                      }}>
-                        {t.name}
-                      </span>
-                      <span style={{
-                        flex: 1, textAlign: "right",
-                        fontSize: "var(--typo-caption-3-regular-size)",
-                        fontWeight: t.picked ? "var(--typo-caption-3-bold-weight)" : "var(--typo-caption-3-regular-weight)",
-                        color: t.picked ? "var(--color-warning)" : "var(--color-on-surface-variant2)",
-                        lineHeight: 1.4,
-                      }}>
-                        <span style={{ display: "block" }}>{t.dest}</span>
-                        <span style={{ fontSize: "var(--typo-caption-3-regular-size)", opacity: 0.8 }}>{t.note}</span>
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* ── 정보 섹션: 비용, 영업시간 ── */}
+        {hasPrice && (
+          <SectionWrap label="정보" px={px}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-sp80)" }}>
+              {hasPrice && <InfoRow icon="pricetag">{detail.price}</InfoRow>}
             </div>
-          )}
+          </SectionWrap>
+        )}
 
-          {/* Highlights */}
-          {detail.highlights && detail.highlights.length > 0 && (
-            <div>
+        {/* ── 메모 섹션: 카드형 ── */}
+        {hasTip && (
+          <SectionWrap label="메모" px={px}>
+            <div style={{
+              padding: "var(--spacing-sp120) var(--spacing-sp160)",
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-surface-container-low)",
+            }}>
               <p style={{
-                margin: "0 0 8px", fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)",
-                color: "var(--color-on-surface-variant2)", letterSpacing: "var(--typo-caption-2-bold-letter-spacing)",
+                margin: 0,
+                fontSize: "var(--typo-caption-1-regular-size)",
+                lineHeight: 1.6,
+                color: "var(--color-on-surface-variant)",
+                whiteSpace: "pre-line",
               }}>
-                포인트
+                {detail.tip}
               </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {detail.highlights.map((h, i) => (
-                  <div key={i} style={{
-                    display: "flex", gap: "8px", alignItems: "flex-start",
-                  }}>
+            </div>
+          </SectionWrap>
+        )}
+
+        {/* ── 포인트/하이라이트 ── */}
+        {hasHighlights && (
+          <SectionWrap label="포인트" px={px}>
+            <div style={{ display: "flex", flexDirection: "column", gap: SPACING.md }}>
+              {detail.highlights.map((h, i) => {
+                const isNote = h.startsWith("[");
+                return (
+                  <div key={i} style={{ display: "flex", gap: SPACING.lg, alignItems: "flex-start" }}>
                     <div style={{
-                      width: "5px", height: "5px", borderRadius: "50%",
-                      background: dayColor, flexShrink: 0, marginTop: "6px",
+                      width: "5px", height: "5px", borderRadius: RADIUS.full,
+                      background: isNote ? COLOR.onSurfaceVariant2 : accentColor,
+                      flexShrink: 0, marginTop: "6px",
                     }} />
-                    <span style={{ fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface)", lineHeight: 1.55 }}>
+                    <span style={{
+                      fontSize: "var(--typo-caption-1-regular-size)",
+                      lineHeight: 1.6,
+                      color: isNote ? COLOR.onSurfaceVariant : COLOR.onSurface,
+                    }}>
                       {h}
                     </span>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
-        </div>
+          </SectionWrap>
+        )}
 
+        {/* ── 교통 타임테이블 ── */}
+        {hasTimetable && (
+          <SectionWrap label={`${detail.timetable.station} → ${detail.timetable.direction}`} px={px}>
+            <div style={{
+              borderRadius: RADIUS.md, overflow: "hidden",
+              border: `1px solid ${COLOR.outlineVariant}`,
+            }}>
+              <div style={{
+                display: "flex", padding: `${SPACING.md} ${SPACING.lg}`,
+                background: COLOR.surfaceLow,
+                borderBottom: `1px solid ${COLOR.outlineVariant}`,
+                fontSize: "var(--typo-caption-3-bold-size)",
+                fontWeight: "var(--typo-caption-3-bold-weight)",
+                color: COLOR.onSurfaceVariant,
+              }}>
+                <span style={{ width: "52px", flexShrink: 0 }}>시각</span>
+                <span style={{ flex: 1 }}>열차명</span>
+                <span style={{ flex: 1, textAlign: "right" }}>행선 / 소요</span>
+              </div>
+              {detail.timetable.trains.map((t, i) => (
+                <div key={i} style={{
+                  display: "flex", flexDirection: "column",
+                  padding: `${SPACING.md} ${SPACING.lg}`,
+                  background: t.picked ? COLOR.surfaceLow : COLOR.surfaceLowest,
+                  borderBottom: i < detail.timetable.trains.length - 1 ? `1px solid ${COLOR.outlineVariant}` : "none",
+                  borderLeft: t.picked ? `3px solid ${accentColor}` : "3px solid transparent",
+                }}>
+                  {t.picked && (
+                    <span style={{
+                      alignSelf: "flex-start",
+                      fontSize: "var(--typo-caption-3-bold-size)",
+                      fontWeight: "var(--typo-caption-3-bold-weight)",
+                      color: accentColor, letterSpacing: "0.3px", marginBottom: SPACING.sm,
+                    }}>
+                      탑승 예정
+                    </span>
+                  )}
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <span style={{
+                      width: "52px", flexShrink: 0, fontVariantNumeric: "tabular-nums",
+                      fontSize: t.picked ? "var(--typo-label-1-n---bold-size)" : "var(--typo-caption-1-medium-size)",
+                      fontWeight: t.picked ? "var(--typo-label-1-n---bold-weight)" : "var(--typo-caption-1-medium-weight)",
+                      color: t.picked ? accentColor : COLOR.onSurfaceVariant,
+                    }}>
+                      {t.time}
+                    </span>
+                    <span style={{
+                      flex: 1,
+                      fontSize: t.picked ? "var(--typo-label-2-bold-size)" : "var(--typo-caption-2-medium-size)",
+                      fontWeight: t.picked ? "var(--typo-label-2-bold-weight)" : "var(--typo-caption-2-medium-weight)",
+                      color: COLOR.onSurface,
+                    }}>
+                      {t.name}
+                    </span>
+                    <span style={{
+                      flex: 1, textAlign: "right",
+                      fontSize: "var(--typo-caption-3-regular-size)",
+                      fontWeight: t.picked ? "var(--typo-caption-3-bold-weight)" : "var(--typo-caption-3-regular-weight)",
+                      color: COLOR.onSurfaceVariant2, lineHeight: 1.4,
+                    }}>
+                      <span style={{ display: "block" }}>{t.dest}</span>
+                      <span style={{ fontSize: "var(--typo-caption-3-regular-size)", opacity: 0.8 }}>{t.note}</span>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionWrap>
+        )}
+
+        {/* ── 미니맵: 정적 이미지, 실패 시 텍스트 링크 ── */}
+        {hasCoords && mapUrl && (
+          <SectionWrap px={px}>
+            {mapError ? (
+              <a href={mapUrl} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: "flex", alignItems: "center", gap: "var(--spacing-sp60)",
+                  padding: "var(--spacing-sp120) var(--spacing-sp160)",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--color-surface-container-low)",
+                  color: "var(--color-primary)",
+                  fontSize: "var(--typo-caption-1-medium-size)",
+                  fontWeight: "var(--typo-caption-1-medium-weight)",
+                  textDecoration: "none",
+                }}>
+                <Icon name="pin" size={14} />
+                지도에서 보기
+              </a>
+            ) : (
+              <a href={mapUrl} target="_blank" rel="noopener noreferrer"
+                style={{ display: "block", borderRadius: RADIUS.md, overflow: "hidden", border: `1px solid ${COLOR.outlineVariant}` }}>
+                <img
+                  src={`https://staticmap.openstreetmap.de/staticmap.php?center=${detail.lat},${detail.lon}&zoom=15&size=400x120&markers=${detail.lat},${detail.lon},red-pushpin`}
+                  alt="지도" loading="lazy"
+                  onError={() => setMapError(true)}
+                  style={{ width: "100%", height: "100px", objectFit: "cover", display: "block" }}
+                />
+              </a>
+            )}
+          </SectionWrap>
+        )}
+
+        {/* ── 수정하기 (맨 아래) ── */}
+        {onEdit && (
+          <div style={{ padding: `var(--spacing-sp200) ${px} var(--spacing-sp160)` }}>
+            <Button variant="neutral" size="md" fullWidth
+              onClick={() => { onEdit(detail); onClose(); }}
+              iconLeft="edit">
+              수정하기
+            </Button>
+          </div>
+        )}
+
+        {!onEdit && <div style={{ height: "var(--spacing-sp120)" }} />}
+      </div>
     </BottomSheet>
   );
 }

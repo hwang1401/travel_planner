@@ -91,7 +91,7 @@ export default function Field({
     border: `1px solid ${borderColor}`,
     borderRadius: s.radius,
     background: bg,
-    transition: 'border-color 0.15s ease',
+    transition: 'border-color var(--transition-fast)',
     boxSizing: 'border-box',
     overflow: 'hidden',
     cursor: isSelect && !disabled ? 'pointer' : undefined,
@@ -177,7 +177,7 @@ export default function Field({
 
           {/* BottomSheet dropdown */}
           {sheetOpen && (
-            <BottomSheet onClose={() => setSheetOpen(false)} maxHeight="40vh" zIndex={4000}>
+            <BottomSheet onClose={() => setSheetOpen(false)} maxHeight="40vh" zIndex="var(--z-confirm)">
               <div style={{ padding: '4px 0 0' }}>
                 {label && (
                   <div style={{

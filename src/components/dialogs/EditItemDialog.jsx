@@ -21,10 +21,15 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const [type, setType] = useState(item?.type || "spot");
   const [sub, setSub] = useState(item?.sub || "");
   const [address, setAddress] = useState(item?.detail?.address || "");
+  const [detailLat, setDetailLat] = useState(item?.detail?.lat || null);
+  const [detailLon, setDetailLon] = useState(item?.detail?.lon || null);
   const [detailName, setDetailName] = useState(item?.detail?.name || "");
   const [detailTip, setDetailTip] = useState(item?.detail?.tip || "");
   const [detailPrice, setDetailPrice] = useState(item?.detail?.price || "");
   const [detailHours, setDetailHours] = useState(item?.detail?.hours || "");
+  const [detailHighlights, setDetailHighlights] = useState(
+    () => (item?.detail?.highlights && Array.isArray(item.detail.highlights)) ? item.detail.highlights.join("\n") : ""
+  );
   // Multi-image support: migrate from single image to array
   const [detailImages, setDetailImages] = useState(() => {
     if (item?.detail?.images && Array.isArray(item.detail.images)) return [...item.detail.images];
@@ -205,7 +210,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const handleSave = () => {
     if (!time.trim() || !desc.trim()) return;
     const hasImages = detailImages.length > 0;
-    const hasDetailContent = detailName.trim() || address.trim() || detailTip.trim() || hasImages || detailPrice.trim() || detailHours.trim();
+    const hasDetailContent = detailName.trim() || address.trim() || detailTip.trim() || hasImages || detailPrice.trim() || detailHours.trim() || detailHighlights.trim();
 
     const newItem = {
       time: time.trim(),
@@ -215,12 +220,17 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       _custom: true,
     };
 
-    // Build timetable + highlights from loaded route
+    // Build timetable + highlights
     let timetable = loadedTimetable;
-    let highlights = item?.detail?.highlights || null;
+    // Parse user-entered highlights (newline-separated)
+    const parsedHighlights = detailHighlights.trim()
+      ? detailHighlights.split("\n").map((l) => l.trim()).filter(Boolean)
+      : null;
+    // Route highlights override manual ones when a route is loaded
+    let highlights = parsedHighlights;
     if (loadedTimetable?._routeId) {
       const route = TIMETABLE_DB.find((r) => r.id === loadedTimetable._routeId);
-      if (route) highlights = route.highlights;
+      if (route?.highlights) highlights = route.highlights;
     }
 
     if (hasDetailContent || timetable) {
@@ -230,6 +240,8 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         name: detailName.trim() || desc.trim(),
         category: catMap[type] || "관광",
         ...(address.trim() ? { address: address.trim() } : {}),
+        ...(detailLat != null ? { lat: detailLat } : {}),
+        ...(detailLon != null ? { lon: detailLon } : {}),
         ...(detailTip.trim() ? { tip: detailTip.trim() } : {}),
         ...(detailPrice.trim() ? { price: detailPrice.trim() } : {}),
         ...(detailHours.trim() ? { hours: detailHours.trim() } : {}),
@@ -247,18 +259,9 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     <BottomSheet
       onClose={onClose}
       maxHeight="85vh"
+      minHeight={isNew ? "85vh" : undefined}
+      title={isNew ? "일정 추가" : "일정 수정"}
     >
-        {/* Header */}
-        <div style={{
-          padding: "6px 16px 12px 20px", flexShrink: 0,
-          borderBottom: "1px solid var(--color-outline-variant)",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <h3 style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
-            {isNew ? "일정 추가" : "일정 수정"}
-          </h3>
-          <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
-        </div>
 
         {/* Tabs (only show for new items) */}
         {isNew && (
@@ -565,7 +568,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
           </div>
         ) : (
         /* ── Single item form tab ── */
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px", display: "flex", flexDirection: "column", gap: "12px" }}>
           {/* Time + Type row */}
           <div style={{ display: "flex", gap: "10px" }}>
             <Field as="select" label="시간" required size="lg" variant="outlined"
@@ -589,9 +592,9 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
           <Field label="부가 정보" size="lg" variant="outlined"
             value={sub} onChange={(e) => setSub(e.target.value)} placeholder="예: 도보 5분 · 1,000엔" />
 
-          {/* Divider */}
-          <div style={{ borderTop: "1px solid var(--color-outline-variant)", paddingTop: "10px" }}>
-            <p style={{ margin: "0 0 10px", fontSize: "var(--typo-caption-1-bold-size)", fontWeight: "var(--typo-caption-1-bold-weight)", color: "var(--color-on-surface-variant)" }}>상세 정보</p>
+          {/* Section: 상세 정보 */}
+          <div style={{ borderTop: "1px solid var(--color-outline-variant)", paddingTop: "12px" }}>
+            <p style={{ margin: "0 0 8px", fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant2)", letterSpacing: "0.5px" }}>상세 정보</p>
           </div>
 
           {/* Detail name */}
@@ -602,7 +605,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
           <AddressSearch
             label="주소"
             value={address}
-            onChange={(addr) => setAddress(addr)}
+            onChange={(addr, lat, lon) => { setAddress(addr); setDetailLat(lat || null); setDetailLon(lon || null); }}
             placeholder="주소 또는 장소 검색"
             size="lg"
           />
@@ -618,6 +621,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
           {/* Tip */}
           <Field as="textarea" label="팁 / 메모" size="lg" variant="outlined"
             value={detailTip} onChange={(e) => setDetailTip(e.target.value)} placeholder="참고사항 입력" rows={2} />
+
+          {/* Highlights */}
+          <Field as="textarea" label="포인트 (줄바꿈으로 구분)" size="lg" variant="outlined"
+            value={detailHighlights} onChange={(e) => setDetailHighlights(e.target.value)}
+            placeholder={"추천 메뉴, 꿀팁 등 핵심 포인트\n예: 후쿠오카 돈코츠 라멘 추천\n예: 면세 카운터 있음 (여권 필수)"} rows={3} />
 
           {/* Images */}
           {tripId ? (
@@ -644,8 +652,8 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
           {/* Timetable loader - only for move type */}
           {type === "move" && (
             <>
-              <div style={{ borderTop: "1px solid var(--color-outline-variant)", paddingTop: "10px" }}>
-                <p style={{ margin: "0 0 10px", fontSize: "var(--typo-caption-1-bold-size)", fontWeight: "var(--typo-caption-1-bold-weight)", color: "var(--color-on-surface-variant)", display: "flex", alignItems: "center", gap: "4px" }}><Icon name="car" size={14} />시간표 불러오기</p>
+              <div style={{ borderTop: "1px solid var(--color-outline-variant)", paddingTop: "12px" }}>
+                <p style={{ margin: "0 0 8px", fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant2)", letterSpacing: "0.5px" }}>시간표 불러오기</p>
               </div>
               <Field as="select" label="노선 선택" size="lg" variant="outlined"
                 value={selectedRoute} onChange={(e) => setSelectedRoute(e.target.value)}>

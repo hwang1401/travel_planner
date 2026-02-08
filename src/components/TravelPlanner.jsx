@@ -7,6 +7,7 @@ import { usePresence } from "../hooks/usePresence";
 import { BASE_DAYS } from "../data/days";
 import { loadCustomData, mergeData, generateDaySummary } from "../data/storage";
 import { TYPE_CONFIG } from "../data/guides";
+import { COLOR, SPACING, RADIUS, TYPE_LABELS, getTypeConfig } from "../styles/tokens";
 /* Service imports */
 import { getTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
 import { loadSchedule, subscribeToSchedule, createDebouncedSave } from "../services/scheduleService";
@@ -20,6 +21,7 @@ import Field from "./common/Field";
 import Tab from "./common/Tab";
 import ConfirmDialog from "./common/ConfirmDialog";
 import Toast from "./common/Toast";
+import EmptyState from "./common/EmptyState";
 
 /* Dialog imports */
 import DetailDialog from "./dialogs/DetailDialog";
@@ -33,6 +35,15 @@ import AddDayDialog from "./dialogs/AddDayDialog";
 import FullMapDialog from "./map/FullMapDialog";
 import MapButton from "./map/MapButton";
 import { getItemCoords } from "../data/locations";
+
+/* Schedule components */
+import PlaceCard from "./schedule/PlaceCard";
+import TravelTimeConnector from "./schedule/TravelTimeConnector";
+// IconContainer removed — action sheet uses direct Icon placement
+import AddPlacePage from "./schedule/AddPlacePage";
+import PasteInfoPage from "./schedule/PasteInfoPage";
+import { getDistance, getTravelInfo } from "../utils/distance";
+import { getTodayDayIndex, getCurrentItemIndex, isTodayInTrip } from "../utils/today";
 
 export default function TravelPlanner() {
   const navigate = useNavigate();
@@ -69,6 +80,11 @@ export default function TravelPlanner() {
   const [shareCode, setShareCode] = useState(null);
   const [showReorder, setShowReorder] = useState(false);
   const [reorderList, setReorderList] = useState([]);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [showAddPlace, setShowAddPlace] = useState(false);
+  const [showPasteInfo, setShowPasteInfo] = useState(false);
+  const todayInitDone = useRef(false);
 
   /* ── Debounced save ref ── */
   const debouncedSaveRef = useRef(null);
@@ -210,6 +226,57 @@ export default function TravelPlanner() {
   }, [customData, baseLen]);
 
   const current = DAYS[selectedDay];
+
+  /* ── Auto-select today's day (once) ── */
+  useEffect(() => {
+    if (todayInitDone.current || DAYS.length === 0) return;
+    todayInitDone.current = true;
+    if (isTodayInTrip(DAYS)) {
+      const todayIdx = getTodayDayIndex(DAYS);
+      if (todayIdx !== 0) setSelectedDay(todayIdx);
+    }
+  }, [DAYS]);
+
+  /* ── "지금" indicator: flatten all items and find current ── */
+  const nowItemKey = useMemo(() => {
+    if (!current || !isTodayInTrip(DAYS)) return null;
+    const allItems = current.sections?.flatMap((s) => s.items?.filter(Boolean) || []) || [];
+    const { index, status } = getCurrentItemIndex(allItems);
+    if (index >= 0 && (status === "current" || status === "next")) {
+      // Build a key: sectionIdx-itemIdx
+      let counter = 0;
+      for (let si = 0; si < (current.sections?.length || 0); si++) {
+        const items = current.sections[si].items?.filter(Boolean) || [];
+        for (let ii = 0; ii < items.length; ii++) {
+          if (counter === index) return `${si}-${ii}`;
+          counter++;
+        }
+      }
+    }
+    return null;
+  }, [current, DAYS]);
+
+  /* ── Compute route summary for current day ── */
+  const routeSummary = useMemo(() => {
+    if (!current) return null;
+    let placeCount = 0;
+    let totalDistance = 0;
+    let prevCoords = null;
+    const allItems = current.sections?.flatMap((s) => s.items?.filter(Boolean) || []) || [];
+    for (const item of allItems) {
+      const loc = getItemCoords(item, selectedDay);
+      if (loc) {
+        placeCount++;
+        if (prevCoords) {
+          totalDistance += getDistance(prevCoords[0], prevCoords[1], loc.coords[0], loc.coords[1]);
+        }
+        prevCoords = loc.coords;
+      }
+    }
+    if (placeCount < 2) return null;
+    const distText = totalDistance < 1000 ? `${Math.round(totalDistance)}m` : `${(totalDistance / 1000).toFixed(1)}km`;
+    return `${placeCount}개 장소 · 이동거리 약 ${distText}`;
+  }, [current, selectedDay]);
 
   /* Map display index → original (pre-reorder) index for customData access */
   const dayIndexMap = useMemo(() => {
@@ -602,360 +669,261 @@ export default function TravelPlanner() {
     }}>
       {/* Header */}
       <div style={{
-        padding: "14px 20px", background: "var(--color-surface-container-lowest)",
-        borderBottom: "1px solid var(--color-outline-variant)",
-        display: "flex", alignItems: "center", gap: "10px", flexShrink: 0,
+        padding: "12px 16px 12px 8px", background: "var(--color-surface)",
+        display: "flex", alignItems: "center", gap: "4px", flexShrink: 0,
       }}>
         <Button variant="ghost-neutral" size="sm" iconOnly="chevronLeft"
           onClick={() => navigate("/")}
-          style={{ marginLeft: "-8px", flexShrink: 0 }} />
+          style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: "var(--typo-body-2-n---bold-size)", fontWeight: "var(--typo-body-2-n---bold-weight)", lineHeight: "var(--typo-body-2-n---bold-line-height)", letterSpacing: "var(--typo-body-2-n---bold-letter-spacing)", color: "var(--color-on-surface)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {tripName}
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <h1 style={{ margin: 0, fontSize: "var(--typo-body-2-n---bold-size)", fontWeight: "var(--typo-body-2-n---bold-weight)", lineHeight: "var(--typo-body-2-n---bold-line-height)", letterSpacing: "var(--typo-body-2-n---bold-letter-spacing)", color: "var(--color-on-surface)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {tripName}
+            </h1>
+            {/* Viewer badge */}
+            {!isLegacy && !canEdit && (
+              <span style={{
+                padding: "2px 6px", borderRadius: "var(--radius-sm, 4px)",
+                background: "var(--color-surface-container-low)",
+                fontSize: "var(--typo-caption-3-bold-size)",
+                fontWeight: "var(--typo-caption-3-bold-weight)",
+                color: "var(--color-on-surface-variant2)",
+                flexShrink: 0,
+              }}>
+                보기 전용
+              </span>
+            )}
+          </div>
           <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", fontWeight: "var(--typo-caption-2-regular-weight)", lineHeight: "var(--typo-caption-2-regular-line-height)", color: "var(--color-on-surface-variant2)" }}>
             {tripSubtitle}
           </p>
         </div>
-        {/* Online presence indicators */}
-        {!isLegacy && onlineUsers.length > 1 && (
-          <div style={{
-            display: "flex", alignItems: "center", marginRight: "-4px",
-          }}>
-            {onlineUsers.filter((u) => u.id !== user?.id).slice(0, 3).map((u, i) => (
-              <div key={u.id} style={{
-                width: "24px", height: "24px", borderRadius: "50%",
-                border: "2px solid var(--color-surface-container-lowest)",
-                marginLeft: i > 0 ? "-8px" : "0",
-                overflow: "hidden", flexShrink: 0,
-                position: "relative", zIndex: 3 - i,
-              }} title={u.name}>
-                {u.avatarUrl ? (
-                  <img src={u.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <div style={{
-                    width: "100%", height: "100%",
-                    background: "var(--color-primary-container)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "10px", fontWeight: 700,
-                    color: "var(--color-on-primary-container)",
-                  }}>
-                    {(u.name || "?").charAt(0).toUpperCase()}
-                  </div>
-                )}
-                {/* Green dot: online */}
-                <div style={{
-                  position: "absolute", bottom: "-1px", right: "-1px",
-                  width: "8px", height: "8px", borderRadius: "50%",
-                  background: "#22C55E", border: "1.5px solid var(--color-surface-container-lowest)",
-                }} />
-              </div>
-            ))}
-            {onlineUsers.length > 4 && (
-              <div style={{
-                width: "24px", height: "24px", borderRadius: "50%",
-                border: "2px solid var(--color-surface-container-lowest)",
-                marginLeft: "-8px",
-                background: "var(--color-surface-container)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "9px", fontWeight: 700,
-                color: "var(--color-on-surface-variant2)",
-                flexShrink: 0,
-              }}>
-                +{onlineUsers.length - 4}
-              </div>
-            )}
-          </div>
-        )}
-        {/* Share / Invite button (Supabase trips only, all roles) */}
+        {/* Share button (Supabase trips only) */}
         {!isLegacy && (
-          <Button variant="neutral" size="lg" iconOnly="share"
+          <Button variant="ghost-neutral" size="sm" iconOnly="share"
             onClick={() => setShowShareSheet(true)}
             title="공유 및 초대" />
         )}
-        {/* Viewer badge */}
-        {!isLegacy && !canEdit && (
-          <span style={{
-            padding: "4px 8px", borderRadius: "var(--radius-md, 8px)",
-            background: "var(--color-surface-container-low)",
-            fontSize: "var(--typo-caption-2-bold-size)",
-            fontWeight: "var(--typo-caption-2-bold-weight)",
-            color: "var(--color-on-surface-variant2)",
-          }}>
-            보기 전용
-          </span>
-        )}
-        <Button variant="neutral" size="lg" iconOnly="compass" onClick={() => setShowGuide(true)}
-          title="여행 가이드" />
-        <Button variant="neutral" size="lg" iconOnly="file" onClick={() => setShowDocs(true)}
-          title="여행 서류" />
+        {/* More menu button */}
+        <Button variant="ghost-neutral" size="sm" iconOnly="list"
+          onClick={() => setShowMoreMenu(true)}
+          title="더보기" />
       </div>
 
-      {/* Day tabs */}
+      {/* ── Day header zone: tabs + day info panel (sticky) ── */}
       <div style={{
-        display: "flex", gap: 0, padding: "0 12px",
+        flexShrink: 0,
         background: "var(--color-surface-container-lowest)",
-        flexShrink: 0, alignItems: "center",
+        borderBottom: "1px solid var(--color-outline-variant)",
       }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {DAYS.length > 0 ? (
-            <Tab
-              items={DAYS.map((day, i) => ({ label: `D${i + 1}`, value: i }))}
-              value={selectedDay}
-              onChange={setSelectedDay}
-              size="md"
-            />
-          ) : (
-            <div style={{ padding: "10px 4px", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
-              날짜를 추가해 주세요
+        {/* Day tabs row */}
+        <div style={{
+          display: "flex", gap: 0, padding: "0 12px",
+          alignItems: "center",
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {DAYS.length > 0 ? (
+              <Tab
+                items={DAYS.map((day, i) => ({ label: `D${i + 1}`, value: i }))}
+                value={selectedDay}
+                onChange={setSelectedDay}
+                size="md"
+              />
+            ) : (
+              <div style={{ padding: "10px 4px", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
+                날짜를 추가해 주세요
+              </div>
+            )}
+          </div>
+
+          {/* Day reorder + add buttons */}
+          {canEdit && (
+            <div style={{ flexShrink: 0, display: "flex", gap: "var(--spacing-sp60)", marginLeft: "var(--spacing-sp120)", paddingRight: "var(--spacing-sp40)" }}>
+              {DAYS.length > 1 && (
+                <Button variant="neutral" size="sm" iconOnly="swap"
+                  onClick={handleOpenReorder}
+                  title="순서 변경" />
+              )}
+              <Button variant="neutral" size="sm" iconOnly="plus"
+                onClick={() => setShowAddDay(true)}
+                title="날짜 추가" />
             </div>
           )}
         </div>
 
-        {/* Day reorder + add buttons (only if can edit) */}
-        {canEdit && (
-          <div style={{ flexShrink: 0, display: "flex", gap: "6px", marginLeft: "12px", paddingRight: "4px" }}>
-            {DAYS.length > 1 && (
-              <Button variant="neutral" size="sm" iconOnly="swap"
-                onClick={handleOpenReorder}
-                title="순서 변경" />
-            )}
-            <Button variant="neutral" size="sm" iconOnly="plus"
-              onClick={() => setShowAddDay(true)}
-              title="날짜 추가" />
+        {/* Day info panel — tightly coupled with tabs */}
+        {current && (
+          <div style={{ padding: "10px 16px 12px" }}>
+            {/* Title + meta row */}
+            <div style={{
+              display: "flex", alignItems: "flex-start", gap: "8px",
+            }}>
+              <div
+                style={{ flex: 1, minWidth: 0, cursor: canEdit ? "pointer" : "default" }}
+                onClick={canEdit ? () => { setEditingDayIdx(toOrigIdx(selectedDay)); setEditDayLabel(current.label); } : undefined}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <h2 style={{
+                    margin: 0, fontSize: "var(--typo-body-2-n---bold-size)", fontWeight: "var(--typo-body-2-n---bold-weight)", color: "var(--color-on-surface)",
+                    letterSpacing: "var(--typo-body-2-n---bold-letter-spacing)",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {current.label}
+                  </h2>
+                  {canEdit && toOrigIdx(selectedDay) >= baseLen && (
+                    <Button variant="ghost-neutral" size="xsm" iconOnly="trash"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteDay(toOrigIdx(selectedDay)); }}
+                      style={{ opacity: 0.3 }} />
+                  )}
+                </div>
+                {/* Date + stay + route summary */}
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sp40)", flexWrap: "wrap", marginTop: "var(--spacing-sp20)" }}>
+                  {(current.date || current.stay) && (
+                    <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
+                      {[current.date, current.stay].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                  {routeSummary && (
+                    <>
+                      {(current.date || current.stay) && <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-outline-variant)" }}>·</span>}
+                      <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-primary)", fontWeight: 600 }}>
+                        {routeSummary}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+              {/* Add schedule button — compact, right-aligned */}
+              {canEdit && (
+                <Button variant="neutral" size="xsm" iconLeft="plus"
+                  onClick={() => setShowAddSheet(true)}
+                  style={{ borderRadius: "16px", flexShrink: 0 }}>
+                  추가
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Main content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 32px" }}>
+      {/* ── Main content: scrollable timeline ── */}
+      <div
+        onTouchStart={(e) => {
+          const t = e.touches[0];
+          e.currentTarget._swipeStartX = t.clientX;
+          e.currentTarget._swipeStartY = t.clientY;
+          e.currentTarget._swipeDecided = false;
+        }}
+        onTouchMove={(e) => {
+          if (e.currentTarget._swipeDecided) return;
+          const dx = Math.abs(e.touches[0].clientX - (e.currentTarget._swipeStartX || 0));
+          const dy = Math.abs(e.touches[0].clientY - (e.currentTarget._swipeStartY || 0));
+          if (dx > 15 || dy > 15) {
+            e.currentTarget._swipeDecided = true;
+            e.currentTarget._swipeIsHorizontal = dx > dy * 1.5;
+          }
+        }}
+        onTouchEnd={(e) => {
+          if (!e.currentTarget._swipeIsHorizontal) return;
+          const dx = e.changedTouches[0].clientX - (e.currentTarget._swipeStartX || 0);
+          if (Math.abs(dx) < 50) return;
+          if (dx > 0 && selectedDay > 0) {
+            setSelectedDay(selectedDay - 1);
+          } else if (dx < 0 && selectedDay < DAYS.length - 1) {
+            setSelectedDay(selectedDay + 1);
+          }
+        }}
+        style={{ flex: 1, overflowY: "auto", padding: "12px 16px 32px", touchAction: "pan-y" }}>
 
         {/* Empty trip state */}
         {!current && (
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "center", gap: "16px", padding: "60px 20px",
-            textAlign: "center",
-          }}>
-            <Icon name="calendar" size={48} style={{ color: "var(--color-on-surface-variant2)", opacity: 0.5 }} />
-            <div>
-              <p style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
-                아직 일정이 없습니다
-              </p>
-              <p style={{ margin: "8px 0 0", fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant2)" }}>
-                날짜를 추가하고 일정을 계획해 보세요
-              </p>
-            </div>
-            {canEdit && (
-              <Button variant="primary" size="md" iconLeft="plus" onClick={() => setShowAddDay(true)}>
-                날짜 추가
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            icon="calendar"
+            title="아직 일정이 없습니다"
+            description="날짜를 추가하고 일정을 계획해 보세요"
+            actions={canEdit ? { label: "날짜 추가", variant: "primary", iconLeft: "plus", onClick: () => setShowAddDay(true) } : undefined}
+          />
         )}
 
-        {/* Day title card */}
-        {current && <div style={{
-          display: "flex", alignItems: "center", gap: "12px",
-          marginBottom: "16px", padding: "14px 16px",
-          background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px)", border: "1px solid var(--color-outline-variant)",
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <h2
-                  onClick={canEdit ? () => { setEditingDayIdx(toOrigIdx(selectedDay)); setEditDayLabel(current.label); } : undefined}
-                  style={{
-                    margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)",
-                    letterSpacing: "var(--typo-body-1-n---bold-letter-spacing)", cursor: canEdit ? "pointer" : "default",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}
-                  title={canEdit ? "이름 수정" : undefined}
-                >
-                  {current.label}
-                </h2>
-                {canEdit && (
-                  <Button variant="ghost-neutral" size="xsm" iconOnly="edit"
-                    onClick={() => { setEditingDayIdx(toOrigIdx(selectedDay)); setEditDayLabel(current.label); }}
-                    style={{ width: "24px", height: "24px" }} />
-                )}
-                {canEdit && toOrigIdx(selectedDay) >= baseLen && (
-                  <Button variant="ghost-neutral" size="xsm" iconOnly="trash"
-                    onClick={() => handleDeleteDay(toOrigIdx(selectedDay))}
-                    style={{ width: "24px", height: "24px" }} />
-                )}
-              </div>
-            <p style={{ margin: "2px 0 0", fontSize: "var(--typo-caption-2-regular-size)", fontWeight: "var(--typo-caption-2-regular-weight)", lineHeight: "var(--typo-caption-2-regular-line-height)", color: "var(--color-on-surface-variant2)" }}>
-              {current.date} · {current.stay}
-            </p>
-          </div>
-          {canEdit && (
-            <div style={{ flexShrink: 0 }}>
-              <Button variant="primary" size="sm" iconLeft="plus"
-                onClick={() => setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null })}>
-                일정 추가
-              </Button>
-            </div>
-          )}
-        </div>}
+        {/* Timeline — flat list of all items across sections */}
+        {current && (() => {
+          // Flatten all section items into one list, preserving section/item indices
+          const allItems = [];
+          current.sections.forEach((sec, si) => {
+            if (!sec.items) return;
+            sec.items.filter(Boolean).forEach((item, ii) => {
+              allItems.push({ item, si, ii, section: sec });
+            });
+          });
 
-        {/* Sections */}
-        {current && ((current.sections.length === 0 || current.sections.every((s) => !s.items || s.items.length === 0)) ? (
-          /* ── Empty State: no schedule items at all ── */
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            padding: "48px 20px", textAlign: "center",
-          }}>
-            <div style={{
-              width: "56px", height: "56px", borderRadius: "50%",
-              background: "var(--color-primary-container)", display: "flex",
-              alignItems: "center", justifyContent: "center", marginBottom: "16px",
-            }}>
-              <Icon name="calendar" size={24} />
-            </div>
-            <p style={{
-              margin: "0 0 6px", fontSize: "var(--typo-body-1-n---bold-size)",
-              fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)",
-            }}>
-              아직 일정이 없습니다
-            </p>
-            <p style={{
-              margin: "0 0 20px", fontSize: "var(--typo-caption-1-regular-size)",
-              fontWeight: "var(--typo-caption-1-regular-weight)", color: "var(--color-on-surface-variant2)",
-              lineHeight: "var(--typo-caption-1-regular-line-height)",
-            }}>
-              {canEdit
-                ? `상단의 "일정 추가" 버튼을 눌러\n새로운 일정을 추가해보세요`
+          if (allItems.length === 0) return (
+            <EmptyState
+              icon="calendar"
+              title="아직 일정이 없습니다"
+              description={canEdit
+                ? "일정 추가 버튼을 눌러\n새로운 일정을 추가해보세요"
                 : "아직 추가된 일정이 없습니다"}
-            </p>
-            {canEdit && (
-              <div style={{ display: "flex", gap: "8px" }}>
-                <Button variant="primary" size="md" iconLeft="plus"
-                  onClick={() => setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null })}>
-                  일정 추가
-                </Button>
-                <Button variant="neutral" size="md" iconLeft="flash"
-                  onClick={() => { setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null }); setOpenAiTab(true); }}>
-                  AI 추천
-                </Button>
-              </div>
-            )}
-          </div>
-        ) : (
-          current.sections.filter((sec) => sec.items && sec.items.filter(Boolean).length > 0).map((section, si) => (
-            <div key={si} style={{ marginBottom: "12px" }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: "8px",
-                padding: "0 4px", marginBottom: "8px",
-              }}>
-                <div style={{
-                  width: "6px", height: "6px", borderRadius: "50%", background: "var(--color-primary)",
-                }} />
-                <span style={{
-                  fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-primary)", letterSpacing: "var(--typo-caption-2-bold-letter-spacing)",
-                }}>
-                  {section.title}
-                </span>
-                <div style={{ flex: 1, height: "1px", background: "var(--color-primary-container)" }} />
-              </div>
+              actions={canEdit ? [
+                { label: "추가하기", variant: "primary", iconLeft: "plus", onClick: () => setShowAddSheet(true) },
+              ] : undefined}
+            />
+          );
 
-              <div style={{
-                background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px)",
-                border: "1px solid var(--color-outline-variant)", overflow: "hidden",
-              }}>
-                {(
-                  section.items.filter(Boolean).map((item, ii) => {
-                    const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
-                    const isLast = ii === section.items.length - 1;
-                    const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
-                    const TYPE_TO_CATEGORY = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", stay: "숙소", info: "정보" };
+          let globalOrder = 0;
+          return (
+            <div>
+              {allItems.map((entry, flatIdx) => {
+                const { item, si, ii, section } = entry;
+                const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
+                const resolvedLoc = getItemCoords(item, selectedDay);
+                const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
+                const enrichedItem = resolvedAddress && !item.detail?.address
+                  ? { ...item, detail: { ...(item.detail || {}), address: resolvedAddress, name: item.detail?.name || item.desc, category: item.detail?.category || TYPE_LABELS[item.type] || "정보" } }
+                  : item;
+                const isClickable = true;
+                const itemOrder = resolvedLoc ? ++globalOrder : null;
+                const isNow = nowItemKey === `${si}-${ii}`;
+                const isLastItem = flatIdx === allItems.length - 1;
 
-                    // Resolve location: explicit detail.address OR fallback via getItemCoords
-                    const resolvedLoc = getItemCoords(item, selectedDay);
-                    const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
+                // Previous item for TravelTimeConnector
+                const prevEntry = flatIdx > 0 ? allItems[flatIdx - 1] : null;
+                const prevItem = prevEntry?.item || null;
+                const prevLoc = prevItem ? getItemCoords(prevItem, selectedDay) : null;
 
-                    // Enrich item with resolved address for edit dialog
-                    const enrichedItem = resolvedAddress && !item.detail?.address
-                      ? { ...item, detail: { ...(item.detail || {}), address: resolvedAddress, name: item.detail?.name || item.desc, category: item.detail?.category || TYPE_TO_CATEGORY[item.type] || "정보" } }
-                      : item;
+                const handleClick = () => {
+                  const detail = enrichedItem.detail || {};
+                  setActiveDetail({
+                    ...detail,
+                    name: detail.name || enrichedItem.desc || "",
+                    category: detail.category || TYPE_LABELS[enrichedItem.type] || "정보",
+                    _item: enrichedItem, _si: effectiveSi, _ii: ii, _di: selectedDay,
+                  });
+                };
 
-                    const hasDetail = !!(enrichedItem.detail && (enrichedItem.detail.image || enrichedItem.detail.images?.length || enrichedItem.detail.tip || enrichedItem.detail.address || enrichedItem.detail.timetable || enrichedItem.detail.hours));
-                    const mapQuery = resolvedAddress || (resolvedLoc ? resolvedLoc.label : null);
-
-                    const handleClick = () => {
-                      if (hasDetail) {
-                        setActiveDetail({
-                          ...enrichedItem.detail,
-                          name: enrichedItem.detail.name || enrichedItem.desc,
-                          category: enrichedItem.detail.category || TYPE_TO_CATEGORY[enrichedItem.type] || "정보",
-                          _item: enrichedItem, _si: effectiveSi, _ii: ii, _di: selectedDay,
-                        });
-                      }
-                    };
-                    return (
-                      <div
-                        key={ii}
-                        onClick={hasDetail ? handleClick : undefined}
-                        style={{
-                          display: "flex", alignItems: "flex-start", gap: "8px",
-                          padding: "10px 12px",
-                          borderBottom: isLast ? "none" : "1px solid var(--color-surface-dim)",
-                          background: "transparent",
-                          cursor: hasDetail ? "pointer" : "default",
-                          transition: "background 0.15s",
-                        }}
-                        onMouseEnter={(e) => { if (hasDetail) e.currentTarget.style.background = "var(--color-surface-container-low)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                      >
-                        <span style={{
-                          width: "38px", flexShrink: 0, textAlign: "right",
-                          fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant2)",
-                          fontVariantNumeric: "tabular-nums",
-                          lineHeight: "20px", whiteSpace: "nowrap",
-                        }}>
-                          {item.time}
-                        </span>
-                        <div style={{ width: "3px", flexShrink: 0, borderRadius: "2px", background: cfg.border, alignSelf: "stretch", minHeight: "20px" }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "4px", minHeight: "20px" }}>
-                            <p style={{
-                              margin: 0, fontSize: "var(--typo-label-2-medium-size)", fontWeight: "var(--typo-label-2-medium-weight)", color: "var(--color-on-surface)", lineHeight: "20px",
-                            }}>
-                              {item.desc}
-                            </p>
-                            {hasDetail && (
-                              <Icon name="chevronRight" size={12} style={{ opacity: 0.35, flexShrink: 0 }} />
-                            )}
-                          </div>
-                          {item.sub && (
-                            <p style={{ margin: "2px 0 0", fontSize: "var(--typo-caption-2-regular-size)", fontWeight: "var(--typo-caption-2-regular-weight)", color: "var(--color-on-surface-variant2)", lineHeight: "var(--typo-caption-2-regular-line-height)" }}>
-                              {item.sub}
-                            </p>
-                          )}
-                        </div>
-                        {mapQuery && (
-                          <div style={{ flexShrink: 0, alignSelf: "center" }}>
-                            <MapButton query={mapQuery} />
-                          </div>
-                        )}
-                        {/* Edit / Delete (only if can edit) */}
-                        {canEdit && (
-                          <div style={{ display: "flex", gap: "4px", flexShrink: 0, alignSelf: "center" }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button variant="ghost-neutral" size="xsm" iconOnly="edit"
-                              onClick={() => setEditTarget({ item: enrichedItem, sectionIdx: effectiveSi, itemIdx: ii, dayIdx: toOrigIdx(selectedDay) })} />
-                            <Button variant="ghost-neutral" size="xsm" iconOnly="trash"
-                              onClick={() => handleDeleteItem(toOrigIdx(selectedDay), effectiveSi, ii, item)} />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                return (
+                  <div key={`${si}-${ii}`}>
+                    {flatIdx > 0 && (
+                      <TravelTimeConnector
+                        fromCoords={prevLoc?.coords}
+                        toCoords={resolvedLoc?.coords}
+                        fromLabel={prevItem?.detail?.address || prevLoc?.label}
+                        toLabel={resolvedAddress || resolvedLoc?.label}
+                      />
+                    )}
+                    <PlaceCard
+                      item={enrichedItem}
+                      order={itemOrder}
+                      isNow={isNow}
+                      isClickable={isClickable}
+                      onClick={handleClick}
+                      isLast={isLastItem}
+                    />
+                  </div>
+                );
+              })}
             </div>
-          ))
-        ))}
+          );
+        })()}
 
         {/* Auto-generated day summary */}
         {current && (() => {
@@ -978,6 +946,12 @@ export default function TravelPlanner() {
         detail={activeDetail}
         onClose={() => setActiveDetail(null)}
         dayColor="var(--color-primary)"
+        onEdit={canEdit ? (d) => {
+          const item = d._item;
+          if (item) {
+            setEditTarget({ item, sectionIdx: d._si, itemIdx: d._ii, dayIdx: toOrigIdx(d._di ?? selectedDay) });
+          }
+        } : undefined}
       />
 
       {/* Document Dialog */}
@@ -988,6 +962,61 @@ export default function TravelPlanner() {
 
       {/* Day Info Dialog */}
       {dayInfoTab && current && <DayInfoDialog dayNum={current.day} tab={dayInfoTab} onClose={() => setDayInfoTab(null)} color="var(--color-primary)" />}
+
+      {/* "추가하기" Action Sheet — 아이콘 직접 배치, 색상으로 구분 */}
+      {showAddSheet && canEdit && (
+        <BottomSheet onClose={() => setShowAddSheet(false)} maxHeight="auto" title="추가하기">
+          <div style={{
+            padding: "var(--spacing-sp80) var(--spacing-sp200) var(--spacing-sp240)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--spacing-sp40)",
+          }}>
+            {[
+              { icon: "pin", iconColor: "var(--color-primary)", label: "장소 추가", desc: "검색해서 장소를 추가해요", onClick: () => { setShowAddSheet(false); setShowAddPlace(true); } },
+              { icon: "document", iconColor: "var(--color-on-surface-variant)", label: "예약 정보 붙여넣기", desc: "확인메일, 바우처를 복붙하면 AI가 정리", onClick: () => { setShowAddSheet(false); setShowPasteInfo(true); } },
+              { icon: "flash", iconColor: "var(--color-on-surface-variant)", label: "AI로 일정 채우기", desc: "여행 스타일 알려주면 AI가 자동 생성", onClick: () => { setShowAddSheet(false); setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null }); setOpenAiTab(true); } },
+            ].map((action, i) => (
+              <div
+                key={i}
+                onClick={action.onClick}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "var(--spacing-sp120)",
+                  minHeight: "48px",
+                  padding: "var(--spacing-sp120) var(--spacing-sp40)",
+                  borderRadius: "var(--radius-md)",
+                  cursor: "pointer",
+                  transition: "background var(--transition-fast)",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-surface-container-low)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <Icon name={action.icon} size={20} style={{
+                  flexShrink: 0,
+                  marginTop: "2px",
+                  color: action.iconColor,
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{
+                    margin: 0,
+                    fontSize: "var(--typo-label-2-medium-size)",
+                    fontWeight: 600,
+                    color: "var(--color-on-surface)",
+                  }}>{action.label}</p>
+                  <p style={{
+                    margin: "var(--spacing-sp20) 0 0",
+                    fontSize: "var(--typo-caption-2-regular-size)",
+                    color: "var(--color-on-surface-variant2)",
+                    lineHeight: 1.4,
+                  }}>{action.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </BottomSheet>
+      )}
 
       {/* Edit/Add Item Dialog (only if can edit) */}
       {editTarget && canEdit && (
@@ -1007,14 +1036,30 @@ export default function TravelPlanner() {
         />
       )}
 
+      {/* Add Place Page (full-screen) */}
+      <AddPlacePage
+        open={showAddPlace}
+        onClose={() => setShowAddPlace(false)}
+        onSave={(item) => handleSaveItem(item, toOrigIdx(selectedDay), -1, null)}
+        dayIdx={toOrigIdx(selectedDay)}
+      />
+
+      {/* Paste Info Page (full-screen) */}
+      <PasteInfoPage
+        open={showPasteInfo}
+        onClose={() => setShowPasteInfo(false)}
+        onImport={(items) => handleBulkImport(items, toOrigIdx(selectedDay))}
+        context={current ? `Day ${current.day} ${current.label || ''}` : ''}
+      />
+
       {/* Floating Map Button */}
       <Button variant="primary" size="xlg" iconOnly="map"
         onClick={() => setShowMap(true)}
         title="여행 지도"
         style={{
-          position: "fixed", bottom: "calc(24px + env(safe-area-inset-bottom, 0px))", right: "24px", zIndex: 900,
+          position: "fixed", bottom: "calc(24px + env(safe-area-inset-bottom, 0px))", right: "24px", zIndex: "var(--z-fab)",
           width: "52px", height: "52px",
-          boxShadow: "var(--shadow-heavy)",
+          boxShadow: "var(--shadow-strong)",
         }} />
 
       {/* Full Map Dialog */}
@@ -1033,11 +1078,8 @@ export default function TravelPlanner() {
 
       {/* Edit Day Name Dialog */}
       {editingDayIdx !== null && canEdit && (
-        <BottomSheet onClose={() => setEditingDayIdx(null)} maxHeight="auto" zIndex={3000}>
+        <BottomSheet onClose={() => setEditingDayIdx(null)} maxHeight="auto" zIndex="var(--z-confirm)" title="이름 수정">
           <div style={{ padding: "8px 24px 24px" }}>
-            <h3 style={{ margin: "0 0 20px", fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)", display: "flex", alignItems: "center", gap: "6px" }}>
-              <Icon name="edit" size={16} />이름 수정
-            </h3>
             <Field size="xlg" variant="outlined"
               value={editDayLabel}
               onChange={(e) => setEditDayLabel(e.target.value)}
@@ -1072,16 +1114,8 @@ export default function TravelPlanner() {
 
       {/* ── Share & Invite Bottom Sheet ── */}
       {showShareSheet && !isLegacy && (
-        <BottomSheet onClose={() => setShowShareSheet(false)} maxHeight="70vh" zIndex={3000}>
+        <BottomSheet onClose={() => setShowShareSheet(false)} maxHeight="70vh" zIndex="var(--z-confirm)" title="공유 및 초대">
           <div style={{ padding: "8px 24px 24px" }}>
-            <h3 style={{
-              margin: "0 0 20px",
-              fontSize: "var(--typo-body-1-n---bold-size)",
-              fontWeight: "var(--typo-body-1-n---bold-weight)",
-              color: "var(--color-on-surface)",
-            }}>
-              공유 및 초대
-            </h3>
 
             {/* Share link section */}
             <div style={{ marginBottom: "20px" }}>
@@ -1187,7 +1221,7 @@ export default function TravelPlanner() {
                             <div style={{
                               position: "absolute", bottom: "-1px", right: "-1px",
                               width: "8px", height: "8px", borderRadius: "50%",
-                              background: "#22C55E", border: "1.5px solid var(--color-surface-container-lowest)",
+                              background: "var(--color-success)", border: "1.5px solid var(--color-surface-container-lowest)",
                             }} />
                           )}
                         </div>
@@ -1205,7 +1239,7 @@ export default function TravelPlanner() {
                           {isOnline && (
                             <span style={{
                               fontSize: "var(--typo-caption-3-regular-size)",
-                              color: "#22C55E",
+                              color: "var(--color-success)",
                             }}>온라인</span>
                           )}
                           <span style={{
@@ -1229,20 +1263,12 @@ export default function TravelPlanner() {
 
       {/* ── Day Reorder Bottom Sheet ── */}
       {showReorder && (
-        <BottomSheet onClose={() => setShowReorder(false)} maxHeight="70vh" zIndex={3000}>
+        <BottomSheet onClose={() => setShowReorder(false)} maxHeight="70vh" zIndex="var(--z-confirm)" title="Day 순서 변경">
           <div style={{ padding: "8px 24px 24px" }}>
             <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              marginBottom: "16px",
+              display: "flex", justifyContent: "flex-end",
+              marginBottom: "12px",
             }}>
-              <h3 style={{
-                margin: 0,
-                fontSize: "var(--typo-body-1-n---bold-size)",
-                fontWeight: "var(--typo-body-1-n---bold-weight)",
-                color: "var(--color-on-surface)",
-              }}>
-                Day 순서 변경
-              </h3>
               <Button variant="primary" size="sm" onClick={handleReorderConfirm}>
                 적용
               </Button>
@@ -1318,6 +1344,40 @@ export default function TravelPlanner() {
                 </div>
               ))}
             </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* More Menu */}
+      {showMoreMenu && (
+        <BottomSheet onClose={() => setShowMoreMenu(false)} maxHeight="auto" zIndex="var(--z-confirm)">
+          <div style={{ padding: "8px 20px 20px" }}>
+            {[
+              { icon: "compass", label: "여행 가이드", onClick: () => { setShowMoreMenu(false); setShowGuide(true); } },
+              { icon: "file", label: "여행 서류", onClick: () => { setShowMoreMenu(false); setShowDocs(true); } },
+              ...(!isLegacy ? [{ icon: "persons", label: `멤버 (${tripMeta?.members?.length || 0}명)`, onClick: () => { setShowMoreMenu(false); setShowShareSheet(true); } }] : []),
+            ].map((menuItem, idx) => (
+              <button
+                key={idx}
+                onClick={menuItem.onClick}
+                style={{
+                  display: "flex", alignItems: "center", gap: "12px",
+                  width: "100%", padding: "14px 4px",
+                  background: "none", border: "none", cursor: "pointer",
+                  borderBottom: idx < 2 ? "1px solid var(--color-surface-dim)" : "none",
+                  textAlign: "left",
+                }}
+              >
+                <Icon name={menuItem.icon} size={18} style={{ color: "var(--color-on-surface-variant)", opacity: 0.7 }} />
+                <span style={{
+                  fontSize: "var(--typo-label-2-medium-size)",
+                  fontWeight: "var(--typo-label-2-medium-weight)",
+                  color: "var(--color-on-surface)",
+                }}>
+                  {menuItem.label}
+                </span>
+              </button>
+            ))}
           </div>
         </BottomSheet>
       )}

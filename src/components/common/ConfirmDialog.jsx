@@ -1,14 +1,10 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import Button from './Button';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 /* ── Confirm Dialog ── */
 export default function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
+  useScrollLock();
 
   const handleBackdropTouch = useCallback((e) => {
     e.preventDefault();
@@ -20,7 +16,7 @@ export default function ConfirmDialog({ title, message, confirmLabel, onConfirm,
       onClick={onCancel}
       onTouchMove={handleBackdropTouch}
       style={{
-        position: "fixed", inset: 0, zIndex: 3000,
+        position: "fixed", inset: 0, zIndex: "var(--z-confirm)",
         background: "color-mix(in srgb, var(--color-scrim) 40%, transparent)", backdropFilter: "blur(4px)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: "24px", animation: "fadeIn 0.15s ease",
