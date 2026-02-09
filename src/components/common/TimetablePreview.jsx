@@ -6,7 +6,7 @@
  * timetable: { station, direction, trains: [{ time, name, picked?, dest?, note? }] }
  * variant: 'compact' | 'full'
  */
-import { COLOR, RADIUS } from '../../styles/tokens';
+import { COLOR, RADIUS, SPACING } from '../../styles/tokens';
 
 export default function TimetablePreview({ timetable, variant = 'full', accentColor }) {
   if (!timetable?.trains?.length) return null;
@@ -30,15 +30,15 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
         }}>
           {station} → {direction}
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
           {trains.map((t, i) => (
             <div
               key={i}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '4px 6px',
+                gap: SPACING.md,
+                padding: `${SPACING.sm} ${SPACING.ms}`,
                 borderRadius: 'var(--radius-md, 8px)',
                 background: t.picked ? 'var(--color-primary-container)' : 'transparent',
                 fontWeight: t.picked ? 700 : 400,

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 import Icon from './Icon';
+import { SPACING } from '../../styles/tokens';
 
 /*
  * ── Tab Component (Figma Design System) ──
@@ -33,7 +34,7 @@ const SIZE_MAP = {
     inactiveWeight: 'var(--typo-caption-1-regular-weight)',
     lineHeight: 'var(--typo-caption-1-bold-line-height)',
     letterSpacing: 'var(--typo-caption-1-bold-letter-spacing)',
-    padding: '8px 14px',
+    padding: `${SPACING.md} ${SPACING.lx}`,
     iconSize: 14,
   },
   md: {
@@ -43,7 +44,7 @@ const SIZE_MAP = {
     inactiveWeight: 'var(--typo-body-1-n---regular-weight)',
     lineHeight: 'var(--typo-body-1-n---bold-line-height)',
     letterSpacing: 'var(--typo-body-1-n---bold-letter-spacing)',
-    padding: '12px 16px',
+    padding: `${SPACING.lg} ${SPACING.xl}`,
     iconSize: 16,
   },
   lg: {
@@ -53,7 +54,7 @@ const SIZE_MAP = {
     inactiveWeight: 'var(--typo-heading-3-regular-weight)',
     lineHeight: 'var(--typo-heading-3-bold-line-height)',
     letterSpacing: 'var(--typo-heading-3-bold-letter-spacing)',
-    padding: '12px 16px',
+    padding: `${SPACING.lg} ${SPACING.xl}`,
     iconSize: 18,
   },
 };
@@ -93,7 +94,7 @@ export default function Tab({
     gap: 0,
     alignItems: 'stretch',
     ...(isPill
-      ? { gap: '6px' }
+      ? { gap: SPACING.ms }
       : { borderBottom: '1px solid var(--color-outline-variant)' }),
     ...(fullWidth
       ? {}
@@ -115,8 +116,8 @@ export default function Tab({
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '4px',
-              padding: '5px 12px',
+              gap: SPACING.sm,
+              padding: `5px ${SPACING.lg}`,
               borderRadius: 'var(--radius-md, 8px)',
               height: 'auto',
               whiteSpace: 'nowrap',

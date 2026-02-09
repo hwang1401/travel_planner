@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import { getStationsByRegion, getStationList, findRoutesByStations } from '../../data/timetable';
+import { SPACING } from '../../styles/tokens';
 
 /**
  * 출발지 / 도착지 2단계 선택 — 풀스크린 오버레이.
@@ -87,8 +88,8 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
         borderBottom: '1px solid var(--color-outline-variant)',
       }}>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '10px 12px 10px 8px',
+          display: 'flex', alignItems: 'center', gap: SPACING.md,
+          padding: `${SPACING.ml} ${SPACING.lg} ${SPACING.ml} ${SPACING.md}`,
         }}>
           <Button variant="ghost-neutral" size="sm" iconOnly="chevronLeft" onClick={onClose} />
           <h3 style={{
@@ -104,8 +105,8 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
         {/* step 2: 출발지 표시 + 변경 */}
         {step === 2 && (
           <div style={{
-            padding: '8px 20px 10px',
-            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.ml}`,
+            display: 'flex', alignItems: 'center', gap: SPACING.ml,
             background: 'var(--color-primary-container)',
             borderBottom: '1px solid var(--color-outline-variant)',
           }}>
@@ -125,7 +126,7 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
                 fontSize: 'var(--typo-caption-1-regular-size)',
                 color: 'var(--color-primary)',
                 fontFamily: 'inherit', fontWeight: 600,
-                padding: '4px 8px',
+                padding: `${SPACING.sm} ${SPACING.md}`,
               }}>
               변경
             </button>
@@ -133,9 +134,9 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
         )}
 
         {/* 검색 입력 — Field/AddressSearch와 동일 스타일 */}
-        <div style={{ padding: '12px 20px' }}>
+        <div style={{ padding: `${SPACING.lg} ${SPACING.xxl}` }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
+            display: 'flex', alignItems: 'center', gap: SPACING.md,
             height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
             border: '1px solid var(--color-outline-variant)',
             borderRadius: 'var(--radius-md, 8px)',
@@ -170,11 +171,11 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
         flex: 1, overflowY: 'auto',
         overscrollBehavior: 'contain',
         WebkitOverflowScrolling: 'touch',
-        paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
+        paddingBottom: `calc(${SPACING.xxl} + env(safe-area-inset-bottom, 0px))`,
       }}>
         {filteredGroups.length === 0 ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-            <Icon name="navigation" size={36} style={{ color: 'var(--color-on-surface-variant2)', opacity: 0.2, marginBottom: '16px' }} />
+          <div style={{ padding: `60px ${SPACING.xxl}`, textAlign: 'center' }}>
+            <Icon name="navigation" size={36} style={{ color: 'var(--color-on-surface-variant2)', opacity: 0.2, marginBottom: SPACING.xl }} />
             <p style={{ margin: 0, fontSize: 'var(--typo-body-2-size)', color: 'var(--color-on-surface-variant2)' }}>
               {q ? '검색 결과가 없습니다' : (step === 2 ? `${from}에서 출발하는 노선이 없습니다` : '등록된 역이 없습니다')}
             </p>
@@ -184,7 +185,7 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
             <div key={g.region}>
               {/* 지역 헤더 */}
               <div style={{
-                padding: '14px 20px 6px',
+                padding: `${SPACING.lx} ${SPACING.xxl} ${SPACING.ms}`,
                 fontSize: 'var(--typo-caption-1-bold-size)',
                 fontWeight: 700,
                 color: 'var(--color-primary)',
@@ -200,14 +201,14 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
                 <button key={s} type="button"
                   onClick={() => handlePick(s)}
                   style={{
-                    width: '100%', padding: '14px 20px',
+                    width: '100%', padding: `${SPACING.lx} ${SPACING.xxl}`,
                     textAlign: 'left', border: 'none',
                     background: 'transparent',
                     color: 'var(--color-on-surface)',
                     fontSize: 'var(--typo-body-2-size)',
                     fontWeight: 500,
                     cursor: 'pointer', fontFamily: 'inherit',
-                    display: 'flex', alignItems: 'center', gap: '8px',
+                    display: 'flex', alignItems: 'center', gap: SPACING.md,
                     borderBottom: i < g.stations.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
                   }}>
                   <span style={{ flex: 1 }}>{s}</span>

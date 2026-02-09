@@ -6,30 +6,31 @@ import Tab from '../common/Tab';
 import BottomSheet from '../common/BottomSheet';
 import MapButton from '../map/MapButton';
 import { GUIDE_DATA, getGuidesForDestinations } from '../../data/guides';
+import { SPACING } from '../../styles/tokens';
 
 /* ── Guide Card ── */
 function GuideCard({ item }) {
   return (
     <div style={{
-      marginBottom: "10px", padding: "14px",
+      marginBottom: SPACING.ml, padding: SPACING.lx,
       background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px)",
       border: "1px solid var(--color-outline-variant)",
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: SPACING.md, marginBottom: SPACING.ms }}>
         <div style={{ minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: "var(--typo-label-2-bold-size)", fontWeight: "var(--typo-label-2-bold-weight)", color: "var(--color-on-surface)" }}>{item.name}</p>
           {item.sub && <p style={{ margin: 0, fontSize: "var(--typo-caption-3-regular-size)", color: "var(--color-on-surface-variant2)", marginTop: "1px" }}>{item.sub}</p>}
         </div>
         <MapButton query={item.mapQuery} />
       </div>
-      <p style={{ margin: "0 0 8px", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "var(--typo-caption-2-regular-line-height)" }}>{item.desc}</p>
+      <p style={{ margin: `0 0 ${SPACING.md}`, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "var(--typo-caption-2-regular-line-height)" }}>{item.desc}</p>
       {item.schedule && (
-        <p style={{ margin: "0 0 8px", fontSize: "var(--typo-caption-2-medium-size)", color: "var(--color-on-surface-variant)", fontWeight: "var(--typo-caption-2-medium-weight)", display: "flex", alignItems: "center", gap: "4px" }}><Icon name="clock" size={12} />{item.schedule}</p>
+        <p style={{ margin: `0 0 ${SPACING.md}`, fontSize: "var(--typo-caption-2-medium-size)", color: "var(--color-on-surface-variant)", fontWeight: "var(--typo-caption-2-medium-weight)", display: "flex", alignItems: "center", gap: SPACING.sm }}><Icon name="clock" size={12} />{item.schedule}</p>
       )}
       {item.details && item.details.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "8px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: SPACING.md }}>
           {item.details.map((d, j) => (
-            <div key={j} style={{ display: "flex", gap: "6px", alignItems: "flex-start" }}>
+            <div key={j} style={{ display: "flex", gap: SPACING.ms, alignItems: "flex-start" }}>
               <span style={{ color: "var(--color-on-surface-variant2)", fontSize: "var(--typo-caption-3-regular-size)", marginTop: "5px", flexShrink: 0 }}>●</span>
               <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "var(--typo-caption-2-regular-line-height)" }}>{d}</span>
             </div>
@@ -38,10 +39,10 @@ function GuideCard({ item }) {
       )}
       {item.tip && (
         <div style={{
-          padding: "6px 10px", background: "var(--color-warning-container)", borderRadius: "var(--radius-md, 8px)",
+          padding: `${SPACING.ms} ${SPACING.ml}`, background: "var(--color-warning-container)", borderRadius: "var(--radius-md, 8px)",
           border: "1px solid var(--color-warning-container)",
         }}>
-          <span style={{ fontSize: "var(--typo-caption-3-regular-size)", color: "var(--color-on-warning-container)", lineHeight: "var(--typo-caption-3-regular-line-height)", display: "flex", alignItems: "flex-start", gap: "4px" }}><Icon name="bulb" size={12} style={{ marginTop: "1px" }} /><span>{item.tip}</span></span>
+          <span style={{ fontSize: "var(--typo-caption-3-regular-size)", color: "var(--color-on-warning-container)", lineHeight: "var(--typo-caption-3-regular-line-height)", display: "flex", alignItems: "flex-start", gap: SPACING.sm }}><Icon name="bulb" size={12} style={{ marginTop: "1px" }} /><span>{item.tip}</span></span>
         </div>
       )}
     </div>
@@ -69,7 +70,7 @@ export default function ShoppingGuideDialog({ onClose, destinations }) {
         ) : (
           <>
             {/* Region Tabs */}
-            <div style={{ padding: "0 20px" }}>
+            <div style={{ padding: `0 ${SPACING.xxl}` }}>
               <Tab
                 items={guides.map((r, i) => ({ label: r.region, value: i }))}
                 value={regionIdx}
@@ -80,7 +81,7 @@ export default function ShoppingGuideDialog({ onClose, destinations }) {
             </div>
 
             {/* Category Chips */}
-            <div style={{ padding: "12px 20px 0" }}>
+            <div style={{ padding: `${SPACING.lg} ${SPACING.xxl} 0` }}>
               <Tab
                 items={region.chips.map((c, i) => ({ label: c, value: i }))}
                 value={chipIdx}
@@ -91,7 +92,7 @@ export default function ShoppingGuideDialog({ onClose, destinations }) {
             </div>
 
             {/* Content */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px 20px" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: `${SPACING.lg} ${SPACING.xxl} ${SPACING.xxl}` }}>
               {filtered.map((item, i) => (
                 <GuideCard key={`${regionIdx}-${chipIdx}-${i}`} item={item} />
               ))}

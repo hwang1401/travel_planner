@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Icon from './Icon';
+import { SPACING } from '../../styles/tokens';
 
 /* ── Toast Notification Component ── */
 export default function Toast({ message, icon, duration = 2500, onDone }) {
@@ -26,12 +27,12 @@ export default function Toast({ message, icon, duration = 2500, onDone }) {
       zIndex: "var(--z-toast)",
       background: "var(--color-inverse-surface)",
       color: "var(--color-on-inverse-surface)",
-      padding: "10px 20px",
+      padding: `${SPACING.ml} ${SPACING.xxl}`,
       borderRadius: "var(--radius-md, 8px)",
       boxShadow: "var(--shadow-heavy)",
       display: "flex",
       alignItems: "center",
-      gap: "8px",
+      gap: SPACING.md,
       fontSize: "var(--typo-label-2-medium-size)",
       fontWeight: "var(--typo-label-2-medium-weight)",
       opacity: exiting ? 0 : 1,

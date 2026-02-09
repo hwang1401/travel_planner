@@ -87,11 +87,11 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
     <div>
       {/* Selection summary */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px',
+        display: 'flex', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.xl,
         fontSize: 'var(--typo-caption-1-medium-size)', color: 'var(--color-on-surface-variant)',
       }}>
         <span style={{
-          padding: '6px 14px', borderRadius: '8px',
+          padding: `${SPACING.ms} ${SPACING.lx}`, borderRadius: RADIUS.md,
           background: selStart ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
           color: selStart ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
           fontWeight: 600,
@@ -100,7 +100,7 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
         </span>
         <span style={{ color: 'var(--color-on-surface-variant2)' }}>→</span>
         <span style={{
-          padding: '6px 14px', borderRadius: '8px',
+          padding: `${SPACING.ms} ${SPACING.lx}`, borderRadius: RADIUS.md,
           background: selEnd ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
           color: selEnd ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
           fontWeight: 600,
@@ -115,23 +115,23 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
       </div>
 
       {/* Month nav */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <button onClick={handlePrev} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '6px', display: 'flex' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.lg }}>
+        <button onClick={handlePrev} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: SPACING.ms, display: 'flex' }}>
           <Icon name="chevronLeft" size={18} />
         </button>
         <span style={{ fontSize: 'var(--typo-label-1-n---bold-size)', fontWeight: 'var(--typo-label-1-n---bold-weight)', color: 'var(--color-on-surface)' }}>
           {viewYear}년 {viewMonth + 1}월
         </span>
-        <button onClick={handleNext} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '6px', display: 'flex' }}>
+        <button onClick={handleNext} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: SPACING.ms, display: 'flex' }}>
           <Icon name="chevronRight" size={18} />
         </button>
       </div>
 
       {/* Day header */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '4px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: SPACING.sm }}>
         {DAYS_KR.map((d) => (
           <div key={d} style={{
-            textAlign: 'center', padding: '6px 0',
+            textAlign: 'center', padding: `${SPACING.ms} 0`,
             fontSize: 'var(--typo-caption-3-bold-size)', fontWeight: 'var(--typo-caption-3-bold-weight)',
             color: 'var(--color-on-surface-variant2)',
           }}>{d}</div>
@@ -139,7 +139,7 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
       </div>
 
       {/* Calendar grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: SPACING.xs }}>
         {calendarDays.map((day, i) => {
           if (!day) return <div key={i} />;
           const str = getDayStr(day);
@@ -152,7 +152,7 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
             <div key={i}
               onClick={() => handleDayClick(day)}
               style={{
-                textAlign: 'center', padding: '10px 0',
+                textAlign: 'center', padding: `${SPACING.ml} 0`,
                 cursor: past ? 'not-allowed' : 'pointer',
                 opacity: past ? 0.4 : 1,
                 borderRadius: isStart ? '8px 0 0 8px' : isEnd ? '0 8px 8px 0' : selected ? '8px' : '0',
@@ -165,7 +165,7 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
               {day}
               {isToday(day) && !selected && (
                 <div style={{
-                  width: '4px', height: '4px', borderRadius: '50%',
+                  width: '4px', height: '4px', borderRadius: RADIUS.full,
                   background: 'var(--color-primary)',
                   position: 'absolute', bottom: '4px', left: '50%', transform: 'translateX(-50%)',
                 }} />
@@ -393,7 +393,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                 <div style={{
                   width: '24px',
                   height: '24px',
-                  borderRadius: '50%',
+                  borderRadius: RADIUS.full,
                   background: isActive ? 'var(--color-primary)' : 'var(--color-surface-container-lowest)',
                   border: `2px solid ${isActive ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
                   boxSizing: 'border-box',
@@ -442,9 +442,9 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
 
         {/* Step 1: 어디로? */}
         {step === 1 && (
-          <div style={{ padding: '24px 20px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ padding: `${SPACING.xxxl} ${SPACING.xxl} ${SPACING.xxxxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.xxl }}>
             <div>
-              <h2 style={{ margin: '0 0 4px', fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
+              <h2 style={{ margin: `0 0 ${SPACING.sm}`, fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
                 어디로 여행을 떠나시나요?
               </h2>
               <p style={{ margin: 0, fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
@@ -470,18 +470,18 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                 size="lg"
               />
               {destinations.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms, marginTop: SPACING.md }}>
                   {destinations.map((dest, i) => (
                     <div key={i} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '4px',
-                      padding: '4px 10px', borderRadius: '8px',
+                      display: 'inline-flex', alignItems: 'center', gap: SPACING.sm,
+                      padding: `${SPACING.sm} ${SPACING.ml}`, borderRadius: RADIUS.md,
                       background: 'var(--color-primary-container)',
                       fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600,
                       color: 'var(--color-on-primary-container)',
                     }}>
                       <Icon name="pin" size={12} />
                       {dest.name}
-                      <button onClick={() => removeDestination(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0 0 0 2px', display: 'flex' }}>
+                      <button onClick={() => removeDestination(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: `0 0 0 ${SPACING.xs}`, display: 'flex' }}>
                         <Icon name="close" size={12} style={{ opacity: 0.6 }} />
                       </button>
                     </div>
@@ -503,11 +503,11 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
 
         {/* Step 2: 언제? */}
         {step === 2 && (
-          <div style={{ padding: '24px 20px 32px' }}>
-            <h2 style={{ margin: '0 0 4px', fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
+          <div style={{ padding: `${SPACING.xxxl} ${SPACING.xxl} ${SPACING.xxxxl}` }}>
+            <h2 style={{ margin: `0 0 ${SPACING.sm}`, fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
               언제 출발하시나요?
             </h2>
-            <p style={{ margin: '0 0 20px', fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
+            <p style={{ margin: `0 0 ${SPACING.xxl}`, fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
               출발일과 귀국일을 선택해주세요
             </p>
             <InlineCalendar
@@ -520,15 +520,15 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
 
         {/* Step 3: 일정 채우기 */}
         {step === 3 && !step3Mode && (
-          <div style={{ padding: '24px 20px 32px' }}>
-            <h2 style={{ margin: '0 0 4px', fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
+          <div style={{ padding: `${SPACING.xxxl} ${SPACING.xxl} ${SPACING.xxxxl}` }}>
+            <h2 style={{ margin: `0 0 ${SPACING.sm}`, fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
               어떻게 일정을 채울까요?
             </h2>
-            <p style={{ margin: '0 0 24px', fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
+            <p style={{ margin: `0 0 ${SPACING.xxxl}`, fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
               나중에 추가할 수도 있어요
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.ml }}>
               {[
                 { key: 'paste', icon: 'document', title: '예약 정보 붙여넣기', desc: '확인메일, 바우처 텍스트를 복붙하면 AI가 일정으로 정리해요' },
                 { key: 'ai', icon: 'flash', title: 'AI로 일정 만들기', desc: '여행 스타일을 알려주면 AI가 전체 일정을 자동 생성해요' },
@@ -536,8 +536,8 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                 <div key={opt.key}
                   onClick={() => setStep3Mode(opt.key)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '14px',
-                    padding: '16px', borderRadius: '12px',
+                    display: 'flex', alignItems: 'center', gap: SPACING.lx,
+                    padding: SPACING.xl, borderRadius: '12px',
                     border: '1px solid var(--color-outline-variant)',
                     cursor: 'pointer', transition: 'all 0.15s',
                   }}
@@ -552,14 +552,14 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---bold-size)', fontWeight: 600, color: 'var(--color-on-surface)' }}>{opt.title}</p>
-                    <p style={{ margin: '2px 0 0', fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', lineHeight: 1.4 }}>{opt.desc}</p>
+                    <p style={{ margin: `${SPACING.xs} 0 0`, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', lineHeight: 1.4 }}>{opt.desc}</p>
                   </div>
                   <Icon name="chevronRight" size={16} style={{ opacity: 0.3, flexShrink: 0 }} />
                 </div>
               ))}
 
               <Button variant="ghost-neutral" size="lg" fullWidth onClick={() => handleSubmit(false)} disabled={submitting}
-                style={{ marginTop: '8px' }}>
+                style={{ marginTop: SPACING.md }}>
                 {submitting ? '생성 중...' : '직접 만들기 (빈 여행)'}
               </Button>
             </div>
@@ -568,14 +568,14 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
 
         {/* Step 3: Paste mode */}
         {step === 3 && step3Mode === 'paste' && (
-          <div style={{ padding: '24px 20px 32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ padding: `${SPACING.xxxl} ${SPACING.xxl} ${SPACING.xxxxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.xl }}>
             <button
               type="button"
               onClick={() => { setStep3Mode(null); setPreview(null); setGenError(''); setPasteText(''); setPasteAttachments([]); }}
               style={{
                 alignSelf: 'flex-start',
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '4px 0', border: 'none', background: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: SPACING.sm,
+                padding: `${SPACING.sm} 0`, border: 'none', background: 'none', cursor: 'pointer',
                 fontSize: 'var(--typo-caption-1-medium-size)', color: 'var(--color-on-surface-variant)',
                 fontFamily: 'inherit',
               }}
@@ -584,7 +584,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               뒤로
             </button>
             <div>
-              <h2 style={{ margin: '0 0 4px', fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
+              <h2 style={{ margin: `0 0 ${SPACING.sm}`, fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
                 예약 정보 붙여넣기
               </h2>
               <p style={{ margin: 0, fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
@@ -598,7 +598,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               placeholder="여기에 예약 확인 메일이나 일정 텍스트를 붙여넣으세요..."
               rows={8}
               style={{
-                width: '100%', padding: '14px', borderRadius: '12px',
+                width: '100%', padding: SPACING.lx, borderRadius: '12px',
                 border: '1px solid var(--color-outline-variant)',
                 background: 'var(--color-surface-container-lowest)',
                 fontSize: 'var(--typo-label-2-regular-size)',
@@ -608,8 +608,8 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               }}
             />
             <label style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 14px', borderRadius: '8px',
+              display: 'flex', alignItems: 'center', gap: SPACING.md,
+              padding: `${SPACING.ml} ${SPACING.lx}`, borderRadius: RADIUS.md,
               border: '1px dashed var(--color-outline-variant)',
               cursor: 'pointer', color: 'var(--color-on-surface-variant)',
               fontSize: 'var(--typo-caption-1-regular-size)',
@@ -635,11 +635,11 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               }} style={{ display: 'none' }} />
             </label>
             {pasteAttachments.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms }}>
                 {pasteAttachments.map((a, i) => (
                   <span key={i} style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    padding: '6px 10px', borderRadius: '8px',
+                    display: 'inline-flex', alignItems: 'center', gap: SPACING.ms,
+                    padding: `${SPACING.ms} ${SPACING.ml}`, borderRadius: RADIUS.md,
                     background: 'var(--color-surface-container-high)', fontSize: 'var(--typo-caption-2-regular-size)',
                     color: 'var(--color-on-surface-variant)',
                   }}>
@@ -657,7 +657,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
             </Button>
 
             {genError && (
-              <p style={{ margin: 0, padding: '10px 12px', background: 'var(--color-error-container)', borderRadius: '8px', fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
+              <p style={{ margin: 0, padding: `${SPACING.ml} ${SPACING.lg}`, background: 'var(--color-error-container)', borderRadius: RADIUS.md, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
                 {genError}
               </p>
             )}
@@ -674,14 +674,14 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
 
         {/* Step 3: AI mode */}
         {step === 3 && step3Mode === 'ai' && (
-          <div style={{ padding: '24px 20px 32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ padding: `${SPACING.xxxl} ${SPACING.xxl} ${SPACING.xxxxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.xl }}>
             <button
               type="button"
               onClick={() => { setStep3Mode(null); setPreview(null); setGenError(''); setAiPreferences(''); setBookedText(''); setBookedAttachments([]); }}
               style={{
                 alignSelf: 'flex-start',
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '4px 0', border: 'none', background: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: SPACING.sm,
+                padding: `${SPACING.sm} 0`, border: 'none', background: 'none', cursor: 'pointer',
                 fontSize: 'var(--typo-caption-1-medium-size)', color: 'var(--color-on-surface-variant)',
                 fontFamily: 'inherit',
               }}
@@ -690,7 +690,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               뒤로
             </button>
             <div>
-              <h2 style={{ margin: '0 0 4px', fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
+              <h2 style={{ margin: `0 0 ${SPACING.sm}`, fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
                 AI로 일정 만들기
               </h2>
               <p style={{ margin: 0, fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
@@ -709,8 +709,8 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               rows={2}
             />
             <label style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 14px', borderRadius: '8px',
+              display: 'flex', alignItems: 'center', gap: SPACING.md,
+              padding: `${SPACING.ml} ${SPACING.lx}`, borderRadius: RADIUS.md,
               border: '1px dashed var(--color-outline-variant)',
               cursor: 'pointer', color: 'var(--color-on-surface-variant)',
               fontSize: 'var(--typo-caption-1-regular-size)',
@@ -736,11 +736,11 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               }} style={{ display: 'none' }} />
             </label>
             {bookedAttachments.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms }}>
                 {bookedAttachments.map((a, i) => (
                   <span key={i} style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    padding: '6px 10px', borderRadius: '8px',
+                    display: 'inline-flex', alignItems: 'center', gap: SPACING.ms,
+                    padding: `${SPACING.ms} ${SPACING.ml}`, borderRadius: RADIUS.md,
                     background: 'var(--color-surface-container-high)', fontSize: 'var(--typo-caption-2-regular-size)',
                     color: 'var(--color-on-surface-variant)',
                   }}>
@@ -752,12 +752,12 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               </div>
             )}
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms }}>
               {['맛집 위주', '관광 중심', '쇼핑 많이', '여유롭게', '알차게'].map((chip) => (
                 <button key={chip}
                   onClick={() => setAiPreferences((prev) => prev ? `${prev}, ${chip}` : chip)}
                   style={{
-                    padding: '5px 12px', borderRadius: '100px',
+                    padding: `5px ${SPACING.lg}`, borderRadius: '100px',
                     border: '1px solid var(--color-outline-variant)',
                     background: 'var(--color-surface-container-lowest)',
                     fontSize: 'var(--typo-caption-2-regular-size)',
@@ -773,10 +773,10 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
             </Button>
 
             {generating && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'var(--color-primary-container)', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, padding: SPACING.lg, background: 'var(--color-primary-container)', borderRadius: RADIUS.md }}>
                 <div style={{ display: 'flex', gap: '3px' }}>
                   {[0, 1, 2].map((d) => (
-                    <div key={d} style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-primary)', animation: `bounce 1.2s infinite ${d * 0.2}s` }} />
+                    <div key={d} style={{ width: '5px', height: '5px', borderRadius: RADIUS.full, background: 'var(--color-primary)', animation: `bounce 1.2s infinite ${d * 0.2}s` }} />
                   ))}
                 </div>
                 <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)' }}>
@@ -786,7 +786,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
             )}
 
             {genError && (
-              <p style={{ margin: 0, padding: '10px 12px', background: 'var(--color-error-container)', borderRadius: '8px', fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
+              <p style={{ margin: 0, padding: `${SPACING.ml} ${SPACING.lg}`, background: 'var(--color-error-container)', borderRadius: RADIUS.md, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
                 {genError}
               </p>
             )}
@@ -805,7 +805,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
       {/* Bottom action bar (Step 1 & 2 only) */}
       {step < 3 && (
         <div style={{
-          padding: '14px 20px calc(14px + env(safe-area-inset-bottom, 0px))',
+          padding: `${SPACING.lx} ${SPACING.xxl} calc(${SPACING.lx} + env(safe-area-inset-bottom, 0px))`,
           borderTop: '1px solid var(--color-outline-variant)',
           flexShrink: 0,
         }}>
@@ -829,7 +829,7 @@ function PreviewAccordion({ days, expandedDay, setExpandedDay }) {
     <div style={{
       border: '1px solid var(--color-outline-variant)', borderRadius: '12px', overflow: 'hidden',
     }}>
-      <div style={{ padding: '10px 14px', background: 'var(--color-primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: `${SPACING.ml} ${SPACING.lx}`, background: 'var(--color-primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-primary-container)' }}>
           AI 추천 일정 ({days.length}일)
         </span>
@@ -849,19 +849,19 @@ function PreviewAccordion({ days, expandedDay, setExpandedDay }) {
           return (
             <div key={di} style={{ borderBottom: di < days.length - 1 ? '1px solid var(--color-outline-variant)' : 'none' }}>
               <div onClick={() => setExpandedDay(isOpen ? null : di)}
-                style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: isOpen ? 'var(--color-surface-container-lowest)' : 'transparent' }}>
+                style={{ padding: `${SPACING.ml} ${SPACING.lx}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: isOpen ? 'var(--color-surface-container-lowest)' : 'transparent' }}>
                 <span style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-surface)' }}>
                   Day {day.day} — {day.label}
                 </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.ms }}>
                   <span style={{ fontSize: 'var(--typo-caption-3-regular-size)', color: 'var(--color-on-surface-variant2)' }}>{allItems.length}개</span>
                   <Icon name="chevronRight" size={12} style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', opacity: 0.4 }} />
                 </div>
               </div>
               {isOpen && (
-                <div style={{ padding: '0 14px 10px' }}>
+                <div style={{ padding: `0 ${SPACING.lx} ${SPACING.ml}` }}>
                   {allItems.map((it, j) => (
-                    <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '6px 0', borderBottom: j < allItems.length - 1 ? '1px solid var(--color-surface-dim)' : 'none' }}>
+                    <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: SPACING.md, padding: `${SPACING.ms} 0`, borderBottom: j < allItems.length - 1 ? '1px solid var(--color-surface-dim)' : 'none' }}>
                       <span style={{ width: '36px', flexShrink: 0, textAlign: 'right', fontSize: '11px', fontWeight: 600, color: 'var(--color-on-surface-variant2)', fontVariantNumeric: 'tabular-nums', lineHeight: '18px' }}>
                         {it.time || ''}
                       </span>

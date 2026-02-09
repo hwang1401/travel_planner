@@ -17,6 +17,7 @@ import { joinByShareCode } from '../services/memberService';
 import Icon from './common/Icon';
 import Button from './common/Button';
 import PageSplash from './common/PageSplash';
+import { SPACING } from '../styles/tokens';
 
 export default function InvitePage() {
   const { shareCode } = useParams();
@@ -67,7 +68,7 @@ export default function InvitePage() {
       alignItems: 'center',
       justifyContent: 'center',
       background: 'var(--color-surface)',
-      padding: '24px',
+      padding: SPACING.xxxl,
       paddingTop: 'env(safe-area-inset-top, 0px)',
     }}>
       {status === 'joining' && (
@@ -80,7 +81,7 @@ export default function InvitePage() {
             width: '56px', height: '56px', borderRadius: '50%',
             background: 'var(--color-primary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: '20px',
+            marginBottom: SPACING.xxl,
           }}>
             <Icon name="check" size={28} style={{ filter: 'brightness(0) invert(1)' }} />
           </div>
@@ -88,14 +89,14 @@ export default function InvitePage() {
             fontSize: 'var(--typo-body-1-n---bold-size)',
             fontWeight: 'var(--typo-body-1-n---bold-weight)',
             color: 'var(--color-on-surface)',
-            marginBottom: '8px',
+            marginBottom: SPACING.md,
           }}>
             여행에 참여했습니다!
           </p>
           <p style={{
             fontSize: 'var(--typo-caption-1-regular-size)',
             color: 'var(--color-on-surface-variant2)',
-            marginBottom: '20px',
+            marginBottom: SPACING.xxl,
           }}>
             잠시 후 일정 화면으로 이동합니다...
           </p>
@@ -111,7 +112,7 @@ export default function InvitePage() {
             width: '56px', height: '56px', borderRadius: '50%',
             background: 'var(--color-error-container, #fde8e8)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: '20px',
+            marginBottom: SPACING.xxl,
           }}>
             <Icon name="info" size={28} />
           </div>
@@ -119,7 +120,7 @@ export default function InvitePage() {
             fontSize: 'var(--typo-body-1-n---bold-size)',
             fontWeight: 'var(--typo-body-1-n---bold-weight)',
             color: 'var(--color-on-surface)',
-            marginBottom: '8px',
+            marginBottom: SPACING.md,
           }}>
             참여 실패
           </p>
@@ -127,11 +128,11 @@ export default function InvitePage() {
             fontSize: 'var(--typo-caption-1-regular-size)',
             color: 'var(--color-on-surface-variant2)',
             textAlign: 'center',
-            marginBottom: '24px',
+            marginBottom: SPACING.xxxl,
           }}>
             {errorMsg}
           </p>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: SPACING.ml }}>
             <Button variant="neutral" size="lg" onClick={() => navigate('/', { replace: true })}>
               홈으로
             </Button>

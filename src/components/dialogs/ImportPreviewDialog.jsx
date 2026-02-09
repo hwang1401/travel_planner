@@ -3,6 +3,7 @@ import Icon from "../common/Icon";
 import Button from "../common/Button";
 import { TYPE_CONFIG } from "../../data/guides";
 import { TYPE_LABELS } from "../../utils/scheduleParser";
+import { SPACING } from '../../styles/tokens';
 
 /* ── Import Preview Dialog ── */
 export default function ImportPreviewDialog({
@@ -24,7 +25,7 @@ export default function ImportPreviewDialog({
         position: "fixed", inset: 0, zIndex: 9000,
         background: "rgba(0,0,0,0.5)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "20px",
+        padding: SPACING.xxl,
       }}
     >
       <div
@@ -40,7 +41,7 @@ export default function ImportPreviewDialog({
       >
         {/* Header */}
         <div style={{
-          padding: "20px 20px 12px",
+          padding: `${SPACING.xxl} ${SPACING.xxl} ${SPACING.lg}`,
           borderBottom: "1px solid var(--color-outline-variant)",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -54,7 +55,7 @@ export default function ImportPreviewDialog({
             <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onCancel} />
           </div>
           <p style={{
-            margin: "4px 0 0", fontSize: "var(--typo-caption-2-regular-size)",
+            margin: `${SPACING.sm} 0 0`, fontSize: "var(--typo-caption-2-regular-size)",
             color: "var(--color-on-surface-variant2)",
           }}>
             {dayLabel} · {items.length}개 일정 인식
@@ -64,10 +65,10 @@ export default function ImportPreviewDialog({
 
         {/* Warnings */}
         {hasConflicts && (
-          <div style={{ padding: "12px 20px 0" }}>
+          <div style={{ padding: `${SPACING.lg} ${SPACING.xxl} 0` }}>
             {conflicts.internal.length > 0 && (
               <div style={{
-                padding: "10px 12px", marginBottom: "8px",
+                padding: `${SPACING.ml} ${SPACING.lg}`, marginBottom: SPACING.md,
                 background: "var(--color-warning-container)",
                 borderRadius: "var(--radius-md, 8px)",
                 border: "1px solid var(--color-warning-container)",
@@ -75,9 +76,9 @@ export default function ImportPreviewDialog({
                 <p style={{
                   margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
                   color: "var(--color-on-warning-container)",
-                  display: "flex", alignItems: "flex-start", gap: "6px",
+                  display: "flex", alignItems: "flex-start", gap: SPACING.ms,
                 }}>
-                  <Icon name="flash" size={12} style={{ marginTop: "2px", flexShrink: 0 }} />
+                  <Icon name="flash" size={12} style={{ marginTop: SPACING.xs, flexShrink: 0 }} />
                   <span>
                     파일 내 중복 시간: {conflicts.internal.map((c) => c.time).join(", ")}
                   </span>
@@ -86,7 +87,7 @@ export default function ImportPreviewDialog({
             )}
             {conflicts.external.length > 0 && (
               <div style={{
-                padding: "10px 12px", marginBottom: "8px",
+                padding: `${SPACING.ml} ${SPACING.lg}`, marginBottom: SPACING.md,
                 background: "var(--color-error-container)",
                 borderRadius: "var(--radius-md, 8px)",
                 border: "1px solid var(--color-error)",
@@ -94,9 +95,9 @@ export default function ImportPreviewDialog({
                 <p style={{
                   margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
                   color: "var(--color-on-error-container)",
-                  display: "flex", alignItems: "flex-start", gap: "6px",
+                  display: "flex", alignItems: "flex-start", gap: SPACING.ms,
                 }}>
-                  <Icon name="flash" size={12} style={{ marginTop: "2px", flexShrink: 0 }} />
+                  <Icon name="flash" size={12} style={{ marginTop: SPACING.xs, flexShrink: 0 }} />
                   <span>
                     기존 일정과 시간 충돌: {conflicts.external.map((c) => `${c.time} (${c.existingDescs[0]})`).join(", ")}
                   </span>
@@ -108,7 +109,7 @@ export default function ImportPreviewDialog({
 
         {/* Parse errors */}
         {errors.length > 0 && (
-          <div style={{ padding: "8px 20px 0" }}>
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxl} 0` }}>
             <p style={{
               margin: 0, fontSize: "var(--typo-caption-3-regular-size)",
               color: "var(--color-on-surface-variant2)",
@@ -121,7 +122,7 @@ export default function ImportPreviewDialog({
 
         {/* Item list preview */}
         <div style={{
-          flex: 1, overflowY: "auto", padding: "12px 20px",
+          flex: 1, overflowY: "auto", padding: `${SPACING.lg} ${SPACING.xxl}`,
         }}>
           <div style={{
             borderRadius: "var(--radius-md, 8px)",
@@ -136,8 +137,8 @@ export default function ImportPreviewDialog({
                 <div
                   key={i}
                   style={{
-                    display: "flex", alignItems: "center", gap: "8px",
-                    padding: "8px 12px",
+                    display: "flex", alignItems: "center", gap: SPACING.md,
+                    padding: `${SPACING.md} ${SPACING.lg}`,
                     borderBottom: isLast ? "none" : "1px solid var(--color-surface-dim)",
                     background: hasExternalConflict ? "var(--color-error-container)" : "transparent",
                   }}
@@ -202,9 +203,9 @@ export default function ImportPreviewDialog({
 
         {/* Actions */}
         <div style={{
-          padding: "12px 20px 20px",
+          padding: `${SPACING.lg} ${SPACING.xxl} ${SPACING.xxl}`,
           borderTop: "1px solid var(--color-outline-variant)",
-          display: "flex", gap: "8px",
+          display: "flex", gap: SPACING.md,
         }}>
           <Button
             variant="neutral" size="md"

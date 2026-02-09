@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import Icon from './Icon';
 import { getPlacePredictions, getPlaceDetails } from '../../lib/googlePlaces.js';
+import { SPACING } from '../../styles/tokens';
 
 /*
  * ── Address Search Component ──
@@ -135,7 +136,7 @@ export default function AddressSearch({
       {/* Label — Field와 동일한 높이로 수평 정렬 */}
       {label && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '4px',
+          display: 'flex', alignItems: 'center', gap: SPACING.sm,
           paddingBottom: 'var(--spacing-sp40, 4px)',
           minHeight: 'var(--field-label-row-height, 20px)',
         }}>
@@ -152,7 +153,7 @@ export default function AddressSearch({
 
       {/* Input */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '8px',
+        display: 'flex', alignItems: 'center', gap: SPACING.md,
         height: s.height, padding: `0 ${s.px}`,
         border: `1px solid ${borderColor}`, borderRadius: s.radius,
         background: variant === 'filled' ? 'var(--color-surface-container-lowest)' : 'transparent',
@@ -185,7 +186,7 @@ export default function AddressSearch({
         )}
         {query && !loading && (
           <button onClick={handleClear} style={{
-            border: 'none', background: 'none', cursor: 'pointer', padding: '2px',
+            border: 'none', background: 'none', cursor: 'pointer', padding: SPACING.xs,
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <Icon name="close" size={14} style={{ opacity: 0.5 }} />
@@ -196,7 +197,7 @@ export default function AddressSearch({
       {/* Results dropdown */}
       {showResults && results.length > 0 && (
         <div style={{
-          position: 'absolute', left: 0, right: 0, top: '100%', marginTop: '4px',
+          position: 'absolute', left: 0, right: 0, top: '100%', marginTop: SPACING.sm,
           background: 'var(--color-surface-container-lowest)',
           border: '1px solid var(--color-outline-variant)',
           borderRadius: s.radius, boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
@@ -207,8 +208,8 @@ export default function AddressSearch({
               key={i}
               onMouseDown={() => handleSelect(r)}
               style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '10px 14px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: SPACING.md,
+                padding: `${SPACING.ml} ${SPACING.lx}`, cursor: 'pointer',
                 borderBottom: i < results.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
                 transition: 'background 0.1s',
               }}

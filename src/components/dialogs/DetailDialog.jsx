@@ -152,7 +152,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
             }}>
               {detail.name}
             </h3>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", flexWrap: "nowrap", flexShrink: 0 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: SPACING.sm, flexWrap: "nowrap", flexShrink: 0 }}>
               {(detail.categories && detail.categories.length > 0
                 ? detail.categories
                 : detail.category ? [detail.category] : []
@@ -174,7 +174,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           style={{
           flex: 1, minHeight: "min(40vh, 280px)", overflowY: "auto", overscrollBehavior: "contain",
           WebkitOverflowScrolling: "touch", touchAction: "pan-y",
-          ...((onEdit || onDelete) ? { paddingBottom: "12px" } : {}),
+          ...((onEdit || onDelete) ? { paddingBottom: SPACING.lg } : {}),
         }}>
 
         {/* ── 이미지: 헤더 바로 아래 (저장된 이미지만) ── */}
@@ -307,7 +307,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
                       <div style={{
                         width: "5px", height: "5px", borderRadius: RADIUS.full,
                         background: isNote ? COLOR.onSurfaceVariant2 : accentColor,
-                        flexShrink: 0, marginTop: "6px",
+                        flexShrink: 0, marginTop: SPACING.ms,
                       }} />
                       <span style={{
                         fontSize: "var(--typo-label-1-n---regular-size)",
@@ -342,7 +342,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            gap: "6px",
+            gap: SPACING.ms,
             borderTop: "1px solid var(--color-outline-variant)",
             background: "var(--color-surface-container-lowest)",
           }}>
@@ -369,9 +369,9 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
         {(onEdit || onDelete) && (
           <div style={{
             flexShrink: 0,
-            padding: "16px 20px",
+            padding: `${SPACING.xl} ${SPACING.xxl}`,
             display: "flex",
-            gap: "8px",
+            gap: SPACING.md,
             borderTop: "1px solid var(--color-outline-variant)",
             background: "var(--color-surface)",
           }}>

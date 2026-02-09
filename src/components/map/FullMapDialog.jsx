@@ -6,7 +6,7 @@ import Button from '../common/Button';
 import Tab from '../common/Tab';
 import DetailDialog from '../dialogs/DetailDialog';
 import { getItemCoords } from '../../data/locations';
-import { TYPE_CONFIG, TYPE_LABELS } from '../../styles/tokens';
+import { TYPE_CONFIG, TYPE_LABELS, SPACING } from '../../styles/tokens';
 import { useScrollLock } from '../../hooks/useScrollLock';
 
 /* ── Map helper: create numbered day icon ── */
@@ -172,7 +172,7 @@ export default function FullMapDialog({ days, onClose }) {
     }}>
       {/* Header */}
       <div style={{
-        padding: "10px 16px", background: "var(--color-surface-container-lowest)",
+        padding: `${SPACING.ml} ${SPACING.xl}`, background: "var(--color-surface-container-lowest)",
         borderBottom: "1px solid var(--color-outline-variant)",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexShrink: 0,
@@ -229,13 +229,13 @@ export default function FullMapDialog({ days, onClose }) {
                     maxHeight: "200px",
                     overflowY: "auto",
                   }}>
-                    <strong style={{ fontSize: "var(--typo-label-2-bold-size)", display: "block", marginBottom: "6px" }}>
+                    <strong style={{ fontSize: "var(--typo-label-2-bold-size)", display: "block", marginBottom: SPACING.ms }}>
                       {pin.label}
                     </strong>
                     {pin.items.map((entry, di) => (
                       <div key={di} style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "4px 0",
+                        padding: `${SPACING.sm} 0`,
                         borderBottom: di < pin.items.length - 1 ? "1px solid var(--color-surface-dim)" : "none",
                       }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -251,7 +251,7 @@ export default function FullMapDialog({ days, onClose }) {
                           <span
                             onClick={(e) => handlePopupDetailClick(entry, e)}
                             style={{
-                              flexShrink: 0, marginLeft: "8px",
+                              flexShrink: 0, marginLeft: SPACING.md,
                               fontSize: "var(--typo-caption-2-medium-size)",
                               color: "var(--color-primary)", cursor: "pointer", fontWeight: 500,
                             }}
@@ -287,8 +287,8 @@ export default function FullMapDialog({ days, onClose }) {
         <button onClick={() => setCardExpanded(!cardExpanded)}
           style={{
             width: "100%", display: "flex", alignItems: "center",
-            padding: "12px 16px", border: "none", borderRadius: 0,
-            background: "none", cursor: "pointer", gap: "8px",
+            padding: `${SPACING.lg} ${SPACING.xl}`, border: "none", borderRadius: 0,
+            background: "none", cursor: "pointer", gap: SPACING.md,
             fontFamily: "inherit",
           }}>
           <span style={{
@@ -309,7 +309,7 @@ export default function FullMapDialog({ days, onClose }) {
         </button>
 
         {/* Timeline list — timetable style: time / colorbar / title */}
-        <div ref={timelineRef} style={{ flex: 1, overflowY: "auto", padding: "0 4px 12px" }}>
+        <div ref={timelineRef} style={{ flex: 1, overflowY: "auto", padding: `0 ${SPACING.sm} ${SPACING.lg}` }}>
           {allItems.map((entry, i) => {
             const cfg = TYPE_CONFIG[entry.type] || TYPE_CONFIG.info;
             const isActive = selectedItemIdx === i;
@@ -320,7 +320,7 @@ export default function FullMapDialog({ days, onClose }) {
                 style={{
                   display: "flex", alignItems: "flex-start",
                   gap: "var(--spacing-sp80)",
-                  padding: "8px 4px",
+                  padding: `${SPACING.md} ${SPACING.sm}`,
                   borderRadius: "var(--radius-sm)",
                   cursor: entry.coords ? "pointer" : "default",
                   background: isActive ? "var(--color-primary-container)" : "transparent",

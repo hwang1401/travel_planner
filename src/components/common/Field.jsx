@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, Children } from 'react';
 import Icon from './Icon';
 import BottomSheet from './BottomSheet';
+import { SPACING } from '../../styles/tokens';
 
 /*
  * ── Field Component (Figma Design System) ──
@@ -87,7 +88,7 @@ export default function Field({
   const fieldStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: SPACING.md,
     width: '100%',
     height: isTextarea ? 'auto' : s.height,
     minHeight: isTextarea ? s.height : undefined,
@@ -146,7 +147,7 @@ export default function Field({
       {/* Label — 입력 박스와 같은 왼쪽 시작(0). TimePicker와 동일하게 라벨/필드 왼쪽 정렬 */}
       {label && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '4px',
+          display: 'flex', alignItems: 'center', gap: SPACING.sm,
           paddingBottom: 'var(--spacing-sp40, 4px)',
         }}>
           <span style={{
@@ -215,8 +216,8 @@ export default function Field({
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '10px',
-                          padding: '13px 20px',
+                          gap: SPACING.ml,
+                          padding: `13px ${SPACING.xxl}`,
                           cursor: 'pointer',
                           background: isActive ? 'var(--color-primary-container)' : 'transparent',
                           transition: 'background 0.1s',

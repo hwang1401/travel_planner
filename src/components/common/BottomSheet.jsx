@@ -52,8 +52,6 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
         background: "color-mix(in srgb, var(--color-scrim) 35%, transparent)", backdropFilter: "blur(4px)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
         animation: "fadeIn 0.2s ease",
-        touchAction: "none",
-        WebkitOverflowScrolling: "auto",
       }}
     >
       <div

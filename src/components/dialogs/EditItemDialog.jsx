@@ -13,6 +13,7 @@ import TimetablePreview from '../common/TimetablePreview';
 import { readFileAsText, detectConflicts } from '../../utils/scheduleParser';
 import { analyzeScheduleWithAI, getAIRecommendation } from '../../services/geminiService';
 import ImportPreviewDialog from './ImportPreviewDialog';
+import { SPACING, RADIUS, COLOR } from '../../styles/tokens';
 import TimetableSearchDialog from './TimetableSearchDialog';
 
 /* ── Edit Item Dialog (일정 추가/수정) ── */
@@ -324,13 +325,13 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       {/* 헤더 — 여백 확보, 닫기 버튼 */}
       <header style={{
         flexShrink: 0,
-        paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
-        paddingBottom: '16px',
-        paddingLeft: '16px',
-        paddingRight: '20px',
+        paddingTop: `calc(${SPACING.lg} + env(safe-area-inset-top, 0px))`,
+        paddingBottom: SPACING.xl,
+        paddingLeft: SPACING.xl,
+        paddingRight: SPACING.xxl,
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
+        gap: SPACING.lg,
         borderBottom: '1px solid var(--color-outline-variant)',
         background: 'var(--color-surface)',
       }}>
@@ -374,25 +375,25 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {/* Chat messages area */}
             <div ref={chatScrollRef} style={{
-              flex: 1, overflowY: "auto", padding: "16px 20px",
-              display: "flex", flexDirection: "column", gap: "12px",
+              flex: 1, overflowY: "auto", padding: `${SPACING.xl} ${SPACING.xxl}`,
+              display: "flex", flexDirection: "column", gap: SPACING.lg,
             }}>
               {chatMessages.length === 0 && !chatLoading && (
-                <div style={{ textAlign: "center", padding: "24px 12px" }}>
+                <div style={{ textAlign: "center", padding: `${SPACING.xxxl} ${SPACING.lg}` }}>
                   <div style={{
                     width: "48px", height: "48px", borderRadius: "50%",
                     background: "var(--color-primary-container)", display: "flex",
-                    alignItems: "center", justifyContent: "center", margin: "0 auto 12px",
+                    alignItems: "center", justifyContent: "center", margin: `0 auto ${SPACING.lg}`,
                   }}>
                     <Icon name="flash" size={24} style={{ color: "var(--color-primary)" }} />
                   </div>
                   <p style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
                     AI 일정 추천
                   </p>
-                  <p style={{ margin: "8px 0 16px", fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant2)", lineHeight: 1.6 }}>
+                  <p style={{ margin: `${SPACING.md} 0 ${SPACING.xl}`, fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant2)", lineHeight: 1.6 }}>
                     어디를 가고 싶은지, 뭘 먹고 싶은지<br/>자유롭게 말해주세요
                   </p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: SPACING.md }}>
                     {[
                       "오사카 도톤보리 근처에서 맛있는 거 먹고 싶어",
                       "후쿠오카에서 하루종일 놀고 싶어, 라멘은 꼭!",
@@ -405,7 +406,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                           background: "var(--color-surface-container-lowest)",
                           border: "1px solid var(--color-outline-variant)",
                           borderRadius: "var(--radius-md, 8px)",
-                          padding: "10px 14px", cursor: "pointer",
+                          padding: `${SPACING.ml} ${SPACING.lx}`, cursor: "pointer",
                           fontSize: "var(--typo-caption-1-regular-size)",
                           color: "var(--color-on-surface-variant)",
                           textAlign: "left", transition: "background 0.15s",
@@ -427,7 +428,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 }}>
                   <div style={{
                     maxWidth: "85%",
-                    padding: "10px 14px",
+                    padding: `${SPACING.ml} ${SPACING.lx}`,
                     borderRadius: msg.role === "user"
                       ? "var(--radius-md, 8px) var(--radius-md, 8px) 2px var(--radius-md, 8px)"
                       : "var(--radius-md, 8px) var(--radius-md, 8px) var(--radius-md, 8px) 2px",
@@ -445,16 +446,16 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
 
                     {/* AI recommendation items preview */}
                     {msg.role === "ai" && msg.items && msg.items.length > 0 && (
-                      <div style={{ marginTop: msg.text ? "10px" : 0 }}>
+                      <div style={{ marginTop: msg.text ? SPACING.ml : 0 }}>
                         <div style={{
                           borderTop: msg.text ? "1px solid var(--color-outline-variant)" : "none",
-                          paddingTop: msg.text ? "10px" : 0,
-                          display: "flex", flexDirection: "column", gap: "6px",
+                          paddingTop: msg.text ? SPACING.ml : 0,
+                          display: "flex", flexDirection: "column", gap: SPACING.ms,
                         }}>
                           {msg.items.slice(0, 6).map((it, j) => (
                             <div key={j} style={{
-                              display: "flex", alignItems: "center", gap: "8px",
-                              padding: "6px 8px",
+                              display: "flex", alignItems: "center", gap: SPACING.md,
+                              padding: `${SPACING.ms} ${SPACING.md}`,
                               background: "var(--color-surface-container-lowest)",
                               borderRadius: "6px",
                               fontSize: "var(--typo-caption-2-regular-size)",
@@ -477,7 +478,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                           variant="primary" size="sm"
                           onClick={() => handleApplyRecommendation(msg.items)}
                           fullWidth
-                          style={{ marginTop: "10px" }}
+                          style={{ marginTop: SPACING.ml }}
                         >
                           이 일정 적용하기 ({msg.items.length}개)
                         </Button>
@@ -491,12 +492,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
               {chatLoading && (
                 <div style={{ display: "flex", justifyContent: "flex-start" }}>
                   <div style={{
-                    padding: "12px 16px",
+                    padding: `${SPACING.lg} ${SPACING.xl}`,
                     borderRadius: "var(--radius-md, 8px) var(--radius-md, 8px) var(--radius-md, 8px) 2px",
                     background: "var(--color-surface-container-lowest)",
-                    display: "flex", alignItems: "center", gap: "6px",
+                    display: "flex", alignItems: "center", gap: SPACING.ms,
                   }}>
-                    <div style={{ display: "flex", gap: "4px" }}>
+                    <div style={{ display: "flex", gap: SPACING.sm }}>
                       {[0, 1, 2].map((d) => (
                         <div key={d} style={{
                           width: "6px", height: "6px", borderRadius: "50%",
@@ -507,7 +508,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                     </div>
                     <span style={{
                       fontSize: "var(--typo-caption-2-regular-size)",
-                      color: aiStatusMsg.includes("재시도") ? "var(--color-warning, #E67E22)" : "var(--color-on-surface-variant2)",
+                      color: aiStatusMsg.includes("재시도") ? COLOR.warning : "var(--color-on-surface-variant2)",
                       fontWeight: aiStatusMsg.includes("재시도") ? 600 : 400,
                     }}>
                       {aiStatusMsg || "추천 일정을 만들고 있어요..."}
@@ -519,11 +520,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
 
             {/* Chat input bar — 하단 세이프에리어 확보, 커서가 필드 내부에 보이도록 */}
             <div style={{
-              padding: "12px 16px",
-              paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+              padding: `${SPACING.lg} ${SPACING.xl}`,
+              paddingBottom: `calc(${SPACING.lg} + env(safe-area-inset-bottom, 0px))`,
               flexShrink: 0,
               borderTop: "1px solid var(--color-outline-variant)",
-              display: "flex", gap: "8px", alignItems: "flex-end",
+              display: "flex", gap: SPACING.md, alignItems: "flex-end",
               background: "var(--color-surface-container-lowest)",
             }}>
               <textarea
@@ -546,7 +547,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 rows={1}
                 style={{
                   flex: 1, minWidth: 0, resize: "none",
-                  padding: "10px 14px",
+                  padding: `${SPACING.ml} ${SPACING.lx}`,
                   boxSizing: "border-box",
                   borderRadius: "var(--radius-md, 8px)",
                   border: "1px solid var(--color-outline-variant)",
@@ -577,7 +578,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
           </div>
         ) : activeTab === 1 && isNew ? (
           /* ── File import tab ── */
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: SPACING.xxl, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: SPACING.xl }}>
             <input
               ref={fileInputRef}
               type="file"
@@ -587,11 +588,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
             />
 
             {aiLoading ? (
-              <div style={{ textAlign: "center", padding: "40px 20px" }}>
+              <div style={{ textAlign: "center", padding: `40px ${SPACING.xxl}` }}>
                 <div style={{
                   width: "48px", height: "48px", borderRadius: "50%",
                   background: "var(--color-primary-container)", display: "flex",
-                  alignItems: "center", justifyContent: "center", margin: "0 auto 16px",
+                  alignItems: "center", justifyContent: "center", margin: `0 auto ${SPACING.xl}`,
                   animation: "pulse 1.5s infinite",
                 }}>
                   <Icon name="flash" size={24} style={{ color: "var(--color-primary)" }} />
@@ -600,9 +601,9 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                   {aiStatusMsg.includes("재시도") ? "잠시만 기다려주세요" : "AI가 문서를 분석 중입니다"}
                 </p>
                 <p style={{
-                  margin: "8px 0 0",
+                  margin: `${SPACING.md} 0 0`,
                   fontSize: "var(--typo-caption-1-regular-size)",
-                  color: aiStatusMsg.includes("재시도") ? "var(--color-warning, #E67E22)" : "var(--color-on-surface-variant2)",
+                  color: aiStatusMsg.includes("재시도") ? COLOR.warning : "var(--color-on-surface-variant2)",
                   fontWeight: aiStatusMsg.includes("재시도") ? 600 : 400,
                 }}>
                   {aiStatusMsg || "일정 항목을 자동으로 추출하고 있습니다..."}
@@ -614,7 +615,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   style={{
-                    width: "100%", padding: "40px 20px",
+                    width: "100%", padding: `40px ${SPACING.xxl}`,
                     border: "2px dashed var(--color-outline-variant)",
                     borderRadius: "var(--radius-md, 8px)",
                     background: "var(--color-surface-container-lowest)",
@@ -625,11 +626,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--color-primary)"; e.currentTarget.style.background = "var(--color-primary-container)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--color-outline-variant)"; e.currentTarget.style.background = "var(--color-surface-container-lowest)"; }}
                 >
-                  <Icon name="file" size={32} style={{ color: "var(--color-on-surface-variant2)", marginBottom: "12px" }} />
+                  <Icon name="file" size={32} style={{ color: "var(--color-on-surface-variant2)", marginBottom: SPACING.lg }} />
                   <p style={{ margin: 0, fontSize: "var(--typo-label-2-bold-size)", fontWeight: "var(--typo-label-2-bold-weight)", color: "var(--color-on-surface)", textAlign: "center" }}>
                     텍스트 파일 선택
                   </p>
-                  <p style={{ margin: "6px 0 0", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)", textAlign: "center" }}>
+                  <p style={{ margin: `${SPACING.ms} 0 0`, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)", textAlign: "center" }}>
                     .txt, .md 파일을 업로드하면<br/>AI가 자동으로 일정을 분석합니다
                   </p>
                 </div>
@@ -637,10 +638,10 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 {/* Error message */}
                 {fileError && (
                   <div style={{
-                    width: "100%", padding: "10px 14px",
+                    width: "100%", padding: `${SPACING.ml} ${SPACING.lx}`,
                     background: "var(--color-error-container, #FEE2E2)",
                     borderRadius: "var(--radius-md, 8px)",
-                    display: "flex", alignItems: "center", gap: "10px",
+                    display: "flex", alignItems: "center", gap: SPACING.ml,
                   }}>
                     <Icon name="info" size={16} style={{ color: "var(--color-error)", flexShrink: 0 }} />
                     <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-error)", lineHeight: 1.5 }}>
@@ -650,11 +651,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 )}
 
                 <div style={{
-                  width: "100%", padding: "10px 14px",
+                  width: "100%", padding: `${SPACING.ml} ${SPACING.lx}`,
                   background: "var(--color-surface-container-lowest)",
                   borderRadius: "var(--radius-md, 8px)",
                   border: "1px solid var(--color-outline-variant)",
-                  display: "flex", alignItems: "center", gap: "10px",
+                  display: "flex", alignItems: "center", gap: SPACING.ml,
                 }}>
                   <Icon name="flash" size={16} style={{ color: "var(--color-primary)", flexShrink: 0 }} />
                   <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>
@@ -669,13 +670,13 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
          * 순서: 일정명 → 유형·시간 → 주소 → 부가정보 → 메모 → 포인트 → (수정 시만 영업시간·가격) → 이미지 → 시간표
          * 하단 고정 버튼에 가리지 않도록 paddingBottom 여유
          */
-        <div style={{ padding: "16px 20px calc(24px + 80px)", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ padding: `${SPACING.xl} ${SPACING.xxl} calc(${SPACING.xxxl} + 80px)`, display: "flex", flexDirection: "column", gap: SPACING.lg }}>
           {/* 일정명 */}
           <Field label="일정명" required size="lg" variant="outlined"
             value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="예: 캐널시티 라멘스타디움" />
 
           {/* 유형 + 시간 row */}
-          <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
+          <div style={{ display: "flex", gap: SPACING.ml, alignItems: "flex-end" }}>
             <Field as="select" label="유형" size="lg" variant="outlined"
               value={type} onChange={(e) => setType(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
               {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -724,7 +725,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
 
           {/* 영업시간·가격 — 수정 시에만 표시 (생성 시에는 없음) */}
           {!isNew && (
-            <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
+            <div style={{ display: "flex", gap: SPACING.ml, alignItems: "flex-end" }}>
               <Field label="영업시간" size="lg" variant="outlined"
                 value={detailHours} onChange={(e) => setDetailHours(e.target.value)} placeholder="11:00~23:00" style={{ flex: 1, minWidth: 0 }} />
               <Field label="가격" size="lg" variant="outlined"
@@ -768,7 +769,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 onClick={() => setShowTimetableSearch(true)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowTimetableSearch(true); } }}
                 style={{
-                  display: "flex", alignItems: "center", gap: "8px",
+                  display: "flex", alignItems: "center", gap: SPACING.md,
                   width: "100%", height: "var(--height-lg, 36px)", padding: "0 var(--spacing-sp140, 14px)",
                   border: "1px solid var(--color-outline-variant)", borderRadius: "var(--radius-md, 8px)",
                   background: "var(--color-surface-container-lowest)", cursor: "pointer",
@@ -788,7 +789,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
               </div>
               {loadedTimetable?.trains?.length > 0 && (
-                <div style={{ marginTop: "8px" }}>
+                <div style={{ marginTop: SPACING.md }}>
                   <TimetablePreview timetable={loadedTimetable} variant="compact" />
                 </div>
               )}
@@ -809,9 +810,9 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       {(activeTab === 0 || !isNew) && (
         <div style={{
           flexShrink: 0,
-          padding: "16px 20px calc(16px + env(safe-area-inset-bottom, 0px))",
+          padding: `${SPACING.xl} ${SPACING.xxl} calc(${SPACING.xl} + env(safe-area-inset-bottom, 0px))`,
           display: "flex",
-          gap: "8px",
+          gap: SPACING.md,
           borderTop: "1px solid var(--color-outline-variant)",
           background: "var(--color-surface)",
         }}>

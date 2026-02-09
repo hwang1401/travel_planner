@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import Button from './Button';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import { RADIUS } from '../../styles/tokens';
 
 /* ── Image Viewer (fullscreen lightbox via Portal) ── */
 export default function ImageViewer({ src, alt, onClose }) {
@@ -31,7 +32,7 @@ export default function ImageViewer({ src, alt, onClose }) {
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: "95vw", maxHeight: "90vh",
-          objectFit: "contain", borderRadius: "4px",
+          objectFit: "contain", borderRadius: RADIUS.sm,
           cursor: "default",
         }}
       />

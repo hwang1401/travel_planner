@@ -210,7 +210,7 @@ function TimePicker({ value, onChange, label, error }) {
             alignItems: 'center',
             justifyContent: 'center',
             background: 'rgba(0,0,0,0.4)',
-            padding: 20,
+            padding: SPACING.xxl,
             boxSizing: 'border-box',
           }}
           onClick={() => setDialogOpen(false)}
@@ -252,7 +252,7 @@ function TimePicker({ value, onChange, label, error }) {
               flex: 1,
               minHeight: 0,
               overflowY: 'auto',
-              paddingBottom: 16,
+              paddingBottom: SPACING.xl,
               WebkitOverflowScrolling: 'touch',
             }}>
               {TIME_OPTIONS.map((t) => {
@@ -267,7 +267,7 @@ function TimePicker({ value, onChange, label, error }) {
                       setDialogOpen(false);
                     }}
                     style={{
-                      padding: '12px 16px',
+                      padding: `${SPACING.lg} ${SPACING.xl}`,
                       cursor: 'pointer',
                       background: isActive ? 'var(--color-primary-container)' : 'transparent',
                       color: isActive ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)',
@@ -902,7 +902,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
                       onClick={() => setShowStationPicker(true)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowStationPicker(true); } }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: '8px',
+                        display: 'flex', alignItems: 'center', gap: SPACING.md,
                         width: '100%', height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
                         border: '1px solid var(--color-outline-variant)', borderRadius: 'var(--radius-md, 8px)',
                         background: 'var(--color-surface-container-lowest)', cursor: 'pointer',
@@ -922,12 +922,12 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
 
                     {/* 시간표 미리보기 */}
                     {moveFrom && moveTo && !loadedTimetable?.trains?.length && (
-                      <p style={{ margin: '8px 0 0', fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', textAlign: 'center' }}>
+                      <p style={{ margin: `${SPACING.md} 0 0`, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', textAlign: 'center' }}>
                         해당 구간의 시간표가 없습니다
                       </p>
                     )}
                     {loadedTimetable?.trains?.length > 0 && (
-                      <div style={{ marginTop: '8px' }}>
+                      <div style={{ marginTop: SPACING.md }}>
                         <TimetablePreview timetable={loadedTimetable} variant="compact" />
                       </div>
                     )}

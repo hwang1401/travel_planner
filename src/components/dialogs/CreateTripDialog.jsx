@@ -9,7 +9,7 @@ import Toast from '../common/Toast';
 import { uploadImage, generateImagePath } from '../../services/imageService';
 import { generateFullTripSchedule, analyzeScheduleWithAI, formatBookedItemsForPrompt } from '../../services/geminiService';
 import { readFileAsBase64 } from '../../utils/fileReader';
-import { getTypeConfig, RADIUS } from '../../styles/tokens';
+import { getTypeConfig, RADIUS, SPACING } from '../../styles/tokens';
 
 /*
  * ── Create Trip Dialog ──
@@ -103,23 +103,23 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
 
   return (
     <BottomSheet onClose={onClose} maxHeight="auto" zIndex="var(--z-toast)">
-      <div style={{ padding: '8px 20px 20px' }}>
+      <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxl}` }}>
         {/* Header */}
-        <div style={{ marginBottom: '14px' }}>
+        <div style={{ marginBottom: SPACING.lx }}>
           <h3 style={{
-            margin: '0 0 8px', fontSize: 'var(--typo-body-2-n---bold-size)',
+            margin: `0 0 ${SPACING.md}`, fontSize: 'var(--typo-body-2-n---bold-size)',
             fontWeight: 'var(--typo-body-2-n---bold-weight)', color: 'var(--color-on-surface)',
           }}>
             여행 기간 선택
           </h3>
           {/* Selection summary */}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
+            display: 'flex', alignItems: 'center', gap: SPACING.md,
             fontSize: 'var(--typo-caption-1-medium-size)',
             color: 'var(--color-on-surface-variant)',
           }}>
             <span style={{
-              padding: '4px 10px', borderRadius: '6px',
+              padding: `${SPACING.sm} ${SPACING.ml}`, borderRadius: '6px',
               background: selStart ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
               color: selStart ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
               fontWeight: 'var(--typo-caption-1-bold-weight)',
@@ -128,7 +128,7 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
             </span>
             <span style={{ color: 'var(--color-on-surface-variant2)' }}>→</span>
             <span style={{
-              padding: '4px 10px', borderRadius: '6px',
+              padding: `${SPACING.sm} ${SPACING.ml}`, borderRadius: '6px',
               background: selEnd ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
               color: selEnd ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant2)',
               fontWeight: 'var(--typo-caption-1-bold-weight)',
@@ -150,11 +150,11 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
         {/* Month navigation */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          marginBottom: '12px',
+          marginBottom: SPACING.lg,
         }}>
           <button onClick={handlePrev} style={{
             border: 'none', background: 'none', cursor: 'pointer',
-            padding: '6px', display: 'flex',
+            padding: SPACING.ms, display: 'flex',
           }}>
             <Icon name="chevronLeft" size={18} />
           </button>
@@ -167,7 +167,7 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
           </span>
           <button onClick={handleNext} style={{
             border: 'none', background: 'none', cursor: 'pointer',
-            padding: '6px', display: 'flex',
+            padding: SPACING.ms, display: 'flex',
           }}>
             <Icon name="chevronRight" size={18} />
           </button>
@@ -176,11 +176,11 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
         {/* Weekday header */}
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0',
-          marginBottom: '4px',
+          marginBottom: SPACING.sm,
         }}>
           {DAYS_KR.map((d) => (
             <div key={d} style={{
-              textAlign: 'center', padding: '4px 0',
+              textAlign: 'center', padding: `${SPACING.sm} 0`,
               fontSize: 'var(--typo-caption-3-medium-size)',
               fontWeight: 'var(--typo-caption-3-medium-weight)',
               color: d === '일' ? 'var(--color-error)' : d === '토' ? 'var(--color-primary)' : 'var(--color-on-surface-variant2)',
@@ -249,7 +249,7 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
 
         {/* Guide text */}
         <p style={{
-          margin: '10px 0 0', textAlign: 'center',
+          margin: `${SPACING.ml} 0 0`, textAlign: 'center',
           fontSize: 'var(--typo-caption-3-regular-size)',
           color: 'var(--color-on-surface-variant2)',
         }}>
@@ -261,7 +261,7 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
           variant="primary" size="lg" fullWidth
           onClick={handleConfirm}
           disabled={!selStart}
-          style={{ marginTop: '14px' }}
+          style={{ marginTop: SPACING.lx }}
         >
           {selStart && selEnd ? '확인' : selStart ? '당일치기로 선택' : '날짜를 선택하세요'}
         </Button>
@@ -484,10 +484,10 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         overflowX: 'hidden',
         WebkitOverflowScrolling: 'touch',
         overscrollBehavior: 'contain',
-        padding: '20px 20px 32px',
+        padding: `${SPACING.xxl} ${SPACING.xxl} ${SPACING.xxxxl}`,
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
+        gap: SPACING.xxl,
       }}>
 
         {/* ── Cover Image ── */}
@@ -503,14 +503,14 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         {/* ── Section: 여행 정보 ── */}
         <section>
           <p style={{
-            margin: '0 0 12px', fontSize: 'var(--typo-caption-2-bold-size)',
+            margin: `0 0 ${SPACING.lg}`, fontSize: 'var(--typo-caption-2-bold-size)',
             fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant2)',
             letterSpacing: '0.5px',
           }}>
             여행 정보
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.lx }}>
             <Field label="여행 이름" size="lg" variant="outlined"
               value={name} onChange={(e) => setName(e.target.value)}
               placeholder="예: 후쿠오카 가족여행" />
@@ -531,11 +531,11 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
               />
               {/* Destination chips */}
               {destinations.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms, marginTop: SPACING.md }}>
                   {destinations.map((dest, i) => (
                     <div key={i} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '4px',
-                      padding: '4px 10px', borderRadius: 'var(--radius-md, 8px)',
+                      display: 'inline-flex', alignItems: 'center', gap: SPACING.sm,
+                      padding: `${SPACING.sm} ${SPACING.ml}`, borderRadius: 'var(--radius-md, 8px)',
                       background: 'var(--color-primary-container)',
                       fontSize: 'var(--typo-caption-1-bold-size)',
                       fontWeight: 'var(--typo-caption-1-bold-weight)',
@@ -545,7 +545,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                       {dest.name}
                       <button onClick={() => removeDestination(i)} style={{
                         border: 'none', background: 'none', cursor: 'pointer',
-                        padding: '0 0 0 2px', display: 'flex', alignItems: 'center',
+                        padding: `0 0 0 ${SPACING.xs}`, display: 'flex', alignItems: 'center',
                       }}>
                         <Icon name="close" size={12} style={{ opacity: 0.6 }} />
                       </button>
@@ -560,7 +560,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         {/* ── Section: 일정 ── */}
         <section>
           <p style={{
-            margin: '0 0 12px', fontSize: 'var(--typo-caption-2-bold-size)',
+            margin: `0 0 ${SPACING.lg}`, fontSize: 'var(--typo-caption-2-bold-size)',
             fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant2)',
             letterSpacing: '0.5px',
           }}>
@@ -571,15 +571,15 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
           <div
             onClick={() => setShowDatePicker(true)}
             style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
+              display: 'flex', alignItems: 'center', gap: SPACING.md,
               width: '100%', minHeight: 'var(--height-lg, 36px)',
-              padding: '8px var(--spacing-sp140, 14px)',
+              padding: `${SPACING.md} var(--spacing-sp140, 14px)`,
               border: '1px solid var(--color-outline-variant)',
               borderRadius: 'var(--radius-md, 8px)',
               cursor: 'pointer', boxSizing: 'border-box',
             }}
           >
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: SPACING.md }}>
               <span style={{
                 fontSize: 'var(--typo-label-1-n---regular-size)',
                 color: startDate ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
@@ -611,7 +611,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         {!isEdit && (
           <section>
             <p style={{
-              margin: '0 0 12px', fontSize: 'var(--typo-caption-2-bold-size)',
+              margin: `0 0 ${SPACING.lg}`, fontSize: 'var(--typo-caption-2-bold-size)',
               fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant2)',
               letterSpacing: '0.5px',
             }}>
@@ -631,8 +631,8 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
               rows={2}
             />
             <label style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 14px', borderRadius: '8px',
+              display: 'flex', alignItems: 'center', gap: SPACING.md,
+              padding: `${SPACING.ml} ${SPACING.lx}`, borderRadius: '8px',
               border: '1px dashed var(--color-outline-variant)',
               cursor: 'pointer', color: 'var(--color-on-surface-variant)',
               fontSize: 'var(--typo-caption-1-regular-size)',
@@ -658,11 +658,11 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
               }} style={{ display: 'none' }} />
             </label>
             {bookedAttachments.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms }}>
                 {bookedAttachments.map((a, i) => (
                   <span key={i} style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    padding: '6px 10px', borderRadius: '8px',
+                    display: 'inline-flex', alignItems: 'center', gap: SPACING.ms,
+                    padding: `${SPACING.ms} ${SPACING.ml}`, borderRadius: '8px',
                     background: 'var(--color-surface-container-high)', fontSize: 'var(--typo-caption-2-regular-size)',
                     color: 'var(--color-on-surface-variant)',
                   }}>
@@ -675,13 +675,13 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             )}
 
             {/* Quick preference chips */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms, marginTop: SPACING.md }}>
               {['맛집 위주', '관광 중심', '쇼핑 많이', '여유롭게', '알차게'].map((chip) => (
                 <button
                   key={chip}
                   onClick={() => setAiPreferences((prev) => prev ? `${prev}, ${chip}` : chip)}
                   style={{
-                    padding: '5px 12px', borderRadius: '100px',
+                    padding: `5px ${SPACING.lg}`, borderRadius: '100px',
                     border: '1px solid var(--color-outline-variant)',
                     background: 'var(--color-surface-container-lowest)',
                     fontSize: 'var(--typo-caption-2-regular-size)',
@@ -709,7 +709,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                 iconLeft="flash"
                 onClick={handleGenerateAi}
                 disabled={aiGenerating || submitting}
-                style={{ marginTop: '12px' }}
+                style={{ marginTop: SPACING.lg }}
               >
                 {aiGenerating ? 'AI가 일정을 만들고 있어요...' : 'AI 일정 미리보기'}
               </Button>
@@ -720,7 +720,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                 iconLeft="flash"
                 onClick={() => { setAiPreview(null); setExpandedDay(null); handleGenerateAi(); }}
                 disabled={aiGenerating || submitting}
-                style={{ marginTop: '12px', alignSelf: 'flex-start' }}
+                style={{ marginTop: SPACING.lg, alignSelf: 'flex-start' }}
               >
                 다시 생성하기
               </Button>
@@ -729,8 +729,8 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             {/* AI Loading */}
             {aiGenerating && (
               <div style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '12px', marginTop: '10px',
+                display: 'flex', alignItems: 'center', gap: SPACING.md,
+                padding: SPACING.lg, marginTop: SPACING.ml,
                 background: 'var(--color-primary-container)',
                 borderRadius: 'var(--radius-md, 8px)',
               }}>
@@ -755,7 +755,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             {/* AI Error */}
             {aiError && (
               <p style={{
-                margin: '10px 0 0', padding: '10px 12px',
+                margin: `${SPACING.ml} 0 0`, padding: `${SPACING.ml} ${SPACING.lg}`,
                 background: 'var(--color-error-container, #FEE2E2)',
                 borderRadius: 'var(--radius-md, 8px)',
                 fontSize: 'var(--typo-caption-2-regular-size)',
@@ -768,14 +768,14 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
             {/* AI Preview */}
             {aiPreview && aiPreview.days.length > 0 && (
               <div style={{
-                marginTop: '12px',
+                marginTop: SPACING.lg,
                 border: '1px solid var(--color-outline-variant)',
                 borderRadius: 'var(--radius-md, 8px)',
                 overflow: 'hidden',
               }}>
                 {/* Preview header */}
                 <div style={{
-                  padding: '10px 14px',
+                  padding: `${SPACING.ml} ${SPACING.lx}`,
                   background: 'var(--color-primary-container)',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
@@ -790,7 +790,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                     onClick={() => setAiPreview(null)}
                     style={{
                       border: 'none', background: 'none', cursor: 'pointer',
-                      padding: '2px', display: 'flex',
+                      padding: SPACING.xs, display: 'flex',
                     }}
                   >
                     <Icon name="close" size={14} style={{ opacity: 0.6 }} />
@@ -820,7 +820,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                         <div
                           onClick={() => setExpandedDay(isOpen ? null : di)}
                           style={{
-                            padding: '10px 14px',
+                            padding: `${SPACING.ml} ${SPACING.lx}`,
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             cursor: 'pointer', userSelect: 'none',
                             background: isOpen ? 'var(--color-surface-container-lowest)' : 'transparent',
@@ -836,7 +836,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
                               Day {day.day} — {day.label}
                             </span>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.ms, flexShrink: 0 }}>
                             <span style={{
                               fontSize: 'var(--typo-caption-3-regular-size)',
                               color: 'var(--color-on-surface-variant2)',
@@ -857,11 +857,11 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
 
                         {/* Expanded item list */}
                         {isOpen && (
-                          <div style={{ padding: '0 14px 10px' }}>
+                          <div style={{ padding: `0 ${SPACING.lx} ${SPACING.ml}` }}>
                             {allItems.map((it, j) => (
                               <div key={j} style={{
-                                display: 'flex', alignItems: 'flex-start', gap: '8px',
-                                padding: '6px 0',
+                                display: 'flex', alignItems: 'flex-start', gap: SPACING.md,
+                                padding: `${SPACING.ms} 0`,
                                 borderBottom: j < allItems.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
                               }}>
                                 <span style={{
@@ -918,9 +918,9 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
 
       {/* Submit */}
       <div style={{
-        padding: '14px 20px calc(14px + env(safe-area-inset-bottom, 0px))',
+        padding: `${SPACING.lx} ${SPACING.xxl} calc(${SPACING.lx} + env(safe-area-inset-bottom, 0px))`,
         flexShrink: 0,
-        display: 'flex', flexDirection: 'column', gap: '8px',
+        display: 'flex', flexDirection: 'column', gap: SPACING.md,
         borderTop: '1px solid var(--color-outline-variant)',
         background: 'var(--color-surface-container-lowest)',
       }}>
@@ -942,7 +942,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         </Button>
         {!isEdit && (
           <p style={{
-            margin: '2px 0 0', textAlign: 'center',
+            margin: `${SPACING.xs} 0 0`, textAlign: 'center',
             fontSize: 'var(--typo-caption-3-regular-size)',
             color: 'var(--color-on-surface-variant2)',
           }}>

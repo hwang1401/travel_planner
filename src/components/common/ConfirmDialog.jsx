@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import Button from './Button';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import { SPACING } from '../../styles/tokens';
 
 /* ── Confirm Dialog ── */
 export default function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
@@ -19,7 +20,7 @@ export default function ConfirmDialog({ title, message, confirmLabel, onConfirm,
         position: "fixed", inset: 0, zIndex: "var(--z-confirm)",
         background: "color-mix(in srgb, var(--color-scrim) 40%, transparent)", backdropFilter: "blur(4px)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "24px", animation: "fadeIn 0.15s ease",
+        padding: SPACING.xxxl, animation: "fadeIn 0.15s ease",
         touchAction: "none",
       }}
     >
@@ -29,8 +30,8 @@ export default function ConfirmDialog({ title, message, confirmLabel, onConfirm,
         animation: "slideUp 0.2s ease",
         boxShadow: "var(--shadow-heavy)",
       }}>
-        <div style={{ padding: "24px 24px 16px", textAlign: "center" }}>
-          <h3 style={{ margin: "0 0 8px", fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>{title}</h3>
+        <div style={{ padding: `${SPACING.xxxl} ${SPACING.xxxl} ${SPACING.xl}`, textAlign: "center" }}>
+          <h3 style={{ margin: `0 0 ${SPACING.md}`, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>{title}</h3>
           <p style={{ margin: 0, fontSize: "var(--typo-label-2-medium-size)", fontWeight: "var(--typo-label-2-medium-weight)", color: "var(--color-on-surface-variant)", lineHeight: "var(--typo-label-2-medium-line-height)" }}>{message}</p>
         </div>
         <div style={{ display: "flex", borderTop: "1px solid var(--color-outline-variant)" }}>

@@ -102,8 +102,8 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
     <PageTransition open={open} onClose={onClose} viewportRect={viewportRect}>
       {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '8px',
-        padding: '12px 16px', paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
+        display: 'flex', alignItems: 'center', gap: SPACING.md,
+        padding: `${SPACING.lg} ${SPACING.xl}`, paddingTop: `calc(${SPACING.lg} + env(safe-area-inset-top, 0px))`,
         borderBottom: '1px solid var(--color-outline-variant)', flexShrink: 0,
       }}>
         <Button variant="ghost-neutral" size="sm" iconOnly="chevronLeft" onClick={onClose} />
@@ -113,10 +113,10 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: '24px 20px 32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: `${SPACING.xxxl} ${SPACING.xxl} ${SPACING.xxxxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.xl }}>
 
         <div>
-          <h2 style={{ margin: '0 0 4px', fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
+          <h2 style={{ margin: `0 0 ${SPACING.sm}`, fontSize: 'var(--typo-heading-3-size, 22px)', fontWeight: 700, color: 'var(--color-on-surface)' }}>
             예약 정보 붙여넣기
           </h2>
           <p style={{ margin: 0, fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
@@ -131,7 +131,7 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
           placeholder="여기에 예약 확인 메일이나 일정 텍스트를 붙여넣으세요..."
           rows={8}
           style={{
-            width: '100%', padding: '14px', borderRadius: '12px',
+            width: '100%', padding: SPACING.lx, borderRadius: '12px',
             border: '1px solid var(--color-outline-variant)',
             background: 'var(--color-surface-container-lowest)',
             fontSize: 'var(--typo-label-2-regular-size)',
@@ -143,8 +143,8 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
 
         {/* File upload */}
         <label style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '10px 14px', borderRadius: '8px',
+          display: 'flex', alignItems: 'center', gap: SPACING.md,
+          padding: `${SPACING.ml} ${SPACING.lx}`, borderRadius: RADIUS.md,
           border: '1px dashed var(--color-outline-variant)',
           cursor: 'pointer', color: 'var(--color-on-surface-variant)',
           fontSize: 'var(--typo-caption-1-regular-size)',
@@ -155,11 +155,11 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
             style={{ display: 'none' }} />
         </label>
         {attachments.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms }}>
             {attachments.map((a, i) => (
               <span key={i} style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '6px 10px', borderRadius: '8px',
+                display: 'inline-flex', alignItems: 'center', gap: SPACING.ms,
+                padding: `${SPACING.ms} ${SPACING.ml}`, borderRadius: RADIUS.md,
                 background: 'var(--color-surface-container-high)', fontSize: 'var(--typo-caption-2-regular-size)',
                 color: 'var(--color-on-surface-variant)',
               }}>
@@ -181,10 +181,10 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
 
         {/* Loading */}
         {generating && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'var(--color-primary-container)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, padding: SPACING.lg, background: 'var(--color-primary-container)', borderRadius: RADIUS.md }}>
             <div style={{ display: 'flex', gap: '3px' }}>
               {[0, 1, 2].map((d) => (
-                <div key={d} style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-primary)', animation: `bounce 1.2s infinite ${d * 0.2}s` }} />
+                <div key={d} style={{ width: '5px', height: '5px', borderRadius: RADIUS.full, background: 'var(--color-primary)', animation: `bounce 1.2s infinite ${d * 0.2}s` }} />
               ))}
             </div>
             <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)' }}>
@@ -195,7 +195,7 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
 
         {/* Error */}
         {genError && (
-          <p style={{ margin: 0, padding: '10px 12px', background: 'var(--color-error-container)', borderRadius: '8px', fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
+          <p style={{ margin: 0, padding: `${SPACING.ml} ${SPACING.lg}`, background: 'var(--color-error-container)', borderRadius: RADIUS.md, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
             {genError}
           </p>
         )}
@@ -203,7 +203,7 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
         {/* Preview */}
         {preview && preview.items.length > 0 && (
           <div style={{ border: '1px solid var(--color-outline-variant)', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ padding: '10px 14px', background: 'var(--color-primary-container)' }}>
+            <div style={{ padding: `${SPACING.ml} ${SPACING.lx}`, background: 'var(--color-primary-container)' }}>
               <span style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-primary-container)' }}>
                 분석 결과 ({preview.items.length}개 일정)
               </span>
@@ -211,8 +211,8 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
               {preview.items.map((it, j) => (
                 <div key={j} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: '8px',
-                  padding: '8px 14px',
+                  display: 'flex', alignItems: 'flex-start', gap: SPACING.md,
+                  padding: `${SPACING.md} ${SPACING.lx}`,
                   borderBottom: j < preview.items.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
                 }}>
                   <span style={{ width: '36px', flexShrink: 0, textAlign: 'right', fontSize: '11px', fontWeight: 600, color: 'var(--color-on-surface-variant2)', fontVariantNumeric: 'tabular-nums', lineHeight: '18px' }}>

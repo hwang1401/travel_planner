@@ -3,6 +3,7 @@
  * 아이콘 + 텍스트 정보 행. 가이드: 아이콘 marginTop 2px, caption-1, gap sp80.
  */
 import Icon from './Icon';
+import { SPACING } from '../../styles/tokens';
 
 export default function InfoRow({ icon, children, action, empty, style }) {
   return (
@@ -20,7 +21,7 @@ export default function InfoRow({ icon, children, action, empty, style }) {
         size={16}
         style={{
           flexShrink: 0,
-          marginTop: "2px",
+          marginTop: SPACING.xs,
           color: empty
             ? "var(--color-on-surface-variant2)"
             : "var(--color-on-surface-variant)",

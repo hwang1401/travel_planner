@@ -6,8 +6,13 @@ let savedStyles = null;
 
 /**
  * Body scroll lock hook that works on iOS without breaking input focus.
- * Uses overflow:hidden + touch-action instead of position:fixed to avoid
- * iOS Safari input caret positioning bugs.
+ * Uses overflow:hidden on body/html to prevent background scrolling.
+ * A document-level touchmove listener handles iOS Safari edge cases
+ * where overflow:hidden alone doesn't fully prevent body scroll.
+ *
+ * IMPORTANT: Does NOT set touch-action:none on body — that would block
+ * native scrolling inside ALL descendant elements (dialogs, sheets, etc.).
+ *
  * Supports nested modals via reference counting.
  * @param {boolean} enabled - pass false to skip locking (default: true)
  */
@@ -21,54 +26,62 @@ export function useScrollLock(enabled = true) {
       const html = document.documentElement;
       savedStyles = {
         bodyOverflow: body.style.overflow,
-        bodyTouchAction: body.style.touchAction,
         htmlOverflow: html.style.overflow,
       };
 
       body.style.overflow = 'hidden';
-      body.style.touchAction = 'none';
       html.style.overflow = 'hidden';
     }
     lockCount++;
 
-    // Prevent touchmove on document level for iOS
+    // Track touch start position for direction detection
+    let touchStartY = 0;
+
+    const onTouchStart = (e) => {
+      touchStartY = e.touches[0].clientY;
+    };
+
+    // Prevent body scroll on iOS while allowing scroll inside scrollable children
     const preventScroll = (e) => {
-      // Allow scrolling inside elements that have overflow (modal content)
       let target = e.target;
       while (target && target !== document.body) {
         const style = window.getComputedStyle(target);
         const overflowY = style.overflowY;
         if (overflowY === 'auto' || overflowY === 'scroll') {
           const { scrollTop, scrollHeight, clientHeight } = target;
-          // Allow scroll if content is scrollable and not at boundary
+          // Element has scrollable content
           if (scrollHeight > clientHeight) {
+            const currentY = e.touches?.[0]?.clientY ?? 0;
+            const deltaY = currentY - touchStartY;
             const atTop = scrollTop <= 0;
-            const atBottom = scrollTop + clientHeight >= scrollHeight;
-            const isScrollingUp = e.touches?.[0]?.clientY > (preventScroll._lastY || 0);
-            preventScroll._lastY = e.touches?.[0]?.clientY;
-            if ((atTop && isScrollingUp) || (atBottom && !isScrollingUp)) {
+            const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+
+            // Block overscroll at boundaries (prevents rubber-band pulling body)
+            if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
               e.preventDefault();
               return;
             }
-            return; // Allow normal scrolling within the element
+            // Allow normal scroll within the element
+            return;
           }
         }
         target = target.parentElement;
       }
+      // Not inside any scrollable element — block to prevent body scroll
       e.preventDefault();
     };
-    preventScroll._lastY = 0;
 
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
     document.addEventListener('touchmove', preventScroll, { passive: false });
 
     return () => {
+      document.removeEventListener('touchstart', onTouchStart);
       document.removeEventListener('touchmove', preventScroll);
       lockCount--;
       if (lockCount === 0 && savedStyles) {
         const body = document.body;
         const html = document.documentElement;
         body.style.overflow = savedStyles.bodyOverflow;
-        body.style.touchAction = savedStyles.bodyTouchAction;
         html.style.overflow = savedStyles.htmlOverflow;
         savedStyles = null;
         // Restore scroll position

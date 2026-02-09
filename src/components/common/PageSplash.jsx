@@ -7,6 +7,8 @@
  * showLogo: 로고 표시 여부 (기본 true)
  * fillContainer: true면 부모 높이만 채움, false면 100vh (전체 화면)
  */
+import { SPACING } from '../../styles/tokens';
+
 export default function PageSplash({ message, showLogo = true, fillContainer = false }) {
   return (
     <div style={{
@@ -27,7 +29,7 @@ export default function PageSplash({ message, showLogo = true, fillContainer = f
           style={{
             width: '56px',
             height: 'auto',
-            marginBottom: '16px',
+            marginBottom: SPACING.xl,
             objectFit: 'contain',
             opacity: 0.9,
             animation: 'fadeIn 0.5s ease',
@@ -44,7 +46,7 @@ export default function PageSplash({ message, showLogo = true, fillContainer = f
       }} />
       {message && (
         <p style={{
-          margin: '16px 0 0',
+          margin: `${SPACING.xl} 0 0`,
           fontSize: 'var(--typo-caption-1-regular-size)',
           color: 'var(--color-on-surface-variant2)',
           animation: 'fadeIn 0.4s ease 0.15s both',

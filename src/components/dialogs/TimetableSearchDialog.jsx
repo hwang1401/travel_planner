@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import BottomSheet from '../common/BottomSheet';
 import Icon from '../common/Icon';
 import { TIMETABLE_DB } from '../../data/timetable';
+import { SPACING } from '../../styles/tokens';
 
 /* ── 시간표 검색·선택 (교통 move 전용) ──
  * 노선을 검색해서 선택하면 onSelect(routeId) 호출 후 닫힘.
@@ -54,9 +55,9 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
     <div style={wrapperStyle}>
       <BottomSheet onClose={onClose} title="시간표 검색" maxHeight={viewportRect != null && viewportRect.height < window.innerHeight - 80 ? `${Math.max(240, viewportRect.height * 0.9)}px` : '85vh'} minHeight="60vh" zIndex={1100}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        <div style={{ padding: '12px 20px', flexShrink: 0, borderBottom: '1px solid var(--color-outline-variant)' }}>
+        <div style={{ padding: `${SPACING.lg} ${SPACING.xxl}`, flexShrink: 0, borderBottom: '1px solid var(--color-outline-variant)' }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
+            display: 'flex', alignItems: 'center', gap: SPACING.md,
             height: FIELD_HEIGHT, padding: `0 ${FIELD_PX}`,
             border: '1px solid var(--color-outline-variant)',
             borderRadius: FIELD_RADIUS,
@@ -82,7 +83,7 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
         <ul
           style={{
             margin: 0,
-            padding: '8px 0',
+            padding: `${SPACING.md} 0`,
             listStyle: 'none',
             overflowY: 'auto',
             flex: 1,
@@ -92,11 +93,11 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
           }}
         >
           {!(query || '').trim() ? (
-            <li style={{ padding: '20px', textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>
+            <li style={{ padding: SPACING.xxl, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>
               역명 또는 노선명을 입력해주세요
             </li>
           ) : filtered.length === 0 ? (
-            <li style={{ padding: '20px', textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>
+            <li style={{ padding: SPACING.xxl, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>
               검색 결과 없음
             </li>
           ) : (
@@ -107,7 +108,7 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
                   onClick={() => handleSelect(r.id)}
                   style={{
                     width: '100%',
-                    padding: '14px 20px',
+                    padding: `${SPACING.lx} ${SPACING.xxl}`,
                     textAlign: 'left',
                     border: 'none',
                     background: 'transparent',
@@ -118,7 +119,7 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
                 >
                   <span style={{ fontWeight: 'var(--typo-body-2-bold-weight)' }}>{r.label}</span>
                   {(r.station || r.direction) && (
-                    <span style={{ display: 'block', marginTop: '2px', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-caption-2-size)' }}>
+                    <span style={{ display: 'block', marginTop: SPACING.xs, color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-caption-2-size)' }}>
                       {r.station}{r.station && r.direction ? ' · ' : ''}{r.direction}
                     </span>
                   )}

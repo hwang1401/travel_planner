@@ -12,13 +12,17 @@
 
 /* ── Spacing (mirrors --spacing-sp*) ── */
 export const SPACING = {
-  xs: "2px",   // --spacing-sp20
-  sm: "4px",   // --spacing-sp40
-  md: "8px",   // --spacing-sp80
-  lg: "12px",  // --spacing-sp120
-  xl: "16px",  // --spacing-sp160
-  xxl: "20px", // --spacing-sp200
-  xxxl: "24px",// --spacing-sp240
+  xs:    "2px",   // --spacing-sp20
+  sm:    "4px",   // --spacing-sp40
+  ms:    "6px",   // --spacing-sp60  — 칩 갭, 타이트 아이콘-텍스트 갭
+  md:    "8px",   // --spacing-sp80
+  ml:    "10px",  // --spacing-sp100 — 폼 요소 내부 갭, 입력 세로 패딩
+  lg:    "12px",  // --spacing-sp120
+  lx:    "14px",  // --spacing-sp140 — 입력/컨테이너 가로 패딩
+  xl:    "16px",  // --spacing-sp160
+  xxl:   "20px",  // --spacing-sp200
+  xxxl:  "24px",  // --spacing-sp240
+  xxxxl: "32px",  // --spacing-sp320 — 페이지 하단 여유 패딩
 };
 
 /* ── Border Radius (mirrors --radius-*) ── */
@@ -97,6 +101,7 @@ export const COLOR = {
   outline: "var(--color-outline)",
   outlineVariant: "var(--color-outline-variant)",
   error: "var(--color-error)",
+  warning: "var(--color-warning)",
 };
 
 /* ── Typography (CSS var references) ── */

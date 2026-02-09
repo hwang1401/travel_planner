@@ -9,6 +9,7 @@ import ImageViewer from '../common/ImageViewer';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { loadDocuments, createDocument, updateDocument, deleteDocument } from '../../services/documentService';
 import { uploadFile, generateImagePath, isPdfUrl } from '../../services/imageService';
+import { SPACING } from '../../styles/tokens';
 
 /* ── Category presets ── */
 const DOC_CATEGORIES = [
@@ -44,7 +45,7 @@ function LegacyDocumentDialog({ onClose }) {
 
   return (
     <BottomSheet onClose={onClose} maxHeight="85vh" title="여행 서류">
-      <div style={{ display: "flex", gap: "6px", padding: "14px 20px 0" }}>
+      <div style={{ display: "flex", gap: SPACING.ms, padding: `${SPACING.lx} ${SPACING.xxl} 0` }}>
         {LEGACY_TABS.map((t, i) => (
           <Button key={i} variant={tab === i ? "primary" : "neutral"} size="md"
             iconLeft={t.icon} onClick={() => setTab(i)} style={{ flex: 1 }}>
@@ -52,8 +53,8 @@ function LegacyDocumentDialog({ onClose }) {
           </Button>
         ))}
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px 20px" }}>
-        <p style={{ margin: "0 0 12px", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "var(--typo-caption-2-regular-line-height)", textAlign: "center" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: `${SPACING.lx} ${SPACING.xxl} ${SPACING.xxl}` }}>
+        <p style={{ margin: `0 0 ${SPACING.lg}`, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "var(--typo-caption-2-regular-line-height)", textAlign: "center" }}>
           {current.caption}
         </p>
         {current.image && (
@@ -141,7 +142,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
 
       {/* Loading */}
       {loading && (
-        <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ padding: `40px ${SPACING.xxl}`, display: 'flex', justifyContent: 'center' }}>
           <div style={{ width: '28px', height: '28px', border: '3px solid var(--color-outline-variant)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
@@ -160,7 +161,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
       {/* Document tabs */}
       {!loading && docs.length > 0 && (
         <>
-          <div style={{ display: "flex", gap: "6px", padding: "14px 20px 0", overflowX: 'auto', flexShrink: 0, alignItems: 'center' }}>
+          <div style={{ display: "flex", gap: SPACING.ms, padding: `${SPACING.lx} ${SPACING.xxl} 0`, overflowX: 'auto', flexShrink: 0, alignItems: 'center' }}>
             {docs.map((doc) => (
               <Button key={doc.id}
                 variant={selectedDoc?.id === doc.id ? "primary" : "neutral"}
@@ -178,16 +179,16 @@ function DynamicDocumentDialog({ onClose, tripId }) {
           </div>
 
           {selectedDoc && (
-            <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px 20px" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: `${SPACING.lx} ${SPACING.xxl} ${SPACING.xxl}` }}>
               {/* Category badge + caption */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.ms }}>
                 <span style={{
-                  padding: '3px 10px', borderRadius: '100px',
+                  padding: `3px ${SPACING.ml}`, borderRadius: '100px',
                   background: 'var(--color-primary-container)',
                   fontSize: 'var(--typo-caption-3-bold-size)',
                   fontWeight: 'var(--typo-caption-3-bold-weight)',
                   color: 'var(--color-on-primary-container)',
-                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  display: 'inline-flex', alignItems: 'center', gap: SPACING.sm,
                 }}>
                   <Icon name={getCategoryIcon(selectedDoc.category)} size={12} />
                   {selectedDoc.category}
@@ -195,7 +196,7 @@ function DynamicDocumentDialog({ onClose, tripId }) {
               </div>
 
               {selectedDoc.caption && (
-                <p style={{ margin: "0 0 12px", fontSize: "var(--typo-label-2-medium-size)", fontWeight: "var(--typo-label-2-medium-weight)", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>
+                <p style={{ margin: `0 0 ${SPACING.lg}`, fontSize: "var(--typo-label-2-medium-size)", fontWeight: "var(--typo-label-2-medium-weight)", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>
                   {selectedDoc.caption}
                 </p>
               )}
@@ -220,8 +221,8 @@ function DynamicDocumentDialog({ onClose, tripId }) {
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                        padding: '10px', borderTop: '1px solid var(--color-outline-variant)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: SPACING.ms,
+                        padding: SPACING.ml, borderTop: '1px solid var(--color-outline-variant)',
                         fontSize: 'var(--typo-caption-1-bold-size)',
                         fontWeight: 'var(--typo-caption-1-bold-weight)',
                         color: 'var(--color-primary)',
@@ -246,16 +247,16 @@ function DynamicDocumentDialog({ onClose, tripId }) {
                   </div>
                 )
               ) : (
-                <div style={{ borderRadius: "var(--radius-md, 8px)", border: "2px dashed var(--color-outline-variant)", padding: "40px 20px", textAlign: "center", background: "var(--color-surface-container-lowest)" }}>
+                <div style={{ borderRadius: "var(--radius-md, 8px)", border: "2px dashed var(--color-outline-variant)", padding: `40px ${SPACING.xxl}`, textAlign: "center", background: "var(--color-surface-container-lowest)" }}>
                   <Icon name="file" size={32} style={{ opacity: 0.3 }} />
-                  <p style={{ margin: "10px 0 0", fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
+                  <p style={{ margin: `${SPACING.ml} 0 0`, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
                     파일이 없습니다
                   </p>
                 </div>
               )}
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
+              <div style={{ display: 'flex', gap: SPACING.md, marginTop: SPACING.lx }}>
                 <Button variant="neutral" size="md" iconLeft="edit" fullWidth onClick={() => setShowForm(selectedDoc)} style={{ borderColor: "var(--color-outline-variant)" }}>수정</Button>
                 <Button variant="ghost-danger" size="md" iconLeft="trash" onClick={() => handleDelete(selectedDoc)} style={{ flexShrink: 0 }}>삭제</Button>
               </div>
@@ -351,7 +352,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
         zIndex: 5000,
         background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '20px',
+        padding: SPACING.xxl,
         animation: 'fadeIn 0.15s ease',
       }}
     >
@@ -369,7 +370,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
       >
         {/* Header */}
         <div style={{
-          padding: '16px 16px 12px 20px', flexShrink: 0,
+          padding: `${SPACING.xl} ${SPACING.xl} ${SPACING.lg} ${SPACING.xxl}`, flexShrink: 0,
           borderBottom: '1px solid var(--color-outline-variant)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
@@ -380,7 +381,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
         </div>
 
         {/* Form body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: `${SPACING.xl} ${SPACING.xxl} ${SPACING.xxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.lx }}>
           {/* Title */}
           <Field label="문서명" required size="lg" variant="outlined"
             value={title} onChange={(e) => setTitle(e.target.value)}
@@ -389,19 +390,19 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
           {/* Category chips */}
           <div>
             <p style={{
-              margin: '0 0 8px', fontSize: 'var(--typo-caption-2-bold-size)',
+              margin: `0 0 ${SPACING.md}`, fontSize: 'var(--typo-caption-2-bold-size)',
               fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant)',
             }}>
               카테고리
             </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms }}>
               {DOC_CATEGORIES.map((cat) => (
                 <button
                   key={cat.value}
                   onClick={() => setCategory(cat.value)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '5px',
-                    padding: '5px 12px', borderRadius: '100px',
+                    padding: `5px ${SPACING.lg}`, borderRadius: '100px',
                     border: category === cat.value ? '1.5px solid var(--color-primary)' : '1px solid var(--color-outline-variant)',
                     background: category === cat.value ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
                     color: category === cat.value ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant)',
@@ -426,7 +427,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
           {/* File (image or PDF) */}
           <div>
             <p style={{
-              margin: '0 0 8px', fontSize: 'var(--typo-caption-2-bold-size)',
+              margin: `0 0 ${SPACING.md}`, fontSize: 'var(--typo-caption-2-bold-size)',
               fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant)',
             }}>
               파일 (이미지 또는 PDF)
@@ -444,8 +445,8 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
                 {isPdfUrl(imageUrl) ? (
                   /* PDF preview */
                   <div style={{
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '14px 16px',
+                    display: 'flex', alignItems: 'center', gap: SPACING.ml,
+                    padding: `${SPACING.lx} ${SPACING.xl}`,
                     background: 'var(--color-surface-container-lowest)',
                   }}>
                     <div style={{
@@ -471,8 +472,8 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
                 )}
                 {/* Actions overlay */}
                 <div style={{
-                  display: 'flex', justifyContent: 'flex-end', gap: '6px',
-                  padding: '8px', borderTop: '1px solid var(--color-outline-variant)',
+                  display: 'flex', justifyContent: 'flex-end', gap: SPACING.ms,
+                  padding: SPACING.md, borderTop: '1px solid var(--color-outline-variant)',
                   background: 'var(--color-surface-container-lowest)',
                 }}>
                   <Button variant="ghost-neutral" size="xsm" iconLeft="edit" onClick={() => fileRef.current?.click()}>변경</Button>
@@ -493,13 +494,13 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
                   borderRadius: 'var(--radius-md, 8px)',
                   border: '2px dashed var(--color-outline-variant)',
                   background: 'var(--color-surface-container-lowest)',
-                  padding: '24px 16px', textAlign: 'center',
+                  padding: `${SPACING.xxxl} ${SPACING.xl}`, textAlign: 'center',
                   cursor: uploading ? 'default' : 'pointer',
                 }}
               >
                 {uploading ? (
                   <>
-                    <div style={{ width: '24px', height: '24px', border: '3px solid var(--color-outline-variant)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 8px' }} />
+                    <div style={{ width: '24px', height: '24px', border: '3px solid var(--color-outline-variant)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: `0 auto ${SPACING.md}` }} />
                     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                     <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-medium-size)', color: 'var(--color-on-surface-variant2)' }}>업로드 중...</p>
                   </>
@@ -515,7 +516,7 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '0 20px 16px', flexShrink: 0, display: 'flex', gap: '8px' }}>
+        <div style={{ padding: `0 ${SPACING.xxl} ${SPACING.xl}`, flexShrink: 0, display: 'flex', gap: SPACING.md }}>
           <Button variant="neutral" size="lg" onClick={onClose} style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}>
             취소
           </Button>

@@ -4,6 +4,7 @@ import BottomSheet from '../common/BottomSheet';
 import Button from '../common/Button';
 import Icon from '../common/Icon';
 import ConfirmDialog from '../common/ConfirmDialog';
+import { SPACING } from '../../styles/tokens';
 
 /* ── Add Day Dialog (Bottom Sheet) ── */
 export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
@@ -64,13 +65,13 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
     <>
       <div style={sheetWrapperStyle}>
         <BottomSheet onClose={onCancel} maxHeight="auto" zIndex={3000} title="날짜 추가">
-        <div style={{ padding: "8px 20px 24px" }}>
+        <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}` }}>
 
           {/* Day number — inline horizontal chip selector (no nested BottomSheet) */}
-          <div style={{ marginBottom: "16px" }}>
+          <div style={{ marginBottom: SPACING.xl }}>
             <div style={{
-              display: "flex", alignItems: "center", gap: "4px",
-              paddingBottom: "6px",
+              display: "flex", alignItems: "center", gap: SPACING.sm,
+              paddingBottom: SPACING.ms,
             }}>
               <span style={{
                 fontSize: "var(--typo-caption-2-bold-size)",
@@ -81,7 +82,7 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
               </span>
             </div>
             <div style={{
-              display: "flex", gap: "6px", flexWrap: "wrap",
+              display: "flex", gap: SPACING.ms, flexWrap: "wrap",
             }}>
               {Array.from({ length: rangeEnd }, (_, i) => i + 1).map((num) => {
                 const exists = existingNums.includes(num);
@@ -107,8 +108,8 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
                       cursor: "pointer",
                       transition: "all 0.15s",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      gap: "2px",
-                      padding: "0 6px",
+                      gap: SPACING.xs,
+                      padding: `0 ${SPACING.ms}`,
                       fontFamily: "inherit",
                     }}
                   >
@@ -123,7 +124,7 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
           </div>
 
           {/* Day name */}
-          <div style={{ marginBottom: "20px" }}>
+          <div style={{ marginBottom: SPACING.xxl }}>
             <Field label="날짜 이름" size="lg" variant="outlined"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
@@ -132,7 +133,7 @@ export default function AddDayDialog({ onAdd, onCancel, existingDays = [] }) {
           </div>
 
           {/* Actions */}
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", gap: SPACING.ml }}>
             <Button variant="neutral" size="lg" onClick={onCancel} style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}>취소</Button>
             <Button variant="primary" size="lg" onClick={handleSubmit}
               disabled={!canSubmit} style={{ flex: 1 }}>

@@ -812,19 +812,19 @@ export default function TravelPlanner() {
         alignItems: "center", justifyContent: "center",
         background: "var(--color-surface)",
         paddingTop: "env(safe-area-inset-top, 0px)",
-        padding: "20px",
+        padding: SPACING.xxl,
       }}>
-        <Icon name="lock" size={48} style={{ opacity: 0.3, marginBottom: "16px" }} />
+        <Icon name="lock" size={48} style={{ opacity: 0.3, marginBottom: SPACING.xl }} />
         <p style={{
           fontSize: "var(--typo-body-1-n---bold-size)",
           fontWeight: "var(--typo-body-1-n---bold-weight)",
-          color: "var(--color-on-surface)", marginBottom: "8px",
+          color: "var(--color-on-surface)", marginBottom: SPACING.md,
         }}>
           접근 권한이 없습니다
         </p>
         <p style={{
           fontSize: "var(--typo-caption-1-regular-size)",
-          color: "var(--color-on-surface-variant2)", textAlign: "center", marginBottom: "24px",
+          color: "var(--color-on-surface-variant2)", textAlign: "center", marginBottom: SPACING.xxxl,
         }}>
           이 여행의 멤버가 아닙니다.<br />초대 링크를 통해 참여해주세요.
         </p>
@@ -859,7 +859,7 @@ export default function TravelPlanner() {
             {/* Viewer badge */}
             {!isLegacy && !canEdit && (
               <span style={{
-                padding: "2px 6px", borderRadius: "var(--radius-sm, 4px)",
+                padding: `${SPACING.xs} ${SPACING.ms}`, borderRadius: "var(--radius-sm, 4px)",
                 background: "var(--color-surface-container-lowest)",
                 fontSize: "var(--typo-caption-3-bold-size)",
                 fontWeight: "var(--typo-caption-3-bold-weight)",
@@ -980,7 +980,7 @@ export default function TravelPlanner() {
                       type="button"
                       style={{
                         width: "100%", cursor: canEdit ? "pointer" : "default",
-                        display: "flex", alignItems: "center", gap: "6px",
+                        display: "flex", alignItems: "center", gap: SPACING.ms,
                         padding: 0, border: "none", background: "none",
                         textAlign: "left", fontFamily: "inherit",
                       }}
@@ -1125,15 +1125,15 @@ export default function TravelPlanner() {
             <div>
               {bulkDeleteMode && allItems.length > 0 && (
                 <div style={{
-                  display: "flex", alignItems: "center", gap: "6px",
-                  padding: "6px 0 8px", marginBottom: SPACING.sm,
+                  display: "flex", alignItems: "center", gap: SPACING.ms,
+                  padding: `${SPACING.ms} 0 ${SPACING.md}`, marginBottom: SPACING.sm,
                   borderBottom: "1px solid var(--color-outline-variant)",
                 }}>
                   <button
                     type="button"
                     onClick={toggleSelectAll}
                     style={{
-                      display: "flex", alignItems: "center", gap: "6px",
+                      display: "flex", alignItems: "center", gap: SPACING.ms,
                       border: "none", background: "none", cursor: "pointer",
                       fontSize: "var(--typo-caption-1-regular-size)",
                       color: "var(--color-primary)", fontWeight: 600,
@@ -1250,11 +1250,11 @@ export default function TravelPlanner() {
           const summary = generateDaySummary(current);
           return summary ? (
             <div style={{
-              marginTop: "4px", padding: "11px 14px",
+              marginTop: SPACING.sm, padding: `11px ${SPACING.lx}`,
               background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-md, 8px)", border: "1px dashed var(--color-outline-variant)",
             }}>
-              <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", fontWeight: "var(--typo-caption-2-regular-weight)", color: "var(--color-on-surface-variant2)", lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: "6px" }}>
-                <Icon name="pin" size={12} style={{ marginTop: "2px" }} /><span>{summary}</span>
+              <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", fontWeight: "var(--typo-caption-2-regular-weight)", color: "var(--color-on-surface-variant2)", lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: SPACING.ms }}>
+                <Icon name="pin" size={12} style={{ marginTop: SPACING.xs }} /><span>{summary}</span>
               </p>
             </div>
           ) : null;
@@ -1400,13 +1400,13 @@ export default function TravelPlanner() {
       {/* 날짜 ··· 메뉴: 이름 수정(인라인) / 이 날짜 삭제 */}
       {showDayMoreMenu && current && canEdit && (
         <BottomSheet onClose={() => setShowDayMoreMenu(false)} maxHeight="auto" zIndex="var(--z-confirm)" title={current.label}>
-          <div style={{ padding: "8px 24px 24px" }}>
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxxl} ${SPACING.xxxl}` }}>
             <button
               type="button"
               onClick={() => { setShowDayMoreMenu(false); setEditingDayIdx(toOrigIdx(selectedDay)); setEditDayLabel(current.label); }}
               style={{
-                width: "100%", display: "flex", alignItems: "center", gap: "12px",
-                padding: "14px 0", border: "none", background: "none", cursor: "pointer",
+                width: "100%", display: "flex", alignItems: "center", gap: SPACING.lg,
+                padding: `${SPACING.lx} 0`, border: "none", background: "none", cursor: "pointer",
                 fontSize: "var(--typo-body-2-n---regular-size)", color: "var(--color-on-surface)",
                 fontFamily: "inherit", textAlign: "left",
               }}
@@ -1419,8 +1419,8 @@ export default function TravelPlanner() {
                 type="button"
                 onClick={() => { setShowDayMoreMenu(false); handleDeleteDay(toOrigIdx(selectedDay)); }}
                 style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: "12px",
-                  padding: "14px 0", border: "none", background: "none", cursor: "pointer",
+                  width: "100%", display: "flex", alignItems: "center", gap: SPACING.lg,
+                  padding: `${SPACING.lx} 0`, border: "none", background: "none", cursor: "pointer",
                   fontSize: "var(--typo-body-2-n---regular-size)", color: "var(--color-error)",
                   fontFamily: "inherit", textAlign: "left",
                 }}
@@ -1445,12 +1445,12 @@ export default function TravelPlanner() {
       {/* ── Share & Invite Bottom Sheet ── */}
       {showShareSheet && !isLegacy && (
         <BottomSheet onClose={() => setShowShareSheet(false)} maxHeight="70vh" zIndex="var(--z-confirm)" title="공유 및 초대">
-          <div style={{ padding: "8px 24px 24px" }}>
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxxl} ${SPACING.xxxl}` }}>
 
             {/* Share link section */}
-            <div style={{ marginBottom: "20px" }}>
+            <div style={{ marginBottom: SPACING.xxl }}>
               <p style={{
-                margin: "0 0 8px",
+                margin: `0 0 ${SPACING.md}`,
                 fontSize: "var(--typo-caption-1-bold-size)",
                 fontWeight: "var(--typo-caption-1-bold-weight)",
                 color: "var(--color-on-surface-variant)",
@@ -1458,10 +1458,10 @@ export default function TravelPlanner() {
                 초대 링크
               </p>
               <div style={{
-                display: "flex", gap: "8px", alignItems: "center",
+                display: "flex", gap: SPACING.md, alignItems: "center",
               }}>
                 <div style={{
-                  flex: 1, padding: "10px 14px",
+                  flex: 1, padding: `${SPACING.ml} ${SPACING.lx}`,
                   borderRadius: "var(--radius-md, 8px)",
                   background: "var(--color-surface-container-lowest)",
                   fontSize: "var(--typo-caption-1-regular-size)",
@@ -1476,7 +1476,7 @@ export default function TravelPlanner() {
                   disabled={!shareCode} />
               </div>
               <p style={{
-                margin: "8px 0 0",
+                margin: `${SPACING.md} 0 0`,
                 fontSize: "var(--typo-caption-2-regular-size)",
                 color: "var(--color-on-surface-variant2)",
                 lineHeight: 1.5,
@@ -1499,7 +1499,7 @@ export default function TravelPlanner() {
                       });
                     } catch { /* user cancelled */ }
                   }}
-                  style={{ marginTop: "10px", width: "100%" }}
+                  style={{ marginTop: SPACING.ml, width: "100%" }}
                 >
                   다른 앱으로 공유
                 </Button>
@@ -1510,7 +1510,7 @@ export default function TravelPlanner() {
             {tripMeta?.members?.length > 0 && (
               <div>
                 <p style={{
-                  margin: "0 0 8px",
+                  margin: `0 0 ${SPACING.md}`,
                   fontSize: "var(--typo-caption-1-bold-size)",
                   fontWeight: "var(--typo-caption-1-bold-weight)",
                   color: "var(--color-on-surface-variant)",
@@ -1526,8 +1526,8 @@ export default function TravelPlanner() {
                     const isOnline = onlineUsers.some((ou) => ou.id === m.id);
                     return (
                       <div key={m.id} style={{
-                        display: "flex", alignItems: "center", gap: "10px",
-                        padding: "10px 14px",
+                        display: "flex", alignItems: "center", gap: SPACING.ml,
+                        padding: `${SPACING.ml} ${SPACING.lx}`,
                         borderBottom: i < tripMeta.members.length - 1 ? "1px solid var(--color-surface-dim)" : "none",
                         background: "var(--color-surface-container-lowest)",
                       }}>
@@ -1562,10 +1562,10 @@ export default function TravelPlanner() {
                         }}>
                           {m.name}
                           {m.id === user?.id && (
-                            <span style={{ marginLeft: "4px", fontSize: "var(--typo-caption-3-regular-size)", color: "var(--color-on-surface-variant2)" }}>(나)</span>
+                            <span style={{ marginLeft: SPACING.sm, fontSize: "var(--typo-caption-3-regular-size)", color: "var(--color-on-surface-variant2)" }}>(나)</span>
                           )}
                         </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: SPACING.ms, flexShrink: 0 }}>
                           {isOnline && (
                             <span style={{
                               fontSize: "var(--typo-caption-3-regular-size)",
@@ -1575,7 +1575,7 @@ export default function TravelPlanner() {
                           <span style={{
                             fontSize: "var(--typo-caption-2-regular-size)",
                             color: "var(--color-on-surface-variant2)",
-                            padding: "2px 6px", borderRadius: "4px",
+                            padding: `${SPACING.xs} ${SPACING.ms}`, borderRadius: "4px",
                             background: m.role === "owner" ? "var(--color-primary-container)" : "var(--color-surface-container-lowest)",
                           }}>
                             {m.role === "owner" ? "소유자" : m.role === "editor" ? "편집자" : "보기"}
@@ -1594,10 +1594,10 @@ export default function TravelPlanner() {
       {/* ── Day Reorder Bottom Sheet ── */}
       {showReorder && (
         <BottomSheet onClose={() => setShowReorder(false)} maxHeight="70vh" zIndex="var(--z-confirm)" title="Day 순서 변경">
-          <div style={{ padding: "8px 24px 24px" }}>
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxxl} ${SPACING.xxxl}` }}>
             <div style={{
               display: "flex", justifyContent: "flex-end",
-              marginBottom: "12px",
+              marginBottom: SPACING.lg,
             }}>
               <Button variant="primary" size="sm" onClick={handleReorderConfirm}>
                 적용
@@ -1605,13 +1605,13 @@ export default function TravelPlanner() {
             </div>
 
             <div style={{
-              display: "flex", flexDirection: "column", gap: "6px",
+              display: "flex", flexDirection: "column", gap: SPACING.ms,
               maxHeight: "50vh", overflowY: "auto",
             }}>
               {reorderList.map((item, i) => (
                 <div key={`${item.idx}-${i}`} style={{
-                  display: "flex", alignItems: "center", gap: "10px",
-                  padding: "10px 12px",
+                  display: "flex", alignItems: "center", gap: SPACING.ml,
+                  padding: `${SPACING.ml} ${SPACING.lg}`,
                   borderRadius: "var(--radius-md, 8px)",
                   border: "1px solid var(--color-outline-variant)",
                   background: "var(--color-surface-container-lowest)",
@@ -1641,7 +1641,7 @@ export default function TravelPlanner() {
                   </span>
 
                   {/* Up / Down buttons */}
-                  <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: SPACING.sm, flexShrink: 0 }}>
                     <button
                       onClick={() => handleReorderMove(i, -1)}
                       disabled={i === 0}
@@ -1681,7 +1681,7 @@ export default function TravelPlanner() {
       {/* More Menu */}
       {showMoreMenu && (
         <BottomSheet onClose={() => setShowMoreMenu(false)} maxHeight="auto" zIndex="var(--z-confirm)">
-          <div style={{ padding: "8px 20px 20px" }}>
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxl}` }}>
             {[
               { icon: "compass", label: "여행 가이드", onClick: () => { setShowMoreMenu(false); setShowGuide(true); } },
               { icon: "file", label: "여행 서류", onClick: () => { setShowMoreMenu(false); setShowDocs(true); } },
@@ -1691,8 +1691,8 @@ export default function TravelPlanner() {
                 key={idx}
                 onClick={menuItem.onClick}
                 style={{
-                  display: "flex", alignItems: "center", gap: "12px",
-                  width: "100%", padding: "14px 4px",
+                  display: "flex", alignItems: "center", gap: SPACING.lg,
+                  width: "100%", padding: `${SPACING.lx} ${SPACING.sm}`,
                   background: "none", border: "none", cursor: "pointer",
                   borderBottom: idx < 2 ? "1px solid var(--color-surface-dim)" : "none",
                   textAlign: "left",

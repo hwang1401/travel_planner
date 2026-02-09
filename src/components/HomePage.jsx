@@ -21,7 +21,7 @@ const MIN_SPLASH_MS = 400;
 /* ── Trip Card Component ── */
 function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge, memberCount, onClick, onMore }) {
   return (
-    <div style={{ position: 'relative', marginBottom: '12px' }}>
+    <div style={{ position: 'relative', marginBottom: SPACING.lg }}>
       <div
         onClick={onClick}
         style={{
@@ -50,9 +50,9 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
         </div>
 
         {/* Info area */}
-        <div style={{ padding: '14px 16px' }}>
+        <div style={{ padding: `${SPACING.lx} ${SPACING.xl}` }}>
           {/* Title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.ms }}>
             <p style={{
               margin: 0,
               fontSize: 'var(--typo-label-1-n---bold-size)',
@@ -65,7 +65,7 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
             </p>
             {badge && (
               <span style={{
-                padding: '2px 8px', borderRadius: '100px',
+                padding: `${SPACING.xs} ${SPACING.md}`, borderRadius: '100px',
                 background: 'var(--color-surface-container)',
                 fontSize: 'var(--typo-caption-3-bold-size)',
                 fontWeight: 'var(--typo-caption-3-bold-weight)',
@@ -324,8 +324,8 @@ export default function HomePage() {
       paddingTop: 'env(safe-area-inset-top, 0px)',
     }}>
       {/* Header */}
-      <div style={{ padding: '20px 20px 0', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+      <div style={{ padding: `${SPACING.xxl} ${SPACING.xxl} 0`, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm }}>
           <h1 style={{
             margin: 0, fontSize: 'var(--typo-heading-2-bold-size, 22px)',
             fontWeight: 'var(--typo-heading-2-bold-weight, 700)',
@@ -339,8 +339,8 @@ export default function HomePage() {
             <div
               onClick={handleSignOut}
               style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '4px 10px 4px 4px', borderRadius: '20px',
+                display: 'flex', alignItems: 'center', gap: SPACING.ms,
+                padding: `${SPACING.sm} ${SPACING.ml} ${SPACING.sm} ${SPACING.sm}`, borderRadius: '20px',
                 background: 'var(--color-surface-container-lowest)',
                 cursor: 'pointer', transition: 'background 0.15s',
               }}
@@ -371,7 +371,7 @@ export default function HomePage() {
           )}
         </div>
         <p style={{
-          margin: '0 0 20px', fontSize: 'var(--typo-caption-1-regular-size)',
+          margin: `0 0 ${SPACING.xxl}`, fontSize: 'var(--typo-caption-1-regular-size)',
           fontWeight: 'var(--typo-caption-1-regular-weight)',
           color: 'var(--color-on-surface-variant2)',
         }}>
@@ -418,7 +418,7 @@ export default function HomePage() {
 
             {/* Empty state — only when truly no trips at all */}
             {totalTrips === 0 && (
-              <div style={{ marginTop: '24px' }}>
+              <div style={{ marginTop: SPACING.xxxl }}>
                 <EmptyState
                   icon="navigation"
                   title="새로운 여행을 계획해보세요"
@@ -440,7 +440,7 @@ export default function HomePage() {
           <Button variant="primary" size="xlg" iconLeft="plus"
             onClick={() => setShowCreate(true)}
             style={{
-              borderRadius: '24px', padding: '0 24px', height: '48px',
+              borderRadius: '24px', padding: `0 ${SPACING.xxxl}`, height: '48px',
               boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
             }}>
             여행 만들기
@@ -468,9 +468,9 @@ export default function HomePage() {
       {/* More Menu Bottom Sheet */}
       {moreMenu && (
         <BottomSheet onClose={() => setMoreMenu(null)} maxHeight="auto" zIndex={3000}>
-          <div style={{ padding: '8px 24px 24px' }}>
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxxl} ${SPACING.xxxl}` }}>
             <h3 style={{
-              margin: '0 0 16px',
+              margin: `0 0 ${SPACING.xl}`,
               fontSize: 'var(--typo-body-1-n---bold-size)',
               fontWeight: 'var(--typo-body-1-n---bold-weight)',
               color: 'var(--color-on-surface)',
@@ -478,7 +478,7 @@ export default function HomePage() {
               {moreMenu.legacy ? '후쿠오카 · 유후인 여행' : moreMenu.trip?.name}
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.xs }}>
               {/* 여행 수정 (Supabase only) */}
               {!moreMenu.legacy && moreMenu.trip && (
                 <MoreMenuItem
@@ -532,8 +532,8 @@ function MoreMenuItem({ icon, label, onClick, danger = false }) {
     <button
       onClick={onClick}
       style={{
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '13px 14px', borderRadius: 'var(--radius-md, 8px)',
+        display: 'flex', alignItems: 'center', gap: SPACING.lg,
+        padding: `13px ${SPACING.lx}`, borderRadius: 'var(--radius-md, 8px)',
         background: 'none', border: 'none', cursor: 'pointer',
         width: '100%', textAlign: 'left', transition: 'background 0.15s',
       }}

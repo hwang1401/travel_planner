@@ -5,6 +5,7 @@
  */
 
 import { useAuth } from '../contexts/AuthContext';
+import { SPACING } from '../styles/tokens';
 
 export default function LoginPage() {
   const { signInWithKakao, error } = useAuth();
@@ -26,7 +27,7 @@ export default function LoginPage() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '40px 24px 20px',
+        padding: `40px ${SPACING.xxxl} ${SPACING.xxl}`,
         minHeight: '50vh',
         background: 'var(--color-primary)',
       }}>
@@ -36,13 +37,13 @@ export default function LoginPage() {
           style={{
             width: '80px',
             height: 'auto',
-            marginBottom: '20px',
+            marginBottom: SPACING.xxl,
             objectFit: 'contain',
             filter: 'brightness(0) invert(1)',
           }}
         />
         <h1 style={{
-          margin: '0 0 8px',
+          margin: `0 0 ${SPACING.md}`,
           fontSize: '28px',
           fontWeight: 700,
           color: 'var(--color-on-primary)',
@@ -63,21 +64,21 @@ export default function LoginPage() {
 
       {/* Bottom: Login buttons */}
       <div style={{
-        padding: '20px 24px 40px',
+        padding: `${SPACING.xxl} ${SPACING.xxxl} 40px`,
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: SPACING.lg,
       }}>
         {/* Error message */}
         {error && (
           <div style={{
-            padding: '10px 14px',
+            padding: `${SPACING.ml} ${SPACING.lx}`,
             borderRadius: 'var(--radius-md, 8px)',
             background: 'var(--color-error-container, #fde8e8)',
             fontSize: 'var(--typo-caption-1-regular-size)',
             color: 'var(--color-error)',
             textAlign: 'center',
-            marginBottom: '4px',
+            marginBottom: SPACING.sm,
           }}>
             {error}
           </div>
@@ -90,7 +91,7 @@ export default function LoginPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px',
+            gap: SPACING.md,
             width: '100%',
             height: '48px',
             borderRadius: 'var(--radius-md, 8px)',
@@ -115,7 +116,7 @@ export default function LoginPage() {
 
         {/* Terms notice */}
         <p style={{
-          margin: '8px 0 0',
+          margin: `${SPACING.md} 0 0`,
           fontSize: 'var(--typo-caption-3-regular-size, 11px)',
           color: 'var(--color-on-surface-variant2)',
           textAlign: 'center',

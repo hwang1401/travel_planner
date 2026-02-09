@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import Icon from './Icon';
 import Button from './Button';
+import { SPACING } from '../../styles/tokens';
 
 /*
  * ── ImagePicker ──
@@ -84,7 +85,7 @@ export default function ImagePicker({
           {/* Overlay actions */}
           <div style={{
             position: 'absolute', bottom: '8px', right: '8px',
-            display: 'flex', gap: '6px',
+            display: 'flex', gap: SPACING.ms,
           }}>
             <Button
               variant="ghost-neutral" size="sm" iconOnly="edit"
@@ -133,7 +134,7 @@ export default function ImagePicker({
             aspectRatio,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            gap: '8px',
+            gap: SPACING.md,
             cursor: disabled || uploading ? 'default' : 'pointer',
             transition: 'border-color var(--transition-fast), background var(--transition-fast)',
             opacity: disabled ? 0.5 : 1,
@@ -215,7 +216,7 @@ export function MultiImagePicker({
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '8px',
+        gap: SPACING.md,
       }}>
         {images.map((url, i) => (
           <div key={i} style={{
@@ -271,7 +272,7 @@ export function MultiImagePicker({
               aspectRatio: '1/1',
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center',
-              gap: '4px', cursor: uploading ? 'default' : 'pointer',
+              gap: SPACING.sm, cursor: uploading ? 'default' : 'pointer',
             }}
           >
             {uploading ? (

@@ -3,6 +3,7 @@
  * 일정(TravelPlanner) 로딩 시 헤더 + 리스트 형태 스켈레톤.
  */
 import Skeleton from './Skeleton';
+import { SPACING } from '../../styles/tokens';
 
 export default function ScheduleSkeleton() {
   return (
@@ -19,12 +20,12 @@ export default function ScheduleSkeleton() {
       {/* Header */}
       <div
         style={{
-          padding: '12px 16px 12px 8px',
+          padding: `${SPACING.lg} ${SPACING.xl} ${SPACING.lg} ${SPACING.md}`,
           background: 'var(--color-surface-container-lowest)',
           borderBottom: '1px solid var(--color-outline-variant)',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: SPACING.md,
           flexShrink: 0,
         }}
       >
@@ -33,19 +34,19 @@ export default function ScheduleSkeleton() {
       </div>
 
       {/* Day tabs area */}
-      <div style={{ padding: '8px 16px', display: 'flex', gap: '8px', flexShrink: 0 }}>
+      <div style={{ padding: `${SPACING.md} ${SPACING.xl}`, display: 'flex', gap: SPACING.md, flexShrink: 0 }}>
         <Skeleton style={{ height: '36px', width: '72px', borderRadius: 'var(--radius-md)' }} />
         <Skeleton style={{ height: '36px', width: '72px', borderRadius: 'var(--radius-md)' }} />
         <Skeleton style={{ height: '36px', width: '72px', borderRadius: 'var(--radius-md)' }} />
       </div>
 
       {/* List */}
-      <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ flex: 1, padding: SPACING.xl, display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+          <div key={i} style={{ display: 'flex', gap: SPACING.lg, alignItems: 'flex-start' }}>
             <Skeleton style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <Skeleton style={{ height: '16px', width: '60%', marginBottom: '6px' }} />
+              <Skeleton style={{ height: '16px', width: '60%', marginBottom: SPACING.ms }} />
               <Skeleton style={{ height: '12px', width: '85%' }} />
             </div>
           </div>

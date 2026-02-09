@@ -3,6 +3,7 @@
  * 앱 초기 세션 체크 시 표시. AuthContext loading 중에만 노출.
  * 규칙: primary(푸른/보라) 배경일 때는 흰색 로고 사용.
  */
+import { SPACING } from '../styles/tokens';
 
 export default function SplashScreen() {
   return (
@@ -25,14 +26,14 @@ export default function SplashScreen() {
         style={{
           width: '80px',
           height: 'auto',
-          marginBottom: '20px',
+            marginBottom: SPACING.xxl,
           objectFit: 'contain',
           filter: 'brightness(0) invert(1)',
         }}
       />
       <h1
         style={{
-          margin: '0 0 8px',
+          margin: `0 0 ${SPACING.md}`,
           fontSize: '28px',
           fontWeight: 700,
           color: 'var(--color-on-primary)',
