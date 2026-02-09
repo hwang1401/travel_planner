@@ -94,6 +94,10 @@ export default function TravelPlanner() {
   /* ── Debounced save ref ── */
   const debouncedSaveRef = useRef(null);
   const skipNextRealtimeRef = useRef(false);
+  /* 일괄 삭제 확인 시 사용할 payload (클로저/배치로 인한 selectedBulkKeys 손실 방지) */
+  const bulkDeletePayloadRef = useRef(null);
+  /* 일괄 삭제 직후 즉시 저장할 데이터 (디바운서/리얼타임 덮어쓰기 방지) */
+  const bulkDeleteNextRef = useRef(null);
 
   /* ── Presence: who is online ── */
   const presenceUser = useMemo(() => {
@@ -737,16 +741,14 @@ export default function TravelPlanner() {
     });
   }, [performDeleteItem, toOrigIdx, selectedDay]);
 
-  const handleBulkDeleteConfirm = useCallback(() => {
-    const dayIdx = toOrigIdx(selectedDay);
-    const keys = Array.from(selectedBulkKeys);
-    const entries = keys.map((k) => {
-      const [si, ii] = k.split("-").map(Number);
-      return currentDayItems.find((e) => e.si === si && e.ii === ii);
-    }).filter(Boolean);
+  const runBulkDeleteWithPayload = useCallback((payload) => {
+    if (!payload) return;
+    const { keys, entries, dayIdx, baseLen: payloadBaseLen } = payload;
     const extraEntries = entries.filter((e) => e.item._extra);
     const sectionEntries = entries.filter((e) => !e.item._extra);
     const sectionDesc = [...sectionEntries].sort((a, b) => (b.si !== a.si ? b.si - a.si : b.ii - a.ii));
+
+    const mergedDay = DAYS.find((_, i) => toOrigIdx(i) === dayIdx);
 
     updateCustomData((prev) => {
       const next = { ...prev };
@@ -767,40 +769,80 @@ export default function TravelPlanner() {
         if (next[dayIdx].extraItems.length === 0) delete next[dayIdx].extraItems;
       }
 
-      for (const entry of sectionDesc) {
-        const { si, ii } = entry;
-        if (!next[dayIdx].sections) next[dayIdx].sections = {};
-        if (!next[dayIdx].sections[si]) {
-          const sourceSec = baseLen > 0
-            ? BASE_DAYS[dayIdx]?.sections?.[si]
-            : next._extraDays?.[dayIdx - baseLen]?.sections?.[si];
-          next[dayIdx].sections[si] = { items: [...(sourceSec?.items || [])] };
-        } else {
-          next[dayIdx].sections = { ...next[dayIdx].sections };
-          next[dayIdx].sections[si] = { ...next[dayIdx].sections[si], items: [...next[dayIdx].sections[si].items] };
+      if (sectionDesc.length > 0 && mergedDay?.sections) {
+        const indicesBySection = {};
+        for (const entry of sectionDesc) {
+          const { si, ii } = entry;
+          if (!indicesBySection[si]) indicesBySection[si] = [];
+          indicesBySection[si].push(ii);
         }
-        next[dayIdx].sections[si].items.splice(ii, 1);
+        const newSectionsFromMerged = mergedDay.sections.map((sec, si) => {
+          const toRemove = (indicesBySection[si] || []).sort((a, b) => b - a);
+          const displayedItems = (mergedDay.sections[si]?.items ?? []).filter(Boolean);
+          const baseItems = [...displayedItems];
+          toRemove.forEach((ii) => { if (ii >= 0 && ii < baseItems.length) baseItems.splice(ii, 1); });
+          return { ...sec, items: baseItems };
+        });
+
+        if (payloadBaseLen === 0 && next._extraDays) {
+          // standalone: 해당 날짜를 _extraDays에서만 통째로 교체. custom[dayIdx] 오버라이드 제거해 merge 시 덮어쓰기 방지.
+          const ed = next._extraDays[dayIdx];
+          const newDay = { ...(ed || {}), sections: newSectionsFromMerged };
+          next._extraDays = [...next._extraDays];
+          next._extraDays[dayIdx] = newDay;
+          delete next[dayIdx];
+        } else {
+          next[dayIdx] = { ...next[dayIdx] };
+          next[dayIdx].sections = { ...(next[dayIdx].sections || {}) };
+          newSectionsFromMerged.forEach((sec, si) => {
+            next[dayIdx].sections[si] = { items: sec.items || [] };
+          });
+        }
       }
 
-      return { ...next };
+      const result = { ...next };
+      bulkDeleteNextRef.current = result;
+      return result;
     });
+
+    if (tripId && !isLegacy && bulkDeleteNextRef.current) {
+      skipNextRealtimeRef.current = true;
+      debouncedSaveRef.current?.cancel?.();
+      saveSchedule(tripId, bulkDeleteNextRef.current).catch((err) =>
+        console.error("[TravelPlanner] 일괄 삭제 직후 저장 실패:", err)
+      );
+      bulkDeleteNextRef.current = null;
+    }
 
     setBulkDeleteMode(false);
     setSelectedBulkKeys(new Set());
     setConfirmDialog(null);
     setToast({ message: `${keys.length}개 일정이 삭제되었습니다`, icon: "trash" });
-  }, [selectedBulkKeys, selectedDay, toOrigIdx, currentDayItems, updateCustomData, baseLen]);
+    bulkDeletePayloadRef.current = null;
+  }, [updateCustomData, DAYS, toOrigIdx, tripId, isLegacy]);
+
+  const handleBulkDeleteConfirm = useCallback(() => {
+    const payload = bulkDeletePayloadRef.current;
+    runBulkDeleteWithPayload(payload);
+  }, [runBulkDeleteWithPayload]);
 
   const handleBulkDeleteClick = useCallback(() => {
     const n = selectedBulkKeys.size;
     if (n === 0) return;
+    const dayIdx = toOrigIdx(selectedDay);
+    const keys = Array.from(selectedBulkKeys);
+    const entries = keys.map((k) => {
+      const [si, ii] = k.split("-").map(Number);
+      return currentDayItems.find((e) => e.si === si && e.ii === ii);
+    }).filter(Boolean);
+    bulkDeletePayloadRef.current = { keys, entries, dayIdx, baseLen };
     setConfirmDialog({
       title: "일정 일괄 삭제",
       message: `${n}개 일정을 삭제할까요?`,
       confirmLabel: "삭제",
       onConfirm: handleBulkDeleteConfirm,
     });
-  }, [selectedBulkKeys.size, handleBulkDeleteConfirm]);
+  }, [selectedBulkKeys, selectedDay, toOrigIdx, currentDayItems, baseLen, handleBulkDeleteConfirm]);
 
   /* ── Bulk Import: replace or append ── */
   const handleBulkImport = useCallback((items, mode) => {
