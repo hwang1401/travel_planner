@@ -292,7 +292,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
         }
         setGenStatusMsg('일정 생성 중...');
         const { days, error } = await generateFullTripSchedule({
-          destinations: destinations.map((d) => d.name),
+          destinations,
           duration: duration || 1,
           startDate,
           preferences: aiPreferences,

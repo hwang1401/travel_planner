@@ -68,9 +68,11 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
     : images;
 
   /* URLs */
-  const directionsUrl = detail.address
-    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(detail.address)}`
-    : null;
+  const directionsUrl = detail.placeId
+    ? `https://www.google.com/maps/dir/?api=1&destination=place_id:${detail.placeId}&destination_place_id=${detail.placeId}`
+    : detail.address
+      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(detail.address)}`
+      : null;
 
   const px = "var(--spacing-sp200)";
 
@@ -141,10 +143,10 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           display: "flex", alignItems: "center", gap: "var(--spacing-sp80)",
           borderBottom: "1px solid var(--color-outline-variant)",
         }}>
-          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "var(--spacing-sp80)", overflow: "hidden" }}>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: SPACING.md, overflow: "hidden" }}>
             <h3 style={{
               margin: 0,
-              flex: 1, minWidth: 0,
+              minWidth: 0, flexShrink: 1,
               fontSize: "var(--typo-body-1-n---bold-size)",
               fontWeight: "var(--typo-body-1-n---bold-weight)",
               color: "var(--color-on-surface)",
@@ -343,7 +345,6 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
             justifyContent: "center",
             alignItems: "center",
             gap: SPACING.ms,
-            borderTop: "1px solid var(--color-outline-variant)",
             background: "var(--color-surface-container-lowest)",
           }}>
             {allDetailPayloads.map((_, i) => {

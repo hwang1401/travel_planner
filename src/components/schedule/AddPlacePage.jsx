@@ -9,6 +9,7 @@ import PageTransition from '../common/PageTransition';
 import Toast from '../common/Toast';
 import NumberCircle from '../common/NumberCircle';
 import { getPlacePredictions, getPlaceDetails } from '../../lib/googlePlaces.js';
+import { uploadImage, generateImagePath } from '../../services/imageService';
 import { TYPE_CONFIG, TYPE_LABELS, COLOR, SPACING, RADIUS } from '../../styles/tokens';
 import { TIMETABLE_DB, findBestTrain, matchTimetableRoute, findRoutesByStations } from '../../data/timetable';
 import TimetablePreview from '../common/TimetablePreview';
@@ -289,7 +290,7 @@ function TimePicker({ value, onChange, label, error }) {
   );
 }
 
-export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
+export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) {
   // View mode: 'search' (showing results) | 'form' (detail entry)
   const [mode, setMode] = useState('search');
 
@@ -321,6 +322,10 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
   // Validation: field errors and toast
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState(null);
+
+  // Place image & placeId (uploaded to Storage)
+  const [storageImageUrl, setStorageImageUrl] = useState(null);
+  const [selectedPlaceId, setSelectedPlaceId] = useState(null);
 
   // Map state
   const [flyTarget, setFlyTarget] = useState(null);
@@ -434,17 +439,36 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
           if (details.name) setDesc(details.name);
           if (details.formatted_address) setAddress(details.formatted_address);
           if (details.lat != null) { setLat(details.lat); setLon(details.lon); setFlyTarget({ coords: [details.lat, details.lon], ts: Date.now() }); }
+          // Store placeId for later use (navigation URLs)
+          if (details.placeId) setSelectedPlaceId(details.placeId);
           if (details.photoUrl) {
             setSearchResults((prev) => {
               const next = [...prev];
               next[idx] = { ...next[idx], photoUrl: details.photoUrl, lat: details.lat, lon: details.lon, name: details.name, fullAddress: details.formatted_address };
               return next;
             });
+            // Background: copy Google photo to Supabase Storage (so URL doesn't expire)
+            (async () => {
+              try {
+                const res = await fetch(details.photoUrl);
+                if (!res.ok) return;
+                const blob = await res.blob();
+                const file = new File([blob], 'place.jpg', { type: 'image/jpeg' });
+                const path = tripId
+                  ? generateImagePath(tripId, 'items')
+                  : `places/${Date.now()}_${Math.random().toString(36).slice(2, 6)}.jpg`;
+                const publicUrl = await uploadImage(file, path);
+                setStorageImageUrl(publicUrl);
+              } catch (e) {
+                console.warn('[AddPlacePage] Photo storage upload failed:', e);
+                // Fall through — place saves without permanent image
+              }
+            })();
           }
         }
       } catch { /* 실패해도 기존 정보로 폼 유지 */ }
     }
-  }, []);
+  }, [tripId]);
 
   // Go back to search results from form
   const handleBackToResults = () => {
@@ -504,7 +528,13 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
         ...(lat != null ? { lat } : {}),
         ...(lon != null ? { lon } : {}),
         ...(tip.trim() ? { tip: tip.trim() } : {}),
-        ...(searchResults[selectedResultIdx ?? 0]?.photoUrl ? { image: searchResults[selectedResultIdx ?? 0].photoUrl } : {}),
+        // Prefer Storage URL over expiring Google photo URL
+        ...(storageImageUrl
+          ? { image: storageImageUrl }
+          : searchResults[selectedResultIdx ?? 0]?.photoUrl
+            ? { image: searchResults[selectedResultIdx ?? 0].photoUrl }
+            : {}),
+        ...(selectedPlaceId ? { placeId: selectedPlaceId } : {}),
         ...(timetable ? { timetable } : {}),
         ...(finalHighlights ? { highlights: finalHighlights } : {}),
       },
@@ -550,6 +580,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx }) {
       setTime('09:00'); setDesc(''); setType('spot'); setSub('');
       setAddress(''); setLat(null); setLon(null); setTip('');
       setHighlights(''); setLoadedTimetable(null); setMoveFrom(''); setMoveTo(''); setShowStationPicker(false);
+      setStorageImageUrl(null); setSelectedPlaceId(null);
       setErrors({});
       setToast(null);
       setFlyTarget(null);

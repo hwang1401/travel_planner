@@ -451,6 +451,7 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
               "type": "food|spot|shop|move|flight|stay|info",
               "desc": "일정 제목",
               "sub": "부가 설명 (가격, 소요시간 등)",
+              "rag_id": 123,
               "detail": {
                 "address": "주소 (있는 경우)",
                 "lat": 34.6937,
@@ -496,8 +497,73 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 10. 여행 첫날이나 마지막날은 이동이 많으므로 일정을 가볍게 잡으세요.
 11. detail.highlights에는 해당 장소/일정의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등).
 12. food, spot, shop 타입은 반드시 highlights를 포함하세요.
-13. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요.
-14. 사용자가 "참고 데이터" 또는 "참고 장소"를 제공하면, 그 목록에 있는 장소를 우선 반영해 일정을 만들어주세요. 참고 목록에 없는 장소를 추가할 수 있으나, 목록에 있는 장소를 최대한 활용하세요.`;
+13. 모든 타입에 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요. 특히 move, flight 타입은 도착지의 좌표를, stay는 숙소 좌표를, food/spot/shop은 장소 좌표를 반드시 넣어주세요. 공항, 역, 터미널 등 주요 교통 시설의 좌표는 알고 있다면 꼭 포함하세요.
+14. 사용자가 "참고 데이터" 또는 "참고 장소"를 제공하면, 그 목록에 있는 장소를 우선 반영해 일정을 만들어주세요. 참고 목록에 없는 장소를 추가할 수 있으나, 목록에 있는 장소를 최대한 활용하세요.
+15. 참고 장소에 [rag_id:숫자] 형태의 ID가 있으면, 해당 장소를 사용할 때 반드시 rag_id 필드에 그 숫자를 넣어주세요. 참고 장소가 아닌 직접 추천 장소는 rag_id를 생략하세요.`;
+
+/**
+ * Match an item against RAG places.
+ * Priority: rag_id (from AI response) > exact name > contains name > null
+ */
+function findRAGMatch(item, ragPlaces) {
+  if (!ragPlaces?.length) return null;
+
+  // 1차: AI가 반환한 rag_id로 직접 매칭 (가장 정확)
+  if (item._ragId != null) {
+    const byId = ragPlaces.find((p) => p.id === item._ragId);
+    if (byId) return byId;
+  }
+
+  // 2차: 이름 기반 fallback (AI가 rag_id를 안 줬거나 매칭 실패 시)
+  const d = (item.desc || '').trim();
+  if (!d) return null;
+  // Exact match
+  for (const p of ragPlaces) {
+    if (p.name_ko && p.name_ko === d) return p;
+  }
+  // Contains match (either direction)
+  for (const p of ragPlaces) {
+    if (p.name_ko && (d.includes(p.name_ko) || p.name_ko.includes(d))) return p;
+  }
+  return null;
+}
+
+/**
+ * Post-process AI-generated days: inject RAG-verified data (image, placeId,
+ * address, coordinates) into each item's detail when a match is found.
+ * Uses rag_id from AI response first, falls back to name matching.
+ */
+function injectRAGData(days, ragPlaces) {
+  if (!ragPlaces?.length) return days;
+  for (const day of days) {
+    const sections = day.sections || [];
+    for (const sec of sections) {
+      for (const item of sec.items || []) {
+        const match = findRAGMatch(item, ragPlaces);
+        if (match) {
+          if (!item.detail) {
+            item.detail = { name: item.desc, category: '관광' };
+          }
+          if (match.image_url) item.detail.image = match.image_url;
+          if (match.google_place_id) item.detail.placeId = match.google_place_id;
+          // Override address: prepend place name for readability
+          if (match.address) {
+            const namePrefix = match.name_ko && !match.address.includes(match.name_ko) ? `${match.name_ko}, ` : '';
+            item.detail.address = namePrefix + match.address;
+          }
+          // Override coordinates with verified ones
+          if (match.lat != null && match.lon != null) {
+            item.detail.lat = match.lat;
+            item.detail.lon = match.lon;
+          }
+        }
+        // Clean up internal field
+        delete item._ragId;
+      }
+    }
+  }
+  return days;
+}
 
 /** 장기 일정은 7일 단위로 나눠 요청 (MAX_TOKENS 방지) */
 const CHUNK_DAYS = 7;
@@ -524,11 +590,13 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
   }
 
   let placesText = "";
+  let ragPlaces = [];
   try {
     console.log("[RAG] 일정 생성용 장소 조회 시작");
     const rag = await getRAGContext({ destinations, preferences, duration });
     console.log("[RAG] 검색된 장소 수:", rag.placeCount, rag.placeCount === 0 ? "(Supabase rag_places 시드·region 확인)" : "");
     if (rag.placeCount > 0 && rag.placesText) placesText = rag.placesText;
+    if (rag.places?.length) ragPlaces = rag.places;
   } catch (e) {
     console.warn("[GeminiService] RAG context skipped:", e);
   }
@@ -588,6 +656,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
               desc: it.desc,
               sub: it.sub || "",
               ...(detail ? { detail } : {}),
+              ...(it.rag_id != null ? { _ragId: it.rag_id } : {}),
               _extra: true,
               _custom: true,
             };
@@ -674,6 +743,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
         return { days: [], error: finishReason === "MAX_TOKENS" ? "AI 응답이 잘렸습니다. 일정 기간을 줄여서 다시 시도해주세요." : "AI 응답을 파싱할 수 없습니다" };
       }
       const days = normalizeDays(parsed.days, 0);
+      injectRAGData(days, ragPlaces);
       return { days, error: null };
     }
 
@@ -688,6 +758,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
       allDays.push(...chunkDays);
       previousSummary = chunkDays.map((d) => `${d.day}일: ${d.label}`).join(" / ");
     }
+    injectRAGData(allDays, ragPlaces);
     return { days: allDays, error: null };
   } catch (err) {
     console.error("[GeminiService] Trip generation error:", err);

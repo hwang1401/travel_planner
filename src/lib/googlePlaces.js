@@ -105,6 +105,7 @@ export async function getPlaceDetails(placeId) {
         formatted_address: place.formattedAddress || '',
         name: place.displayName || place.formattedAddress || '',
         photoUrl: photoUrl || undefined,
+        placeId,
       };
     } catch (e) {
       console.warn('[Places] Place.fetchFields failed, trying legacy', e);
@@ -131,6 +132,7 @@ export async function getPlaceDetails(placeId) {
             formatted_address: place.formatted_address || '',
             name: place.name || place.formatted_address || '',
             photoUrl: photoUrl || undefined,
+            placeId,
           });
         }
       );

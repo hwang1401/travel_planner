@@ -1363,6 +1363,7 @@ export default function TravelPlanner() {
         onClose={() => setShowAddPlace(false)}
         onSave={(item) => handleSaveItem(item, toOrigIdx(selectedDay), -1, null)}
         dayIdx={toOrigIdx(selectedDay)}
+        tripId={tripId}
       />
 
       {/* Paste Info Page (full-screen) */}

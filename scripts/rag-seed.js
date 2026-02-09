@@ -36,14 +36,17 @@ loadEnv();
 const TYPES = ['food', 'spot', 'shop', 'stay'];
 
 const REGION_CONFIG = {
+  // ── Tier 1: 3대 도시 ──
   osaka: { center: [34.69, 135.5], tier: 1, label: '오사카', nameJa: '大阪' },
   tokyo: { center: [35.68, 139.69], tier: 1, label: '도쿄', nameJa: '東京' },
   kyoto: { center: [35.01, 135.77], tier: 1, label: '교토', nameJa: '京都' },
+  // ── Tier 2: 주요 관광 도시 ──
   fukuoka: { center: [33.59, 130.4], tier: 2, label: '후쿠오카', nameJa: '福岡' },
   okinawa: { center: [26.33, 127.8], tier: 2, label: '오키나와', nameJa: '沖縄' },
   sapporo: { center: [43.06, 141.35], tier: 2, label: '삿포로', nameJa: '札幌' },
   kobe: { center: [34.69, 135.2], tier: 2, label: '고베', nameJa: '神戸' },
   nara: { center: [34.69, 135.8], tier: 2, label: '나라', nameJa: '奈良' },
+  // ── Tier 3: 인기 관광지 ──
   nagoya: { center: [35.18, 136.91], tier: 3, label: '나고야', nameJa: '名古屋' },
   hiroshima: { center: [34.4, 132.46], tier: 3, label: '히로시마', nameJa: '広島' },
   hakone: { center: [35.23, 139.11], tier: 3, label: '하코네', nameJa: '箱根' },
@@ -52,12 +55,38 @@ const REGION_CONFIG = {
   beppu: { center: [33.28, 131.49], tier: 3, label: '벳푸', nameJa: '別府' },
   kamakura: { center: [35.32, 139.55], tier: 3, label: '가마쿠라', nameJa: '鎌倉' },
   nikko: { center: [36.75, 139.6], tier: 3, label: '닛코', nameJa: '日光' },
+  // ── Tier 4: 큐슈·시코쿠·중부 주요 관광지 ──
+  kumamoto: { center: [32.79, 130.74], tier: 4, label: '구마모토', nameJa: '熊本' },
+  nagasaki: { center: [32.75, 129.88], tier: 4, label: '나가사키', nameJa: '長崎' },
+  kagoshima: { center: [31.6, 130.56], tier: 4, label: '가고시마', nameJa: '鹿児島' },
+  matsuyama: { center: [33.84, 132.77], tier: 4, label: '마츠야마', nameJa: '松山' },
+  takamatsu: { center: [34.34, 134.05], tier: 4, label: '타카마츠', nameJa: '高松' },
+  takayama: { center: [36.14, 137.25], tier: 4, label: '다카야마', nameJa: '高山' },
+  hakodate: { center: [41.77, 140.73], tier: 4, label: '하코다테', nameJa: '函館' },
+  sendai: { center: [38.27, 140.87], tier: 4, label: '센다이', nameJa: '仙台' },
+  kawaguchiko: { center: [35.5, 138.76], tier: 4, label: '카와구치코', nameJa: '河口湖' },
+  // ── Tier 5: 소규모·특화 관광지 ──
+  aso: { center: [32.88, 131.1], tier: 5, label: '아소', nameJa: '阿蘇' },
+  yufuin: { center: [33.27, 131.37], tier: 5, label: '유후인', nameJa: '由布院' },
+  miyajima: { center: [34.3, 132.32], tier: 5, label: '미야지마', nameJa: '宮島' },
+  naoshima: { center: [34.46, 133.99], tier: 5, label: '나오시마', nameJa: '直島' },
+  shirakawago: { center: [36.26, 136.91], tier: 5, label: '시라카와고', nameJa: '白川郷' },
+  otaru: { center: [43.19, 141.0], tier: 5, label: '오타루', nameJa: '小樽' },
+  noboribetsu: { center: [42.46, 141.17], tier: 5, label: '노보리베츠', nameJa: '登別' },
+  atami: { center: [35.1, 139.07], tier: 5, label: '아타미', nameJa: '熱海' },
+  miyazaki: { center: [31.91, 131.42], tier: 5, label: '미야자키', nameJa: '宮崎' },
+  takachiho: { center: [32.72, 131.31], tier: 5, label: '타카치호', nameJa: '高千穂' },
+  shimoda: { center: [34.68, 138.95], tier: 5, label: '시모다', nameJa: '下田' },
+  kinosaki: { center: [35.63, 134.81], tier: 5, label: '기노사키', nameJa: '城崎' },
+  ibusuki: { center: [31.23, 130.64], tier: 5, label: '이부스키', nameJa: '指宿' },
 };
 
 const TIER_TARGETS = {
   1: { food: 100, spot: 50, shop: 30, stay: 20 },
   2: { food: 50, spot: 25, shop: 15, stay: 10 },
   3: { food: 25, spot: 15, shop: 10, stay: 5 },
+  4: { food: 25, spot: 15, shop: 10, stay: 5 },
+  5: { food: 15, spot: 10, shop: 5, stay: 3 },
 };
 
 const REGION_KEYS = Object.keys(REGION_CONFIG);
@@ -445,12 +474,33 @@ function normalizeForMatch(s) {
 function getCoreName(s) {
   if (!s || typeof s !== 'string') return '';
   let t = s.trim();
+  // 범용 접미사: 지점명, 시설 접미사, 괄호 설명 등 제거
+  t = t.replace(/\s*[（(].*?[）)]$/, ''); // 괄호 제거 (피 연못 지옥) 등
   const suffix =
-    /(?:店|本店|支店|点|〇〇店|道頓堀店|難波店|心斎橋店|梅田スカイビル店|なんば店|総本店|本点|店舗|横丁店|ビル店|フロア|食品フロア|デパ地下|店)$/i;
+    /(?:本店|支店|総本店|本舗|本館|新館|別館|本院|別院|店舗|店|駅前店|中央店|空港店|駅店|公園|庭園|神社|寺院|寺|城|タワー|センター|会館|ホール|ミュージアム|美術館|博物館|水族館|動物園|植物園|劇場|ビル店|横丁店|フロア|食品フロア|デパ地下)$/i;
   t = t.replace(suffix, '').trim();
   const tokens = t.split(/\s+/).filter(Boolean);
   if (tokens.length >= 2) return tokens.slice(0, 2).join('');
   return t.slice(0, 8);
+}
+
+/** Simple Levenshtein distance */
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = Array.from({ length: m + 1 }, (_, i) => i);
+  for (let j = 1; j <= n; j++) {
+    let prev = dp[0];
+    dp[0] = j;
+    for (let i = 1; i <= m; i++) {
+      const tmp = dp[i];
+      dp[i] = a[i - 1] === b[j - 1] ? prev : Math.min(prev, dp[i], dp[i - 1]) + 1;
+      prev = tmp;
+    }
+  }
+  return dp[m];
 }
 
 function nameSimilar(a, b) {
@@ -465,6 +515,17 @@ function nameSimilar(a, b) {
   if (ca.length >= 2 && cb.length >= 2 && (ca.includes(cb) || cb.includes(ca))) return true;
   if (ca.length >= 2 && nb.includes(ca)) return true;
   if (cb.length >= 2 && na.includes(cb)) return true;
+  // 편집 거리: 짧은 쪽 기준 20% 이내 차이면 통과 (1~2글자 오차 허용)
+  const shorter = Math.min(na.length, nb.length);
+  if (shorter >= 3) {
+    const dist = levenshtein(na, nb);
+    if (dist <= Math.max(2, Math.floor(shorter * 0.25))) return true;
+  }
+  // 코어 이름끼리도 편집 거리 체크
+  if (ca.length >= 3 && cb.length >= 3) {
+    const coreDist = levenshtein(ca, cb);
+    if (coreDist <= 2) return true;
+  }
   return false;
 }
 
@@ -492,7 +553,7 @@ function writeRejectedFile(region, type, rejected) {
     const outDir = join(process.cwd(), 'scripts', 'output');
     mkdirSync(outDir, { recursive: true });
     const outPath = join(outDir, `rag-rejected-${region}-${type}.json`);
-    writeFileSync(outPath, JSON.stringify(rejected.map((r) => ({ name_ko: r.name_ko, name_ja: r.name_ja, reject_reason: r.reject_reason })), null, 2), 'utf8');
+    writeFileSync(outPath, JSON.stringify(rejected.map((r) => ({ name_ko: r.name_ko, name_ja: r.name_ja, reject_reason: r.reject_reason, _place_name: r._place_name || null })), null, 2), 'utf8');
   } catch (_) {}
 }
 
@@ -649,7 +710,7 @@ function printFinalReport(results, failures) {
 
 async function main() {
   const { region, type, replace, dryRun, all, tier, limit } = parseArgs();
-  const isBatch = all || (tier != null && tier >= 1 && tier <= 3);
+  const isBatch = all || (tier != null && tier >= 1 && tier <= 5);
 
   if (isBatch) {
     const env = checkEnv();
