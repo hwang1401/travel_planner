@@ -1453,6 +1453,7 @@ export default function TravelPlanner() {
           onBulkImport={handleBulkImport}
           initialTab={openAiTab ? 2 : 0}
           aiOnly={openAiTab}
+          destinations={tripMeta?.destinations}
         />
       )}
 

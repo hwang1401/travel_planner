@@ -429,6 +429,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
           type: itemType,
           desc: item.desc,
           sub: item.sub || "",
+          ...(item._ragId != null ? { _ragId: item._ragId } : {}),
           ...(item.detail && Object.keys(item.detail).some((k) => item.detail[k])
             ? {
                 detail: {
@@ -436,6 +437,8 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
                   category: TYPE_CAT2[itemType] || "정보",
                   ...(item.detail.address ? { address: item.detail.address } : {}),
                   ...(item.detail.tip ? { tip: item.detail.tip } : {}),
+                  ...(item.detail.lat != null ? { lat: item.detail.lat } : {}),
+                  ...(item.detail.lon != null ? { lon: item.detail.lon } : {}),
                   ...(Array.isArray(item.detail.highlights) && item.detail.highlights.length > 0 ? { highlights: item.detail.highlights } : {}),
                 },
               }
@@ -444,6 +447,37 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
           _custom: true,
         };
       });
+
+    // 상세페이지 채팅으로 추가할 때도 여행 생성과 동일하게 RAG로 이미지·placeId 주입 (같은 식당이면 같은 이미지)
+    const destinations = options?.destinations;
+    if (Array.isArray(destinations) && destinations.length > 0) {
+      try {
+        const rag = await getRAGContext({ destinations, preferences: "", duration: 1 });
+        const ragPlaces = rag.places || [];
+        for (const item of items) {
+          const match = findRAGMatch(item, ragPlaces);
+          if (match) {
+            if (!item.detail) item.detail = { name: item.desc, category: TYPE_CAT2[item.type] || "정보" };
+            if (match.image_url) item.detail.image = match.image_url;
+            if (match.google_place_id) item.detail.placeId = match.google_place_id;
+            if (match.address) {
+              const namePrefix = match.name_ko && !match.address.includes(match.name_ko) ? `${match.name_ko}, ` : "";
+              item.detail.address = namePrefix + match.address;
+            }
+            if (match.lat != null && match.lon != null) {
+              item.detail.lat = match.lat;
+              item.detail.lon = match.lon;
+            }
+          }
+          delete item._ragId;
+        }
+      } catch (e) {
+        console.warn("[GeminiService] RAG injection for chat recommendation skipped:", e);
+        items.forEach((item) => delete item._ragId);
+      }
+    } else {
+      items.forEach((item) => delete item._ragId);
+    }
 
     return { message, items, error: null };
   } catch (err) {

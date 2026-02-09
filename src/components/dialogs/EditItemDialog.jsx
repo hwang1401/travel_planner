@@ -17,7 +17,7 @@ import { SPACING, RADIUS, COLOR } from '../../styles/tokens';
 import TimetableSearchDialog from './TimetableSearchDialog';
 
 /* ── Edit Item Dialog (일정 추가/수정) ── */
-export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color, tripId, currentDay, onBulkImport, initialTab = 0, aiOnly = false }) {
+export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color, tripId, currentDay, onBulkImport, initialTab = 0, aiOnly = false, destinations }) {
   const isNew = !item;
   const [activeTab, setActiveTab] = useState(aiOnly ? 2 : (isNew ? initialTab : 0));
   const [time, setTime] = useState(item?.time || "");
@@ -155,6 +155,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     const dayContext = currentDay?.label || "";
     const { message, items, error } = await getAIRecommendation(msg, history, dayContext, {
       onStatus: (s) => setAiStatusMsg(s),
+      destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean) : undefined,
     });
     setChatLoading(false);
     setAiStatusMsg("");
@@ -170,7 +171,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     setTimeout(() => {
       chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
     }, 100);
-  }, [chatInput, chatLoading, chatMessages, currentDay]);
+  }, [chatInput, chatLoading, chatMessages, currentDay, destinations]);
 
   const handleApplyRecommendation = useCallback((items) => {
     if (!items || items.length === 0) return;
