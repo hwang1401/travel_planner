@@ -1,0 +1,77 @@
+---
+description: 디자인 시스템 사용 규칙 - 맥락별 컴포넌트 사이즈/변형, 토큰 필수 사용
+globs: src/components/**/*.jsx
+alwaysApply: false
+---
+
+# Design System Rules
+
+## 토큰 필수 사용
+
+spacing, color, radius에 매직넘버(하드코딩 px/hex) 금지. 반드시 토큰 사용.
+
+```jsx
+// BAD
+style={{ padding: '12px', gap: '8px', borderRadius: '8px', color: '#6750A4' }}
+
+// GOOD
+import { SPACING, RADIUS, COLOR } from '../../styles/tokens';
+style={{ padding: SPACING.lg, gap: SPACING.md, borderRadius: RADIUS.md, color: COLOR.primary }}
+```
+
+SPACING: xs=2px, sm=4px, md=8px, lg=12px, xl=16px, xxl=20px, xxxl=24px
+CSS 변수도 가능: `var(--spacing-sp80)`, `var(--color-primary)`, `var(--radius-md)`
+
+## Button 맥락별 규칙
+
+| 맥락 | size | variant | 비고 |
+|------|------|---------|------|
+| 헤더 뒤로가기/닫기/공유 | sm | ghost-neutral | iconOnly 사용 |
+| Day탭 영역 (순서변경/추가) | sm | neutral | iconOnly 사용 |
+| 인라인 소형 액션 (체크/삭제) | xsm | 상황에 맞게 | iconOnly 사용 |
+| 다이얼로그 푸터 (저장/확인) | lg | primary | |
+| 다이얼로그 푸터 (취소) | lg | neutral | |
+| 다이얼로그 푸터 (삭제) | lg | ghost-danger | |
+| 페이지 메인 CTA (생성/제출) | xlg | primary | fullWidth |
+| FAB 플로팅 버튼 | xlg | primary | iconOnly |
+
+## Radius 통일 규칙
+
+- 기본값 (카드, 입력, 버튼, 컨테이너): `RADIUS.md` (8px)
+- 바텀시트 상단 / 트립카드 / 큰 카드: `RADIUS.lg` (12px)
+- 소형 뱃지/태그: `RADIUS.sm` (4px)
+- 칩, 필 뱃지, 아이콘 전용 버튼: `RADIUS.full` (999px)
+- 바텀시트/다이얼로그: 상단만 radius, 하단 0
+
+## Spacing 맥락별 규칙
+
+- 페이지/다이얼로그 좌우 여백: `SPACING.xxl` (20px)
+- 바텀시트 컨텐츠: `padding: "8px 24px 24px"`
+- 아이콘-텍스트 갭: `SPACING.sm`(4px) ~ `SPACING.md`(8px)
+- 리스트 아이템 갭: `SPACING.md` (8px)
+- 버튼 그룹 갭: `SPACING.md` (8px)
+- 폼 필드 갭: `SPACING.xl` (16px)
+- 섹션 간 갭: `SPACING.xxl`(20px) ~ `SPACING.xxxl`(24px)
+
+## Typography 맥락별 규칙
+
+- 페이지 제목: `heading-2-bold` 또는 `heading-3-bold`
+- 다이얼로그/시트 제목: `body-1-n---bold`
+- 본문(강조): `body-2-n---bold` / 본문(일반): `label-2-medium`
+- 섹션 라벨: `caption-1-bold`
+- 설명/보조 텍스트: `caption-2-regular`
+- 메타 정보: `caption-2-regular` ~ `caption-3-regular`
+
+TYPO 상수 또는 CSS 변수(`var(--typo-body-1-n---bold-size)`) 사용.
+
+## 컴포넌트 필수 사용
+
+직접 HTML 태그에 인라인 스타일로 만들지 말고, 공통 컴포넌트 사용:
+
+- 버튼 -> `Button` (직접 `<button style={...}>` 금지)
+- 칩/태그 -> `ChipSelector` / `CategoryBadge`
+- 입력 필드 -> `Field`
+- 탭 -> `Tab`
+- 바텀시트 -> `BottomSheet`
+- 빈 상태 -> `EmptyState`
+- 아이콘 -> `Icon`
