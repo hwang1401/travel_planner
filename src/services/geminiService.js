@@ -400,9 +400,14 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
   let ragPlaces = [];
   let ragPlacesText = "";
   const destArr = Array.isArray(destinations) && destinations.length > 0 ? destinations : [];
-  if (destArr.length > 0) {
+  if (destArr.length > 0 || (userMessage && userMessage.trim())) {
     try {
-      const rag = await getRAGContext({ destinations: destArr, preferences: "", duration: 1 });
+      const rag = await getRAGContext({
+        destinations: destArr,
+        preferences: "",
+        duration: 1,
+        hintText: userMessage,
+      });
       ragPlaces = rag.places || [];
       ragPlacesText = rag.placesText || "";
     } catch (e) {
@@ -630,9 +635,9 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
             {
               "time": "HH:MM",
               "type": "food|spot|shop|move|flight|stay|info",
-              "desc": "일정 제목",
+              "desc": "일정 제목 (참고 목록이 있으면 반드시 그 목록의 장소명)",
               "sub": "부가 설명 (가격, 소요시간 등)",
-              "rag_id": 123,
+              "rag_id": "123",
               "detail": {
                 "address": "주소 (있는 경우)",
                 "lat": 34.6937,
@@ -679,8 +684,8 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 11. detail.highlights에는 해당 장소/일정의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등).
 12. food, spot, shop 타입은 반드시 highlights를 포함하세요.
 13. 모든 타입에 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요. 특히 move, flight 타입은 도착지의 좌표를, stay는 숙소 좌표를, food/spot/shop은 장소 좌표를 반드시 넣어주세요. 공항, 역, 터미널 등 주요 교통 시설의 좌표는 알고 있다면 꼭 포함하세요.
-14. 사용자가 "참고 데이터" 또는 "참고 장소"를 제공하면, 그 목록에 있는 장소를 우선 반영해 일정을 만들어주세요. 참고 목록에 없는 장소를 추가할 수 있으나, 목록에 있는 장소를 최대한 활용하세요.
-15. 참고 장소에 [rag_id:숫자] 형태의 ID가 있으면, 해당 장소를 사용할 때 반드시 rag_id 필드에 그 숫자를 넣어주세요. 참고 장소가 아닌 직접 추천 장소는 rag_id를 생략하세요.`;
+14. 참고 데이터/참고 장소가 제공되면, 식사·관광·쇼핑·숙소 항목은 반드시 그 목록에 있는 장소만 사용하세요. "말고기 전문점", "OO 맛집"처럼 목록에 없는 가상의 장소명을 만들지 마세요. 목록에 해당 타입이 없으면 목록에 있는 다른 장소로 구성하거나, desc를 "저녁 식사"처럼 일반적으로만 쓰고 rag_id는 넣지 마세요.
+15. 참고 장소에 [rag_id:숫자] 형태의 ID가 있으면, 해당 장소를 사용할 때 반드시 rag_id 필드에 그 숫자(문자열)를 넣어주세요. 참고 목록이 없을 때만 직접 추천 장소를 쓰고 rag_id를 생략하세요.`;
 
 /**
  * Match an item against RAG places.
@@ -774,7 +779,13 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
   let ragPlaces = [];
   try {
     console.log("[RAG] 일정 생성용 장소 조회 시작");
-    const rag = await getRAGContext({ destinations, preferences, duration });
+    const destStrForHint = Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).join(" ") : "";
+    const rag = await getRAGContext({
+      destinations,
+      preferences,
+      duration,
+      hintText: [preferences, destStrForHint].filter(Boolean).join(" "),
+    });
     console.log("[RAG] 검색된 장소 수:", rag.placeCount, rag.placeCount === 0 ? "(Supabase rag_places 시드·region 확인)" : "");
     if (rag.placeCount > 0 && rag.placesText) placesText = rag.placesText;
     if (rag.places?.length) ragPlaces = rag.places;
@@ -789,7 +800,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
     (preferences?.trim() ? `\n\n사용자 요청:\n${preferences.trim()}` : "") +
     (bookedItems?.trim() ? `\n\n이미 예약된 것 (티켓·숙소 등). 이에 맞춰 일정을 잡아주세요:\n${bookedItems.trim()}` : "");
   if (placesText) {
-    baseUserPrompt += "\n\n## 참고 데이터 (아래 장소를 우선 반영해 일정을 만들어주세요)\n\n" + placesText;
+    baseUserPrompt += "\n\n## 참고 데이터 (식사·관광·쇼핑·숙소는 아래 목록에 있는 장소만 사용하세요. 목록에 없는 'OO 전문점', 'OO 맛집' 같은 가상 장소는 넣지 마세요.)\n\n" + placesText;
   }
 
   const normalizeDays = (rawDays, dayOffset = 0) => {

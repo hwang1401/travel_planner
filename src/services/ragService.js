@@ -89,6 +89,12 @@ const DESTINATION_TO_REGION = {
   이부스키: 'ibusuki', ibusuki: 'ibusuki',
 };
 
+/** region 코드 → 한글 표시명 (일정 추가 시 "구마모토를 여행지에 추가할까요?" 등에 사용) */
+const REGION_DISPLAY_NAMES = {};
+for (const [name, region] of Object.entries(DESTINATION_TO_REGION)) {
+  if (/[가-힣]/.test(name) && !REGION_DISPLAY_NAMES[region]) REGION_DISPLAY_NAMES[region] = name;
+}
+
 /** 권역명 → 다중 region 매핑 (넓은 지역 검색 대응) */
 const AREA_TO_REGIONS = {
   큐슈: ['fukuoka', 'kumamoto', 'nagasaki', 'kagoshima', 'beppu', 'miyazaki', 'aso', 'yufuin', 'takachiho', 'ibusuki'],
@@ -123,6 +129,29 @@ const PREFERENCE_TO_TAGS = [
   { keywords: ['야경', '밤', '야경명소'], tag: '야경' },
   { keywords: ['역사', '사찰', '신사', '전통'], tag: '역사' },
 ];
+
+/**
+ * 사용자 메시지에서 여행지명(한글/영문)을 추출해 RAG 조회에 포함.
+ * 예: "구마모토 일정 만들어줘" → ["구마모토"], 여행에 후쿠오카만 있어도 구마모토 장소 조회됨.
+ * @param {string} text - 사용자 입력 또는 채팅 문맥
+ * @returns {string[]} 추출된 여행지명 (DESTINATION_TO_REGION / AREA_TO_REGIONS 키)
+ */
+function extractDestinationHintsFromText(text) {
+  if (!text || typeof text !== 'string') return [];
+  const t = text.trim();
+  if (!t) return [];
+  const hints = new Set();
+  // 긴 키 먼저 (예: "구마모토시"가 "구마모토"만 매칭되지 않도록)
+  const destKeys = Object.keys(DESTINATION_TO_REGION).sort((a, b) => b.length - a.length);
+  for (const key of destKeys) {
+    if (t.includes(key)) hints.add(key);
+  }
+  const areaKeys = Object.keys(AREA_TO_REGIONS).sort((a, b) => b.length - a.length);
+  for (const key of areaKeys) {
+    if (t.includes(key)) hints.add(key);
+  }
+  return Array.from(hints);
+}
 
 /**
  * @param {string[]|{ name: string, lat?: number, lon?: number }[]} destinations
@@ -196,13 +225,25 @@ function extractTagsFromPreferences(preferences) {
 
 /**
  * Build RAG context for itinerary generation.
- * @param {{ destinations: string[], preferences?: string, duration?: number }} params
+ * @param {{ destinations: string[], preferences?: string, duration?: number, hintText?: string }} params
+ * @param {string} [params.hintText] - 사용자 메시지 등. 여기서 추출한 여행지명(구마모토 등)을 RAG 조회에 추가함.
  * @returns {Promise<{ placesText: string, placeCount: number, places: Array }>}
  */
-export async function getRAGContext({ destinations, preferences, duration }) {
+export async function getRAGContext({ destinations, preferences, duration, hintText }) {
   const result = { placesText: '', placeCount: 0, places: [] };
   try {
-    const regions = destinationsToRegions(destinations || []);
+    let destList = Array.isArray(destinations) ? [...destinations] : [];
+    if (hintText) {
+      const fromHint = extractDestinationHintsFromText(hintText);
+      const existing = new Set(destList.map((d) => (typeof d === 'string' ? d : d?.name ?? '').toString().trim()));
+      for (const h of fromHint) {
+        if (h && !existing.has(h)) {
+          destList.push(h);
+          existing.add(h);
+        }
+      }
+    }
+    const regions = destinationsToRegions(destList);
     if (regions.length === 0) return result;
 
     const selectCols = 'id, region, name_ko, type, description, tags, price_range, opening_hours, image_url, google_place_id, address, lat, lon';
@@ -276,4 +317,41 @@ export async function getRAGContext({ destinations, preferences, duration }) {
     console.warn('[RAG] getRAGContext error:', err);
     return result;
   }
+}
+
+/**
+ * 일정 아이템들의 좌표로부터 region 코드 목록 추출 (여행지 추가 제안용).
+ * @param {Array<{ detail?: { lat?: number, lon?: number } }>} items
+ * @returns {string[]} region 코드 (예: ["kumamoto"])
+ */
+export function getRegionsFromItems(items) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const regions = new Set();
+  for (const item of items) {
+    const lat = item.detail?.lat != null ? Number(item.detail.lat) : null;
+    const lon = item.detail?.lon != null ? Number(item.detail.lon) : null;
+    if (lat != null && lon != null && !Number.isNaN(lat) && !Number.isNaN(lon)) {
+      const r = findRegionByCoords(lat, lon);
+      if (r) regions.add(r);
+    }
+  }
+  return Array.from(regions);
+}
+
+/**
+ * 여행지 목록(destinations)을 region 코드 목록으로 변환.
+ * @param {string[]|{ name: string }[]} destinations
+ * @returns {string[]} region 코드 (예: ["fukuoka", "kumamoto"])
+ */
+export function getRegionCodesFromDestinations(destinations) {
+  return destinationsToRegions(destinations || []);
+}
+
+/**
+ * region 코드 → 한글 표시명 (다이얼로그 문구용).
+ * @param {string} region - 예: "kumamoto"
+ * @returns {string} 예: "구마모토"
+ */
+export function getRegionDisplayName(region) {
+  return REGION_DISPLAY_NAMES[region] || region;
 }

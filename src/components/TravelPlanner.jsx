@@ -9,9 +9,10 @@ import { loadCustomData, mergeData, generateDaySummary } from "../data/storage";
 import { TYPE_CONFIG } from "../data/guides";
 import { COLOR, SPACING, RADIUS, TYPE_LABELS, getTypeConfig } from "../styles/tokens";
 /* Service imports */
-import { getTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
+import { getTrip, updateTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
 import { loadSchedule, saveSchedule, subscribeToSchedule, createDebouncedSave } from "../services/scheduleService";
 import { getMyRole, getShareLink } from "../services/memberService";
+import { getRegionsFromItems, getRegionCodesFromDestinations, getRegionDisplayName } from "../services/ragService";
 
 /* Common component imports */
 import Icon from "./common/Icon";
@@ -21,6 +22,7 @@ import Field from "./common/Field";
 import Tab from "./common/Tab";
 import ConfirmDialog from "./common/ConfirmDialog";
 import Toast from "./common/Toast";
+import Checkbox from "./common/Checkbox";
 import EmptyState from "./common/EmptyState";
 import ScheduleSkeleton from "./common/ScheduleSkeleton";
 import IconContainer from "./common/IconContainer";
@@ -89,6 +91,9 @@ export default function TravelPlanner() {
   const [showPasteInfo, setShowPasteInfo] = useState(false);
   const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
   const [selectedBulkKeys, setSelectedBulkKeys] = useState(() => new Set());
+  /** 일정 추가 직후 새 지역이 있으면 "여행지에 추가할까요?" 시트. 여러 개일 때 선택 가능 */
+  const [addDestinationSheet, setAddDestinationSheet] = useState(null);
+  const [addDestinationSelected, setAddDestinationSelected] = useState(() => new Set());
   const todayInitDone = useRef(false);
 
   /* ── Debounced save ref ── */
@@ -671,7 +676,18 @@ export default function TravelPlanner() {
     });
     const isEdit = itemIdx !== undefined && itemIdx !== null;
     setToast({ message: isEdit ? "일정이 수정되었습니다" : "일정이 추가되었습니다", icon: isEdit ? "edit" : "check" });
-  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget, baseLen, customData, tripId, isLegacy]);
+    // 일정 추가 직후에만: 새 지역이 있으면 "여행지에 추가할까요?" 시트 (직접 추가·AI·붙여넣기 공통)
+    if (!isEdit && !isLegacy && tripId && Array.isArray(tripMeta?.destinations)) {
+      const itemRegions = getRegionsFromItems([newItem]);
+      const currentRegions = getRegionCodesFromDestinations(tripMeta.destinations);
+      const newRegionCodes = itemRegions.filter((r) => !currentRegions.includes(r));
+      const newRegionNames = newRegionCodes.map(getRegionDisplayName).filter(Boolean);
+      if (newRegionNames.length > 0) {
+        setAddDestinationSelected(new Set(newRegionNames));
+        setAddDestinationSheet({ regionNames: newRegionNames, regionCodes: newRegionCodes });
+      }
+    }
+  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget, baseLen, customData, tripId, isLegacy, tripMeta]);
 
   /* 삭제 실행 로직 (확인 다이얼로그 바깥에서 재사용) */
   const performDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
@@ -876,7 +892,18 @@ export default function TravelPlanner() {
       });
       setToast({ message: `${items.length}개 일정이 추가되었습니다`, icon: "check" });
     }
-  }, [updateCustomData, toOrigIdx, selectedDay, baseLen]);
+    // 일정 추가 직후에만: 새 지역이 있으면 "여행지에 추가할까요?" 시트 (여러 개일 때 선택 가능)
+    if (!isLegacy && tripId && Array.isArray(tripMeta?.destinations)) {
+      const itemRegions = getRegionsFromItems(items);
+      const currentRegions = getRegionCodesFromDestinations(tripMeta.destinations);
+      const newRegionCodes = itemRegions.filter((r) => !currentRegions.includes(r));
+      const newRegionNames = newRegionCodes.map(getRegionDisplayName).filter(Boolean);
+      if (newRegionNames.length > 0) {
+        setAddDestinationSelected(new Set(newRegionNames));
+        setAddDestinationSheet({ regionNames: newRegionNames, regionCodes: newRegionCodes });
+      }
+    }
+  }, [updateCustomData, toOrigIdx, selectedDay, baseLen, isLegacy, tripId, tripMeta]);
 
   /* ── Share link copy ── */
   const handleCopyShareLink = useCallback(async () => {
@@ -1496,6 +1523,64 @@ export default function TravelPlanner() {
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
         />
+      )}
+
+      {/* 여행지 추가 시트: 일정 추가 직후 새 지역이 있으면 표시. 여러 개일 때 선택 가능 */}
+      {addDestinationSheet && (
+        <BottomSheet
+          title="여행지 추가"
+          onClose={() => { setAddDestinationSheet(null); setAddDestinationSelected(new Set()); }}
+          zIndex={9500}
+        >
+          <div style={{ padding: SPACING.xxl, display: "flex", flexDirection: "column", gap: SPACING.xl }}>
+            <p style={{ margin: 0, fontSize: "var(--typo-body-2-n---regular-size)", color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>
+              여행지가 추가되었습니다. 아래 여행지를 해당 여행의 여행지에 추가할까요?
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: SPACING.md }}>
+              {addDestinationSheet.regionNames.map((name) => (
+                <Checkbox
+                  key={name}
+                  label={name}
+                  checked={addDestinationSelected.has(name)}
+                  onChange={() => {
+                    setAddDestinationSelected((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(name)) next.delete(name);
+                      else next.add(name);
+                      return next;
+                    });
+                  }}
+                />
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: SPACING.md, marginTop: SPACING.md }}>
+              <Button
+                variant="neutral"
+                size="lg"
+                style={{ flex: 1 }}
+                onClick={() => { setAddDestinationSheet(null); setAddDestinationSelected(new Set()); }}
+              >
+                나중에
+              </Button>
+              <Button
+                variant="primary"
+                size="lg"
+                style={{ flex: 1 }}
+                onClick={async () => {
+                  const toAdd = Array.from(addDestinationSelected);
+                  setAddDestinationSheet(null);
+                  setAddDestinationSelected(new Set());
+                  if (toAdd.length === 0 || !tripId || !tripMeta) return;
+                  const nextDest = [...(tripMeta.destinations || []), ...toAdd];
+                  const updated = await updateTrip(tripId, { destinations: nextDest });
+                  if (updated) setTripMeta((prev) => (prev ? { ...prev, destinations: nextDest } : prev));
+                }}
+              >
+                추가할게요
+              </Button>
+            </div>
+          </div>
+        </BottomSheet>
       )}
 
       {/* 날짜 ··· 메뉴: 이름 수정(인라인) / 이 날짜 삭제 */}
