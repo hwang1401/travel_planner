@@ -10,7 +10,7 @@ import { TYPE_CONFIG } from "../data/guides";
 import { COLOR, SPACING, RADIUS, TYPE_LABELS, getTypeConfig } from "../styles/tokens";
 /* Service imports */
 import { getTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
-import { loadSchedule, subscribeToSchedule, createDebouncedSave } from "../services/scheduleService";
+import { loadSchedule, saveSchedule, subscribeToSchedule, createDebouncedSave } from "../services/scheduleService";
 import { getMyRole, getShareLink } from "../services/memberService";
 
 /* Common component imports */
@@ -600,8 +600,62 @@ export default function TravelPlanner() {
       return { ...next };
     });
     setEditTarget(null);
-    // 수정 저장 직후 즉시 서버/로컬에 반영 (디바운스 대기 없이)
-    debouncedSaveRef.current?.flush?.();
+    // 수정 저장 직후 머지된 데이터를 즉시 서버에 저장 (시간표·detail 누락 방지). customData 기반으로 next 계산 후 저장.
+    const prev = customData;
+    const nextForSave = (() => {
+      const next = { ...prev };
+      if (sectionIdx === -1) {
+        if (!next[dayIdx]) next[dayIdx] = {};
+        if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
+        if (itemIdx !== undefined && itemIdx !== null) {
+          const oldItem = editTarget?.item;
+          if (oldItem) {
+            const idx = next[dayIdx].extraItems.findIndex((it) => it.time === oldItem.time && it.desc === oldItem.desc);
+            if (idx >= 0) {
+              next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+              next[dayIdx].extraItems[idx] = newItem;
+            }
+          }
+        } else {
+          next[dayIdx].extraItems.push(newItem);
+        }
+      } else {
+        if (!next[dayIdx]) next[dayIdx] = {};
+        if (!next[dayIdx].sections) next[dayIdx].sections = {};
+        if (!next[dayIdx].sections[sectionIdx]) {
+          const sourceSec = baseLen > 0 ? BASE_DAYS[dayIdx]?.sections?.[sectionIdx] : next._extraDays?.[dayIdx - baseLen]?.sections?.[sectionIdx];
+          next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec?.items || [])] };
+        }
+        if (itemIdx !== undefined && itemIdx !== null) {
+          next[dayIdx] = { ...next[dayIdx] };
+          next[dayIdx].sections = { ...next[dayIdx].sections };
+          const sec = next[dayIdx].sections[sectionIdx];
+          const newItems = [...(sec.items || [])];
+          newItems[itemIdx] = newItem;
+          next[dayIdx].sections[sectionIdx] = { ...sec, items: newItems };
+          if (baseLen === 0 && next._extraDays?.[dayIdx]) {
+            const ed = next._extraDays[dayIdx];
+            const edSections = ed.sections || [];
+            const edSec = edSections[sectionIdx];
+            if (edSec && Array.isArray(edSec.items) && itemIdx < edSec.items.length) {
+              const edNewItems = [...edSec.items];
+              edNewItems[itemIdx] = newItem;
+              const nextExtra = [...next._extraDays];
+              nextExtra[dayIdx] = { ...ed, sections: edSections.map((s, i) => (i === sectionIdx ? { ...s, items: edNewItems } : s)) };
+              next._extraDays = nextExtra;
+            }
+          }
+        }
+      }
+      return next;
+    })();
+    if (tripId && !isLegacy && debouncedSaveRef.current) {
+      skipNextRealtimeRef.current = true;
+      debouncedSaveRef.current.cancel?.();
+      saveSchedule(tripId, nextForSave).catch((err) => console.error('[TravelPlanner] Immediate save after edit failed:', err));
+    } else if (isLegacy) {
+      debouncedSaveRef.current?.flush?.();
+    }
     // 수정한 항목이 지금 정보 다이얼로그에 열려 있으면 activeDetail 갱신 (시간표 등 반영)
     setActiveDetail((prev) => {
       if (!prev || prev._si !== sectionIdx || prev._ii !== itemIdx) return prev;
@@ -610,7 +664,7 @@ export default function TravelPlanner() {
     });
     const isEdit = itemIdx !== undefined && itemIdx !== null;
     setToast({ message: isEdit ? "일정이 수정되었습니다" : "일정이 추가되었습니다", icon: isEdit ? "edit" : "check" });
-  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget, baseLen]);
+  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget, baseLen, customData, tripId, isLegacy]);
 
   /* 삭제 실행 로직 (확인 다이얼로그 바깥에서 재사용) */
   const performDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
