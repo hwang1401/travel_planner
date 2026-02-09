@@ -773,14 +773,19 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
             </Button>
 
             {generating && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, padding: SPACING.lg, background: 'var(--color-primary-container)', borderRadius: RADIUS.md }}>
-                <div style={{ display: 'flex', gap: '3px' }}>
-                  {[0, 1, 2].map((d) => (
-                    <div key={d} style={{ width: '5px', height: '5px', borderRadius: RADIUS.full, background: 'var(--color-primary)', animation: `bounce 1.2s infinite ${d * 0.2}s` }} />
-                  ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm, padding: SPACING.lg, background: 'var(--color-primary-container)', borderRadius: RADIUS.md }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+                  <div style={{ display: 'flex', gap: '3px' }}>
+                    {[0, 1, 2].map((d) => (
+                      <div key={d} style={{ width: '5px', height: '5px', borderRadius: RADIUS.full, background: 'var(--color-primary)', animation: `bounce 1.2s infinite ${d * 0.2}s` }} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)' }}>
+                    {genStatusMsg || '일정을 생성하고 있습니다...'}
+                  </span>
                 </div>
-                <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)' }}>
-                  {genStatusMsg || '일정을 생성하고 있습니다...'}
+                <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)', opacity: 0.9 }}>
+                  1~2분 걸릴 수 있어요. 화면을 끄지 마세요.
                 </span>
               </div>
             )}

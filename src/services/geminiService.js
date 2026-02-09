@@ -7,7 +7,9 @@ import { getRAGContext } from './ragService.js';
 import { matchTimetableRoute, findBestTrain } from '../data/timetable.js';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
+const API_URL = API_KEY
+  ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`
+  : null;
 
 /** Convert raw API error to user-friendly Korean message */
 function friendlyError(rawMsg, status) {
@@ -59,16 +61,36 @@ function extractText(data) {
 }
 
 /**
- * Fetch with auto-retry on rate limit (up to 2 retries).
+ * Fetch with auto-retry on rate limit and on network failure (Load failed / timeout).
  * onStatus callback for UI updates (e.g. "30초 대기 중...")
  */
 async function fetchWithRetry(body, { maxRetries = 2, onStatus } = {}) {
+  if (!API_URL) {
+    return { ok: false, status: 0, _errMsg: "AI API 키가 설정되지 않았습니다. 배포 환경 변수(VITE_GEMINI_API_KEY)를 확인해 주세요." };
+  }
+  let lastNetErr = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let response;
+    try {
+      if (attempt > 0 && lastNetErr) {
+        const waitSec = 3 + attempt * 2;
+        if (onStatus) onStatus(`연결이 끊겼어요. ${waitSec}초 후 재시도 (${attempt}/${maxRetries})...`);
+        await sleep(waitSec * 1000);
+      }
+      response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      lastNetErr = null;
+    } catch (netErr) {
+      lastNetErr = netErr;
+      if (attempt === maxRetries) {
+        const msg = netErr?.message || "";
+        return { ok: false, status: 0, _errMsg: `네트워크 오류: ${msg}. 요청이 길어 끊겼을 수 있어요. 잠시 후 다시 시도해 주세요.` };
+      }
+      continue;
+    }
 
     if (response.ok) return response;
 
@@ -565,9 +587,9 @@ function injectRAGData(days, ragPlaces) {
   return days;
 }
 
-/** 장기 일정은 7일 단위로 나눠 요청 (MAX_TOKENS 방지) */
+/** 장기 일정은 7일 단위로 나눠 요청 (MAX_TOKENS·무료플랜 한도 방지) */
 const CHUNK_DAYS = 7;
-const MAX_SINGLE_REQUEST_DAYS = 14;
+const MAX_SINGLE_REQUEST_DAYS = 7;
 
 const TRIP_GEN_CHUNK_SYSTEM_PROMPT = `${TRIP_GEN_SYSTEM_PROMPT}
 
@@ -575,7 +597,7 @@ const TRIP_GEN_CHUNK_SYSTEM_PROMPT = `${TRIP_GEN_SYSTEM_PROMPT}
 
 /**
  * Generate a full multi-day trip schedule using AI.
- * For duration > 14 days, generates in chunks of 7 days to avoid MAX_TOKENS.
+ * For duration > 7 days, generates in chunks of 7 days to avoid MAX_TOKENS / free-tier limits.
  * @param {Object} params
  * @param {string[]} params.destinations - e.g. ["오사카", "교토"]
  * @param {number} params.duration - number of days
