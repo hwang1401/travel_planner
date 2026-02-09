@@ -667,8 +667,9 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         ) : (
         /* ── Single item form tab ──
          * 순서: 일정명 → 유형·시간 → 주소 → 부가정보 → 메모 → 포인트 → (수정 시만 영업시간·가격) → 이미지 → 시간표
+         * 하단 고정 버튼에 가리지 않도록 paddingBottom 여유
          */
-        <div style={{ padding: "16px 20px 24px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ padding: "16px 20px calc(24px + 80px)", display: "flex", flexDirection: "column", gap: "12px" }}>
           {/* 일정명 */}
           <Field label="일정명" required size="lg" variant="outlined"
             value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="예: 캐널시티 라멘스타디움" />

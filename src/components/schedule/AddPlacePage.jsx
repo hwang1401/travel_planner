@@ -100,43 +100,35 @@ function FitResults({ positions }) {
   return null;
 }
 
-/* ── 커스텀 시간 선택 UI (BottomSheet 한 화면) ── */
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const MINUTES = [0, 15, 30, 45];
+/* ── 시간 선택 UI: 앱용 팝업 다이얼로그 (잘림 없이 전체 스크롤) ── */
+const TIME_OPTIONS = (() => {
+  const list = [];
+  for (let h = 0; h < 24; h++) {
+    for (const m of [0, 15, 30, 45]) {
+      list.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  return list;
+})();
 
 const FIELD_LG_HEIGHT = 'var(--height-lg, 36px)';
 const FIELD_LG_PX = 'var(--spacing-sp140, 14px)';
 const FIELD_RADIUS = 'var(--radius-md, 8px)';
 
 function TimePicker({ value, onChange, label, error }) {
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const parsed = (value || '').match(/^(\d{1,2}):(\d{2})$/)
-    ? value.split(':').map(Number)
-    : [9, 0];
-  const [h, m] = parsed;
-  const safeH = Math.min(23, Math.max(0, h ?? 9));
-  const safeM = MINUTES.includes(m) ? m : MINUTES[0];
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [viewportRect, setViewportRect] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
 
-  const [pendingH, setPendingH] = useState(safeH);
-  const [pendingM, setPendingM] = useState(safeM);
-
-  const displayText = value && value.match(/^\d{1,2}:\d{2}$/)
-    ? `${String(safeH).padStart(2, '0')}:${String(safeM).padStart(2, '0')}`
-    : '';
-
-  const openSheet = () => {
-    setPendingH(safeH);
-    setPendingM(safeM);
-    setSheetOpen(true);
-  };
-
-  const handleConfirm = () => {
-    const hh = String(pendingH).padStart(2, '0');
-    const mm = String(pendingM).padStart(2, '0');
-    onChange(`${hh}:${mm}`);
-    setSheetOpen(false);
-  };
-
+  const displayText = value && value.match(/^\d{1,2}:\d{2}$/) ? value : '';
   const borderColor = error
     ? 'var(--color-error)'
     : 'var(--color-outline-variant)';
@@ -154,6 +146,10 @@ function TimePicker({ value, onChange, label, error }) {
     color: 'var(--color-on-surface-variant)',
   };
 
+  const dialogStyle = viewportRect
+    ? { position: 'fixed', top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height, zIndex: 2000 }
+    : { position: 'fixed', inset: 0, zIndex: 2000 };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: '60px' }}>
       {label && (
@@ -164,8 +160,8 @@ function TimePicker({ value, onChange, label, error }) {
       <div
         role="button"
         tabIndex={0}
-        onClick={openSheet}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheet(); } }}
+        onClick={() => setDialogOpen(true)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDialogOpen(true); } }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -206,12 +202,42 @@ function TimePicker({ value, onChange, label, error }) {
         </div>
       )}
 
-      {sheetOpen && (
-        <BottomSheet onClose={() => setSheetOpen(false)} maxHeight="40vh" zIndex="var(--z-confirm)">
-          <div style={{ padding: `${SPACING.sm} 0 0` }}>
+      {dialogOpen && (
+        <div
+          style={{
+            ...dialogStyle,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.4)',
+            padding: 20,
+            boxSizing: 'border-box',
+          }}
+          onClick={() => setDialogOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-label="시간 선택"
+            style={{
+              width: '100%',
+              maxWidth: 320,
+              maxHeight: viewportRect ? viewportRect.height - 80 : '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'var(--color-surface-container-lowest)',
+              borderRadius: RADIUS.lg,
+              boxShadow: '0 16px 48px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div style={{
-              padding: `${SPACING.sm} ${SPACING.xxl} ${SPACING.lg}`,
+              flexShrink: 0,
+              padding: `${SPACING.md} ${SPACING.xl}`,
               borderBottom: '1px solid var(--color-outline-variant)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}>
               <span style={{
                 fontSize: 'var(--typo-body-2-n---bold-size)',
@@ -220,114 +246,44 @@ function TimePicker({ value, onChange, label, error }) {
               }}>
                 시간 선택
               </span>
+              <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={() => setDialogOpen(false)} aria-label="닫기" />
             </div>
-            {/* 시 · 분 두 열 나란히 */}
             <div style={{
-              display: 'flex',
-              gap: 0,
-              maxHeight: 'calc(40vh - 120px)',
-              borderTop: '1px solid var(--color-outline-variant)',
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              paddingBottom: 16,
+              WebkitOverflowScrolling: 'touch',
             }}>
-              {/* 시 (왼쪽 열) */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <div style={{
-                  padding: `${SPACING.sm} ${SPACING.lg} ${SPACING.xs}`,
-                  fontSize: 'var(--typo-caption-2-bold-size)',
-                  color: 'var(--color-on-surface-variant)',
-                  borderBottom: '1px solid var(--color-surface-dim)',
-                  flexShrink: 0,
-                }}>
-                  시
-                </div>
-                <div style={{ overflowY: 'auto', flex: 1 }}>
-                  {HOURS.map((hour) => {
-                    const isActive = pendingH === hour;
-                    return (
-                      <div
-                        key={hour}
-                        onClick={() => setPendingH(hour)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: SPACING.md,
-                          padding: `${SPACING.lg} ${SPACING.lg}`,
-                          cursor: 'pointer',
-                          background: isActive ? 'var(--color-primary-container)' : 'transparent',
-                          transition: 'background 0.1s',
-                          borderBottom: '1px solid var(--color-surface-dim)',
-                        }}
-                      >
-                        <span style={{
-                          fontSize: 'var(--typo-label-1-n---regular-size)',
-                          fontWeight: isActive ? 'var(--typo-label-1-n---bold-weight)' : 'var(--typo-label-1-n---regular-weight)',
-                          color: isActive ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)',
-                        }}>
-                          {String(hour).padStart(2, '0')}시
-                        </span>
-                        {isActive && <Icon name="check" size={16} />}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              {/* 분 (오른쪽 열) */}
-              <div style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                minWidth: 0,
-                borderLeft: '1px solid var(--color-outline-variant)',
-              }}>
-                <div style={{
-                  padding: `${SPACING.sm} ${SPACING.lg} ${SPACING.xs}`,
-                  fontSize: 'var(--typo-caption-2-bold-size)',
-                  color: 'var(--color-on-surface-variant)',
-                  borderBottom: '1px solid var(--color-surface-dim)',
-                  flexShrink: 0,
-                }}>
-                  분
-                </div>
-                <div style={{ overflowY: 'auto', flex: 1 }}>
-                  {MINUTES.map((min) => {
-                    const isActive = pendingM === min;
-                    return (
-                      <div
-                        key={min}
-                        onClick={() => setPendingM(min)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: SPACING.md,
-                          padding: `${SPACING.lg} ${SPACING.lg}`,
-                          cursor: 'pointer',
-                          background: isActive ? 'var(--color-primary-container)' : 'transparent',
-                          transition: 'background 0.1s',
-                          borderBottom: '1px solid var(--color-surface-dim)',
-                        }}
-                      >
-                        <span style={{
-                          fontSize: 'var(--typo-label-1-n---regular-size)',
-                          fontWeight: isActive ? 'var(--typo-label-1-n---bold-weight)' : 'var(--typo-label-1-n---regular-weight)',
-                          color: isActive ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)',
-                        }}>
-                          {String(min).padStart(2, '0')}분
-                        </span>
-                        {isActive && <Icon name="check" size={16} />}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div style={{ padding: SPACING.lg, borderTop: '1px solid var(--color-outline-variant)' }}>
-              <Button variant="primary" size="lg" fullWidth onClick={handleConfirm}>
-                확인
-              </Button>
+              {TIME_OPTIONS.map((t) => {
+                const isActive = value === t;
+                return (
+                  <div
+                    key={t}
+                    role="option"
+                    aria-selected={isActive}
+                    onClick={() => {
+                      onChange(t);
+                      setDialogOpen(false);
+                    }}
+                    style={{
+                      padding: '12px 16px',
+                      cursor: 'pointer',
+                      background: isActive ? 'var(--color-primary-container)' : 'transparent',
+                      color: isActive ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)',
+                      fontSize: 'var(--typo-label-1-n---regular-size)',
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'background 0.1s',
+                      borderBottom: '1px solid var(--color-surface-dim)',
+                    }}
+                  >
+                    {t}
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </BottomSheet>
+        </div>
       )}
     </div>
   );

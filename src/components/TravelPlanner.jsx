@@ -87,6 +87,8 @@ export default function TravelPlanner() {
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showAddPlace, setShowAddPlace] = useState(false);
   const [showPasteInfo, setShowPasteInfo] = useState(false);
+  const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
+  const [selectedBulkKeys, setSelectedBulkKeys] = useState(() => new Set());
   const todayInitDone = useRef(false);
 
   /* ── Debounced save ref ── */
@@ -266,6 +268,54 @@ export default function TravelPlanner() {
     return null;
   }, [current, DAYS]);
 
+  /* ── Current day items (flat list with si, ii) for bulk delete and detail nav ── */
+  const currentDayItems = useMemo(() => {
+    if (!current?.sections) return [];
+    const list = [];
+    current.sections.forEach((sec, si) => {
+      (sec.items || []).filter(Boolean).forEach((item, ii) => {
+        list.push({ item, si, ii, section: sec });
+      });
+    });
+    return list;
+  }, [current]);
+
+  /* ── Detail payloads for current day (for modal prev/next) ── */
+  const allDetailPayloads = useMemo(() => {
+    return currentDayItems.map(({ item, si, ii, section }) => {
+      const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
+      const resolvedLoc = getItemCoords(item, selectedDay);
+      const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
+      const enrichedItem = resolvedAddress && !item.detail?.address
+        ? { ...item, detail: { ...(item.detail || {}), address: resolvedAddress, name: item.detail?.name || item.desc, category: item.detail?.category || TYPE_LABELS[item.type] || "정보" } }
+        : item;
+      const detail = enrichedItem.detail || {};
+      return {
+        ...detail,
+        name: detail.name || enrichedItem.desc || "",
+        category: detail.category || TYPE_LABELS[enrichedItem.type] || "정보",
+        timetable: detail.timetable ?? enrichedItem.detail?.timetable,
+        _item: enrichedItem,
+        _si: effectiveSi,
+        _ii: ii,
+        _di: selectedDay,
+      };
+    });
+  }, [currentDayItems, selectedDay]);
+
+  const currentDetailIndex = (() => {
+    if (activeDetail == null || allDetailPayloads.length === 0) return -1;
+    const explicit = activeDetail._index;
+    if (typeof explicit === "number" && explicit >= 0 && explicit < allDetailPayloads.length) return explicit;
+    return allDetailPayloads.findIndex((p) => p._si === activeDetail._si && p._ii === activeDetail._ii && p._di === activeDetail._di);
+  })();
+
+  const onDetailNavigateToIndex = useCallback((index) => {
+    if (index >= 0 && index < allDetailPayloads.length) {
+      setActiveDetail({ ...allDetailPayloads[index], _index: index });
+    }
+  }, [allDetailPayloads]);
+
   /* ── Compute route summary for current day ── */
   const routeSummary = useMemo(() => {
     if (!current) return null;
@@ -312,6 +362,28 @@ export default function TravelPlanner() {
     if (!tripMeta) return "";
     return formatDateRange(tripMeta);
   }, [isLegacy, tripMeta]);
+
+  /* ── Display day number and date (order + trip dates) ── */
+  const displayDayInfo = useMemo(() => {
+    const DAY_WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+    const formatMd = (date) => {
+      const m = date.getMonth() + 1;
+      const d_ = date.getDate();
+      const w = DAY_WEEK[date.getDay()];
+      return `${m}/${d_} (${w})`;
+    };
+    return DAYS.map((day, i) => {
+      const displayDayNumber = i + 1;
+      let displayDate = day.date;
+      if (!isLegacy && tripMeta?.startDate) {
+        const start = new Date(tripMeta.startDate);
+        const d = new Date(start);
+        d.setDate(d.getDate() + i);
+        displayDate = formatMd(d);
+      }
+      return { displayDayNumber, displayDate };
+    });
+  }, [DAYS, isLegacy, tripMeta?.startDate]);
 
   /* ── Handlers ── */
   const handleAddDay = useCallback((label, icon, dayNum, overwrite = false) => {
@@ -401,6 +473,8 @@ export default function TravelPlanner() {
           delete next._dayOrder;
           return { ...next };
         });
+        // 삭제 직후 즉시 저장해 서버에 반영 (debounce만 쓰면 새 Day 추가 전에 저장 안 되어 삭제했던 일정이 다시 불러와질 수 있음)
+        debouncedSaveRef.current?.flush?.();
         setSelectedDay((prev) => Math.max(0, prev - 1));
         setConfirmDialog(null);
         setToast({ message: "날짜가 삭제되었습니다", icon: "trash" });
@@ -605,6 +679,71 @@ export default function TravelPlanner() {
       },
     });
   }, [performDeleteItem, toOrigIdx, selectedDay]);
+
+  const handleBulkDeleteConfirm = useCallback(() => {
+    const dayIdx = toOrigIdx(selectedDay);
+    const keys = Array.from(selectedBulkKeys);
+    const entries = keys.map((k) => {
+      const [si, ii] = k.split("-").map(Number);
+      return currentDayItems.find((e) => e.si === si && e.ii === ii);
+    }).filter(Boolean);
+    const extraEntries = entries.filter((e) => e.item._extra);
+    const sectionEntries = entries.filter((e) => !e.item._extra);
+    const sectionDesc = [...sectionEntries].sort((a, b) => (b.si !== a.si ? b.si - a.si : b.ii - a.ii));
+
+    updateCustomData((prev) => {
+      const next = { ...prev };
+      if (!next[dayIdx]) next[dayIdx] = {};
+
+      if (extraEntries.length > 0 && next[dayIdx].extraItems) {
+        const extraIndices = [];
+        for (const entry of extraEntries) {
+          const idx = next[dayIdx].extraItems.findIndex((it) =>
+            it.time === entry.item.time && it.desc === entry.item.desc
+          );
+          if (idx >= 0) extraIndices.push(idx);
+        }
+        extraIndices.sort((a, b) => b - a);
+        next[dayIdx] = { ...next[dayIdx] };
+        next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+        for (const idx of extraIndices) next[dayIdx].extraItems.splice(idx, 1);
+        if (next[dayIdx].extraItems.length === 0) delete next[dayIdx].extraItems;
+      }
+
+      for (const entry of sectionDesc) {
+        const { si, ii } = entry;
+        if (!next[dayIdx].sections) next[dayIdx].sections = {};
+        if (!next[dayIdx].sections[si]) {
+          const sourceSec = baseLen > 0
+            ? BASE_DAYS[dayIdx]?.sections?.[si]
+            : next._extraDays?.[dayIdx - baseLen]?.sections?.[si];
+          next[dayIdx].sections[si] = { items: [...(sourceSec?.items || [])] };
+        } else {
+          next[dayIdx].sections = { ...next[dayIdx].sections };
+          next[dayIdx].sections[si] = { ...next[dayIdx].sections[si], items: [...next[dayIdx].sections[si].items] };
+        }
+        next[dayIdx].sections[si].items.splice(ii, 1);
+      }
+
+      return { ...next };
+    });
+
+    setBulkDeleteMode(false);
+    setSelectedBulkKeys(new Set());
+    setConfirmDialog(null);
+    setToast({ message: `${keys.length}개 일정이 삭제되었습니다`, icon: "trash" });
+  }, [selectedBulkKeys, selectedDay, toOrigIdx, currentDayItems, updateCustomData, baseLen]);
+
+  const handleBulkDeleteClick = useCallback(() => {
+    const n = selectedBulkKeys.size;
+    if (n === 0) return;
+    setConfirmDialog({
+      title: "일정 일괄 삭제",
+      message: `${n}개 일정을 삭제할까요?`,
+      confirmLabel: "삭제",
+      onConfirm: handleBulkDeleteConfirm,
+    });
+  }, [selectedBulkKeys.size, handleBulkDeleteConfirm]);
 
   /* ── Bulk Import: replace or append ── */
   const handleBulkImport = useCallback((items, mode) => {
@@ -860,14 +999,14 @@ export default function TravelPlanner() {
                       )}
                     </button>
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sp40)", flexWrap: "wrap", marginTop: "var(--spacing-sp20)" }}>
-                      {(current.date || current.stay) && (
+                      {(displayDayInfo[selectedDay]?.displayDate || current.stay) && (
                         <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>
-                          {[current.date, current.stay].filter(Boolean).join(" · ")}
+                          {[displayDayInfo[selectedDay]?.displayDate, current.stay].filter(Boolean).join(" · ")}
                         </span>
                       )}
                       {routeSummary && (
                         <>
-                          {(current.date || current.stay) && <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-outline-variant)" }}>·</span>}
+                          {(displayDayInfo[selectedDay]?.displayDate || current.stay) && <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-outline-variant)" }}>·</span>}
                           <span style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-primary)", fontWeight: 600 }}>
                             {routeSummary}
                           </span>
@@ -876,11 +1015,40 @@ export default function TravelPlanner() {
                     </div>
                   </div>
                   {canEdit && (
-                    <Button variant="primary" size="xsm" iconLeft="plus"
-                      onClick={() => setShowAddSheet(true)}
-                      style={{ borderRadius: "16px", flexShrink: 0 }}>
-                      일정 추가
-                    </Button>
+                    <div style={{ display: "flex", gap: "var(--spacing-sp80)", flexShrink: 0, alignItems: "center" }}>
+                      {!bulkDeleteMode ? (
+                        <>
+                          <Button variant="neutral" size="xsm" iconLeft="trash"
+                            onClick={() => { setBulkDeleteMode(true); setSelectedBulkKeys(new Set()); }}
+                            style={{ borderRadius: "16px" }}
+                            title="일괄 삭제"
+                            aria-label="일괄 삭제">
+                            일괄 삭제
+                          </Button>
+                          <Button variant="primary" size="xsm" iconLeft="plus"
+                            onClick={() => setShowAddSheet(true)}
+                            style={{ borderRadius: "16px" }}>
+                            일정 추가
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button variant="ghost-neutral" size="xsm"
+                            onClick={() => { setBulkDeleteMode(false); setSelectedBulkKeys(new Set()); }}
+                            style={{ borderRadius: "16px" }}
+                            aria-label="취소">
+                            취소
+                          </Button>
+                          <Button variant="primary" size="xsm"
+                            onClick={handleBulkDeleteClick}
+                            disabled={selectedBulkKeys.size === 0}
+                            style={{ borderRadius: "16px" }}
+                            aria-label={`${selectedBulkKeys.size}개 삭제`}>
+                            {selectedBulkKeys.size}개 삭제
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </>
               )}
@@ -930,14 +1098,7 @@ export default function TravelPlanner() {
 
         {/* Timeline — flat list of all items across sections */}
         {current && (() => {
-          // Flatten all section items into one list, preserving section/item indices
-          const allItems = [];
-          current.sections.forEach((sec, si) => {
-            if (!sec.items) return;
-            sec.items.filter(Boolean).forEach((item, ii) => {
-              allItems.push({ item, si, ii, section: sec });
-            });
-          });
+          const allItems = currentDayItems;
 
           if (allItems.length === 0) return (
             <EmptyState
@@ -952,9 +1113,46 @@ export default function TravelPlanner() {
             />
           );
 
+          const allKeys = new Set(allItems.map((e) => `${e.si}-${e.ii}`));
+          const allSelected = allKeys.size > 0 && allKeys.size === selectedBulkKeys.size;
+          const toggleSelectAll = () => {
+            if (allSelected) setSelectedBulkKeys(new Set());
+            else setSelectedBulkKeys(new Set(allKeys));
+          };
+
           let globalOrder = 0;
           return (
             <div>
+              {bulkDeleteMode && allItems.length > 0 && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "6px",
+                  padding: "6px 0 8px", marginBottom: SPACING.sm,
+                  borderBottom: "1px solid var(--color-outline-variant)",
+                }}>
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "6px",
+                      border: "none", background: "none", cursor: "pointer",
+                      fontSize: "var(--typo-caption-1-regular-size)",
+                      color: "var(--color-primary)", fontWeight: 600,
+                      fontFamily: "inherit",
+                    }}
+                    aria-label={allSelected ? "전체 해제" : "전체 선택"}
+                  >
+                    <span style={{
+                      width: 18, height: 18, borderRadius: 4,
+                      border: "2px solid var(--color-outline-variant)",
+                      background: allSelected ? "var(--color-primary)" : "transparent",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {allSelected && <Icon name="check" size={10} style={{ filter: "brightness(0) invert(1)" }} />}
+                    </span>
+                    {allSelected ? "전체 해제" : "전체 선택"}
+                  </button>
+                </div>
+              )}
               {allItems.map((entry, flatIdx) => {
                 const { item, si, ii, section } = entry;
                 const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
@@ -973,7 +1171,22 @@ export default function TravelPlanner() {
                 const prevItem = prevEntry?.item || null;
                 const prevLoc = prevItem ? getItemCoords(prevItem, selectedDay) : null;
 
+                const bulkKey = `${si}-${ii}`;
+                const isBulkSelected = selectedBulkKeys.has(bulkKey);
+                const toggleBulk = () => {
+                  setSelectedBulkKeys((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(bulkKey)) next.delete(bulkKey);
+                    else next.add(bulkKey);
+                    return next;
+                  });
+                };
+
                 const handleClick = () => {
+                  if (bulkDeleteMode) {
+                    toggleBulk();
+                    return;
+                  }
                   const detail = enrichedItem.detail || {};
                   setActiveDetail({
                     ...detail,
@@ -981,11 +1194,12 @@ export default function TravelPlanner() {
                     category: detail.category || TYPE_LABELS[enrichedItem.type] || "정보",
                     timetable: detail.timetable ?? enrichedItem.detail?.timetable,
                     _item: enrichedItem, _si: effectiveSi, _ii: ii, _di: selectedDay,
+                    _index: flatIdx,
                   });
                 };
 
                 return (
-                  <div key={`${si}-${ii}`}>
+                  <div key={bulkKey}>
                     {flatIdx > 0 && (
                       <TravelTimeConnector
                         fromCoords={prevLoc?.coords}
@@ -994,14 +1208,36 @@ export default function TravelPlanner() {
                         toLabel={resolvedAddress || resolvedLoc?.label}
                       />
                     )}
-                    <PlaceCard
-                      item={enrichedItem}
-                      order={itemOrder}
-                      isNow={isNow}
-                      isClickable={isClickable}
-                      onClick={handleClick}
-                      isLast={isLastItem}
-                    />
+                    <div style={{ display: "flex", alignItems: "center", gap: SPACING.md }}>
+                      {bulkDeleteMode && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleBulk(); }}
+                          style={{
+                            flexShrink: 0,
+                            width: 18, height: 18, borderRadius: 4,
+                            border: "2px solid var(--color-outline-variant)",
+                            background: isBulkSelected ? "var(--color-primary)" : "transparent",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            cursor: "pointer", padding: 0,
+                          }}
+                          aria-label={isBulkSelected ? "선택 해제" : "선택"}
+                          aria-checked={isBulkSelected}
+                        >
+                          {isBulkSelected && <Icon name="check" size={10} style={{ filter: "brightness(0) invert(1)" }} />}
+                        </button>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <PlaceCard
+                          item={enrichedItem}
+                          order={itemOrder}
+                          isNow={isNow}
+                          isClickable={!bulkDeleteMode && isClickable}
+                          onClick={handleClick}
+                          isLast={isLastItem}
+                        />
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -1037,6 +1273,9 @@ export default function TravelPlanner() {
           }
         } : undefined}
         onDelete={canEdit && activeDetail?._item?._custom ? handleDeleteFromDetail : undefined}
+        allDetailPayloads={allDetailPayloads}
+        currentDetailIndex={currentDetailIndex}
+        onNavigateToIndex={allDetailPayloads.length > 1 ? onDetailNavigateToIndex : undefined}
       />
 
       {/* Document Dialog */}

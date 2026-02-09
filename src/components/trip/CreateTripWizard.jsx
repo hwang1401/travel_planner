@@ -405,7 +405,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                   justifyContent: 'center',
                 }}>
                   {isDone ? (
-                    <Icon name="check" size={12} style={{ color: 'var(--color-on-primary)' }} />
+                    <Icon name="check" size={12} style={{ filter: 'brightness(0) invert(1)' }} />
                   ) : (
                     <span style={{
                       fontSize: '11px',
