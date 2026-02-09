@@ -1,9 +1,9 @@
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "../common/Icon";
 import Button from "../common/Button";
-import { TYPE_CONFIG } from "../../data/guides";
+import { getTypeConfig, SPACING, RADIUS } from "../../styles/tokens";
 import { TYPE_LABELS } from "../../utils/scheduleParser";
-import { SPACING } from '../../styles/tokens';
 
 /* ── Import Preview Dialog ── */
 export default function ImportPreviewDialog({
@@ -17,6 +17,7 @@ export default function ImportPreviewDialog({
   onCancel,
 }) {
   const hasConflicts = conflicts.internal.length > 0 || conflicts.external.length > 0;
+  const [expandedIndex, setExpandedIndex] = useState(null);
 
   return createPortal(
     <div
@@ -33,7 +34,7 @@ export default function ImportPreviewDialog({
         style={{
           width: "100%", maxWidth: "420px", maxHeight: "80vh",
           background: "var(--color-surface-container-lowest)",
-          borderRadius: "var(--radius-lg, 12px)",
+          borderRadius: RADIUS.lg,
           display: "flex", flexDirection: "column",
           overflow: "hidden",
           boxShadow: "var(--shadow-heavy)",
@@ -70,7 +71,7 @@ export default function ImportPreviewDialog({
               <div style={{
                 padding: `${SPACING.ml} ${SPACING.lg}`, marginBottom: SPACING.md,
                 background: "var(--color-warning-container)",
-                borderRadius: "var(--radius-md, 8px)",
+                borderRadius: RADIUS.md,
                 border: "1px solid var(--color-warning-container)",
               }}>
                 <p style={{
@@ -89,7 +90,7 @@ export default function ImportPreviewDialog({
               <div style={{
                 padding: `${SPACING.ml} ${SPACING.lg}`, marginBottom: SPACING.md,
                 background: "var(--color-error-container)",
-                borderRadius: "var(--radius-md, 8px)",
+                borderRadius: RADIUS.md,
                 border: "1px solid var(--color-error)",
               }}>
                 <p style={{
@@ -125,76 +126,126 @@ export default function ImportPreviewDialog({
           flex: 1, overflowY: "auto", padding: `${SPACING.lg} ${SPACING.xxl}`,
         }}>
           <div style={{
-            borderRadius: "var(--radius-md, 8px)",
+            borderRadius: RADIUS.md,
             border: "1px solid var(--color-outline-variant)",
             overflow: "hidden",
           }}>
             {items.map((item, i) => {
-              const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
+              const cfg = getTypeConfig(item.type);
               const isLast = i === items.length - 1;
               const hasExternalConflict = conflicts.external.some((c) => c.time === item.time && c.newDesc === item.desc);
+              const hasDetail = item.detail && (item.detail.address || item.detail.tip || item.detail.timetable);
+              const isExpanded = expandedIndex === i;
               return (
                 <div
                   key={i}
                   style={{
-                    display: "flex", alignItems: "center", gap: SPACING.md,
-                    padding: `${SPACING.md} ${SPACING.lg}`,
                     borderBottom: isLast ? "none" : "1px solid var(--color-surface-dim)",
                     background: hasExternalConflict ? "var(--color-error-container)" : "transparent",
                   }}
                 >
-                  <span style={{
-                    width: "36px", flexShrink: 0, textAlign: "right",
-                    fontSize: "var(--typo-caption-2-bold-size)",
-                    fontWeight: "var(--typo-caption-2-bold-weight)",
-                    color: "var(--color-on-surface-variant2)",
-                    fontVariantNumeric: "tabular-nums",
-                  }}>
-                    {item.time || "--:--"}
-                  </span>
-                  <div style={{
-                    width: "20px", height: "20px", borderRadius: "var(--radius-sm, 4px)",
-                    background: cfg.bg, border: `1px solid ${cfg.border}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
-                    <Icon name={cfg.icon} size={10} style={{ color: cfg.text }} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{
-                      margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
+                  <div
+                    style={{
+                      display: "flex", alignItems: "flex-start", gap: SPACING.md,
+                      padding: `${SPACING.md} ${SPACING.lg}`,
+                    }}
+                  >
+                    <span style={{
+                      width: "36px", flexShrink: 0, textAlign: "right",
+                      fontSize: "var(--typo-caption-2-bold-size)",
                       fontWeight: "var(--typo-caption-2-bold-weight)",
-                      color: "var(--color-on-surface)",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      color: "var(--color-on-surface-variant2)",
+                      fontVariantNumeric: "tabular-nums",
+                      lineHeight: "var(--typo-caption-2-bold-line-height, 1.25)",
+                      paddingTop: "2px",
                     }}>
-                      {item.desc}
-                    </p>
-                    {(item.sub || item.detail) && (
+                      {item.time || "--:--"}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{
-                        margin: 0, fontSize: "var(--typo-caption-3-regular-size)",
-                        color: "var(--color-on-surface-variant2)",
+                        margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
+                        fontWeight: "var(--typo-caption-2-bold-weight)",
+                        color: "var(--color-on-surface)",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
-                        {item.sub}
-                        {item.sub && item.detail ? " · " : ""}
-                        {item.detail && (
-                          <span style={{ color: "var(--color-primary)", opacity: 0.7 }}>
-                            {[
-                              item.detail.address && "주소",
-                              item.detail.timetable && "영업시간",
-                              item.detail.tip && "상세정보",
-                            ].filter(Boolean).join(" · ")}
-                          </span>
-                        )}
+                        {item.desc}
                       </p>
-                    )}
+                      {(item.sub || item.detail) && (
+                        <p style={{
+                          margin: 0, fontSize: "var(--typo-caption-3-regular-size)",
+                          color: "var(--color-on-surface-variant2)",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {item.sub}
+                          {item.sub && item.detail ? " · " : ""}
+                          {item.detail && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setExpandedIndex(isExpanded ? null : i); }}
+                              style={{
+                                margin: 0, padding: 0, border: "none", background: "none",
+                                color: "var(--color-primary)", cursor: "pointer",
+                                fontSize: "inherit", fontFamily: "inherit",
+                                textDecoration: "underline",
+                                textUnderlineOffset: "2px",
+                              }}
+                            >
+                              {[
+                                item.detail.address && "주소",
+                                item.detail.timetable && "영업시간",
+                                item.detail.tip && "상세정보",
+                              ].filter(Boolean).join(" · ")}
+                            </button>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <span style={{
+                      fontSize: "var(--typo-caption-3-regular-size)",
+                      color: cfg.text, flexShrink: 0,
+                      lineHeight: "var(--typo-caption-2-regular-line-height, 1.25)",
+                      paddingTop: "2px",
+                    }}>
+                      {TYPE_LABELS[item.type] || "정보"}
+                    </span>
                   </div>
-                  <span style={{
-                    fontSize: "var(--typo-caption-3-regular-size)",
-                    color: cfg.text, flexShrink: 0,
-                  }}>
-                    {TYPE_LABELS[item.type] || "정보"}
-                  </span>
+                  {hasDetail && isExpanded && (
+                    <div
+                      style={{
+                        padding: `${SPACING.sm} ${SPACING.lg} ${SPACING.md}`,
+                        paddingLeft: `calc(36px + ${SPACING.md} + ${SPACING.lg})`,
+                        background: "var(--color-surface-container-low)",
+                        borderTop: "1px solid var(--color-outline-variant)",
+                        fontSize: "var(--typo-caption-2-regular-size)",
+                        color: "var(--color-on-surface-variant2)",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {item.detail.address && (
+                        <p style={{ margin: "0 0 6px", fontWeight: 600, color: "var(--color-on-surface)" }}>주소</p>
+                      )}
+                      {item.detail.address && (
+                        <p style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{item.detail.address}</p>
+                      )}
+                      {item.detail.tip && (
+                        <>
+                          <p style={{ margin: "10px 0 6px", fontWeight: 600, color: "var(--color-on-surface)" }}>상세정보</p>
+                          <p style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{item.detail.tip}</p>
+                        </>
+                      )}
+                      {item.detail.timetable && (() => {
+                        const t = item.detail.timetable;
+                        const text = typeof t === "string" ? t : (t.summary || (t.trains?.length ? `열차 ${t.trains.length}편` : null));
+                        if (!text) return null;
+                        return (
+                          <>
+                            <p style={{ margin: "10px 0 6px", fontWeight: 600, color: "var(--color-on-surface)" }}>영업시간</p>
+                            <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{text}</p>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -208,7 +259,7 @@ export default function ImportPreviewDialog({
           display: "flex", gap: SPACING.md,
         }}>
           <Button
-            variant="neutral" size="md"
+            variant="neutral" size="lg"
             onClick={onCancel}
             style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}
           >
@@ -216,7 +267,7 @@ export default function ImportPreviewDialog({
           </Button>
           {existingCount > 0 && (
             <Button
-              variant="neutral" size="md"
+              variant="neutral" size="lg"
               onClick={onAppend}
               style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}
             >
@@ -224,7 +275,7 @@ export default function ImportPreviewDialog({
             </Button>
           )}
           <Button
-            variant="primary" size="md"
+            variant="primary" size="lg"
             onClick={onReplace}
             style={{ flex: 1 }}
           >

@@ -310,16 +310,24 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
 사용자가 여행 목적지, 먹고 싶은 것, 하고 싶은 것 등을 자연어로 말하면
 그에 맞는 하루 일정을 추천해주세요.
 
+message 작성 시:
+- 존댓말(해요체)로 쓰되, 가이드·안내문 같은 공적인 톤은 피하고 친구에게 말하듯 편하게 쓰세요.
+- "~에 오신 것을 환영합니다" 같은 환영 문구는 쓰지 마세요. 사용자 말에 이어지는 대화처럼 쓰세요.
+- 사용자 말을 그대로 반복하거나 길게 요약하지 마세요. 이전 답변에서 이미 말한 내용을 다시 쓰지 마세요. 새로 바뀐 점이나 짧은 코멘트만 1~2문장으로 답하세요.
+- 사용자에게 "참고 장소", "[참고 장소]" 같은 내부 용어를 절대 쓰지 마세요. 목록에 없다고 설명할 때는 "추천 목록에 돈까스 맛집이 없어서요", "저희가 알고 있는 맛집 중에는 OO이 없어서요"처럼 자연스럽게 쓰세요.
+- 예: "그럼 하카타 저녁 맛집 위주로 잡아볼게요.", "나카스 대신 새벽 3시까지 하는 술집으로 바꿔뒀어요." 추천 이유나 코스 설명은 1~3문장으로 간단히.
+
 응답은 반드시 아래 JSON 형식으로만 해주세요. 다른 텍스트는 포함하지 마세요.
 
 {
-  "message": "사용자에게 보여줄 친절한 안내 메시지 (추천 이유, 코스 설명 등을 1~3문장으로)",
+  "message": "사용자 말에 대한 대화체 답변. 추가 정보가 필요하면 질문만 하고 items는 빈 배열.",
   "items": [
     {
       "time": "HH:MM",
       "type": "food|spot|shop|move|flight|stay|info",
-      "desc": "일정 제목 (간결하게)",
+      "desc": "일정 제목 (간결하게, 식사·관광·쇼핑·숙소는 반드시 구체적인 장소명)",
       "sub": "부가 설명 (가격, 소요시간 등)",
+      "rag_id": "123",
       "detail": {
         "address": "주소 (있는 경우)",
         "lat": 33.5894,
@@ -328,8 +336,13 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
         "highlights": ["핵심 포인트 1", "핵심 포인트 2"]
       }
     }
-  ]
+  ],
+  "choices": ["점심", "저녁"]
 }
+
+items: 추가 정보가 필요해 사용자에게 물어볼 때는 items를 빈 배열 []로 두세요. 일정을 만들 때만 items를 채우세요.
+choices: items가 빈 배열일 때만 사용하세요. 사용자가 고를 수 있는 선택지 2~4개를 문자열 배열로 넣으세요. 예: "점심? 저녁?" → choices: ["점심", "저녁"]. 일정을 만들 때(items를 채울 때)는 choices를 빈 배열 []로 두세요.
+rag_id: 사용자 메시지에 [참고 장소] 목록이 있으면, 식사·관광·쇼핑·숙소 추천 시 반드시 그 목록에 있는 장소만 사용하고, 해당 장소의 rag_id를 item에 넣으세요. rag_id는 반드시 문자열로 쓰세요 (예: "rag_id": "775b0632"). JSON에서 배열·객체 마지막 항목 뒤에는 쉼표를 넣지 마세요.
 
 타입 기준:
 - food: 식사, 카페, 간식
@@ -344,14 +357,31 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
 1. 시간순으로 현실적인 일정을 구성해주세요 (이동 시간 고려).
 2. 사용자가 언급한 장소/음식을 반드시 포함하세요.
 3. 이동 구간도 포함하여 실제로 따라할 수 있게 해주세요.
-4. 해당 지역의 유명 맛집, 관광지 위주로 현실적인 장소를 추천해주세요.
-5. sub에 예상 비용이나 소요시간을 넣어주세요.
-6. food, spot, shop, stay 타입은 반드시 detail.address를 포함하세요 (실제 주소 또는 구글맵에서 검색 가능한 장소명).
-7. detail 객체는 address가 있으면 반드시 포함하세요.
-8. message에는 추천 코스를 간단히 설명하고, 이모지를 적절히 사용해주세요.
-9. 보통 하루 일정은 5~10개 항목이 적당합니다.
-10. detail.highlights에는 해당 장소의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등). food, spot, shop 타입은 반드시 포함.
-11. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요.`;
+4. 식사·관광·쇼핑·숙소는 반드시 구체적인 장소명(실제 맛집/명소 이름)을 desc에 넣으세요. "OO 라멘으로 아침"처럼 모호하게 쓰지 말고 "이치란 하카타"처럼 장소명을 쓰세요.
+5. [참고 장소] 목록이 주어지면 그 목록에 있는 장소만 사용하고, 각 item에 rag_id를 반드시 넣으세요.
+6. sub에 예상 비용이나 소요시간을 넣어주세요.
+7. food, spot, shop, stay 타입은 반드시 detail.address를 포함하세요 (실제 주소 또는 구글맵에서 검색 가능한 장소명).
+8. detail 객체는 address가 있으면 반드시 포함하세요.
+9. message는 존댓말(해요체)로, 가이드/공식 톤 말고 친구에게 말하듯 편하게 쓰고, 환영 문구는 쓰지 말고, 추천 코스만 간단히 설명하세요. 이모지는 사용하지 마세요.
+10. 보통 하루 일정은 5~10개 항목이 적당합니다.
+11. detail.highlights에는 해당 장소의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등). food, spot, shop 타입은 반드시 포함.
+12. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요.
+
+부분 수정 (대화가 이어질 때):
+- 사용자에게 [현재 일정]이 주어지면, 사용자가 "OO 말고 XX로", "OO만 바꿔줘", "그거 대신 ~" 등 일부만 수정을 요청한 것으로 간주하세요.
+- 이 경우 전체 일정을 새로 만들지 말고, 기존 일정에서 요청한 부분만 바꾸고 나머지는 그대로 유지한 뒤, 수정된 전체 일정을 items로 반환하세요.
+- message는 "OO 대신 XX로 바꿔뒀어요."처럼 무엇만 바뀌었는지 짧게만 쓰세요.
+- "~시까지 뭐 할 거 없어?", "~시까지 다른 거 없어?", "10시까지 뭐 하라고?"처럼 말하면: 그 시간까지 할 다른 활동(쇼핑, 구경, 산책 등)을 추천해 달라는 뜻입니다. 기존 구간의 시간을 줄이지 말고, 그 시간까지 채울 새 일정(이동+활동)을 추가하세요.
+
+참고 장소 사용 (내부: 사용자 메시지에 붙는 장소 목록. 사용자에게 "참고 장소"라고 말하지 말 것):
+- 사용자 메시지에 [참고 장소] 목록이 포함되어 있으면, 식사·관광·쇼핑·숙소 항목은 반드시 그 목록에 있는 장소만 사용하고, 각 item에 해당 장소의 rag_id를 넣으세요. 목록에 없는 장소는 절대 넣지 마세요 (예: 목록에 돈까스 맛집이 없으면 "돈까스 맛집" 같은 항목을 임의로 만들지 말고, 목록에 있는 라멘/우동 등으로만 구성).
+- 사용자가 "하카타에서 뭐 추천해줘"처럼만 말해도, [참고 장소] 목록이 주어졌으면 그 목록 안의 장소만 사용하세요. 목록에 없는 메뉴/장소 타입(예: 돈까스)을 꾸며 넣지 마세요.
+- 사용자가 요청한 메뉴/장소가 그 목록에 없을 때, message에서는 "추천 목록에 OO이 없어서요", "저희가 가진 맛집 정보에는 OO이 없어서요"처럼만 쓰고, "[참고 장소]"라는 말은 쓰지 마세요.
+
+대화·추가 질문 vs 일정 만들기 (맥락에 따라 판단):
+- 질문이 필요한 경우에만 질문하세요: 사용자 말만으로는 시간대·점심/저녁 등이 불명확할 때만 message에 질문을 쓰고, items: [], choices: ["선택지1", "선택지2"]로 반환하세요.
+- 일정을 만들 조건이 갖춰지면: 사용자가 "점심으로 해줘", "저녁" 등 답했거나, 처음부터 "하카타 맛집 점심 추천해줘"처럼 충분한 정보를 줬으면 items를 채우고 choices: []로 두세요. "타임라인 만들어줘", "일정 짜줘"라고 하면 바로 items를 채우세요.
+- 요약: 맥락상 추가 정보가 필요할 때만 질문(choices 사용). 일정을 만들 수 있을 때는 items를 채우고 choices는 비우세요.`;
 
 /**
  * Get AI schedule recommendations based on natural language input.
@@ -361,9 +391,23 @@ const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 일정 추천 전문
  * @param {string} [dayContext] - e.g. "Day 2 오사카"
  * @returns {Promise<{ message: string, items: Array, error: string|null }>}
  */
-export async function getAIRecommendation(userMessage, chatHistory = [], dayContext = "", { onStatus } = {}) {
+export async function getAIRecommendation(userMessage, chatHistory = [], dayContext = "", { onStatus, destinations, currentItems } = {}) {
   if (!API_KEY) {
     return { message: "", items: [], error: "Gemini API 키가 설정되지 않았습니다" };
+  }
+
+  // RAG: 채팅 추천 시에도 실제 장소 매칭을 위해 목적지가 있으면 참고 장소 목록을 먼저 가져와 프롬프트에 넣음
+  let ragPlaces = [];
+  let ragPlacesText = "";
+  const destArr = Array.isArray(destinations) && destinations.length > 0 ? destinations : [];
+  if (destArr.length > 0) {
+    try {
+      const rag = await getRAGContext({ destinations: destArr, preferences: "", duration: 1 });
+      ragPlaces = rag.places || [];
+      ragPlacesText = rag.placesText || "";
+    } catch (e) {
+      console.warn("[GeminiService] RAG prefetch for chat skipped:", e);
+    }
   }
 
   // Build conversation contents
@@ -377,11 +421,17 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
     });
   }
 
-  // Add current user message
+  // Current user message; if follow-up with existing schedule, append [현재 일정]; if RAG 있으면 [참고 장소] 추가
   const contextPrefix = dayContext ? `[여행 일정: ${dayContext}] ` : "";
+  let currentUserText = contextPrefix + userMessage;
+  if (Array.isArray(currentItems) && currentItems.length > 0) {
+    const scheduleBlock = formatBookedItemsForPrompt(currentItems);
+    if (scheduleBlock) currentUserText += "\n\n[현재 일정]\n" + scheduleBlock;
+  }
+  if (ragPlacesText) currentUserText += "\n\n" + ragPlacesText;
   contents.push({
     role: "user",
-    parts: [{ text: contextPrefix + userMessage }],
+    parts: [{ text: currentUserText }],
   });
 
   try {
@@ -403,16 +453,101 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
       return { message: "", items: [], error: "AI 응답이 비어있습니다" };
     }
 
+    // 마크다운 코드블록 제거 (```json ... ``` 또는 ``` ... ``` 또는 앞만 있는 경우)
+    let raw = text.trim();
+    const codeBlock = raw.match(/^```(?:json)?\s*([\s\S]*?)```$/);
+    if (codeBlock) raw = codeBlock[1].trim();
+    else if (raw.startsWith("```")) {
+      raw = raw.replace(/^```(?:json)?\s*\n?/, "").trim();
+      const end = raw.indexOf("```");
+      if (end !== -1) raw = raw.slice(0, end).trim();
+    }
+
+    // rag_id가 따옴표 없이 나오면 파싱 실패 (예: "rag_id": 775b0632 → 숫자에 b 불가) → 문자열로 감쌈
+    raw = raw.replace(/"rag_id"\s*:\s*([a-zA-Z0-9\-]+)/g, '"rag_id": "$1"');
+
+    // 첫 번째 완전한 JSON 객체 추출 (중괄호 짝 맞추기)
+    function extractFirstJson(str) {
+      const start = str.indexOf("{");
+      if (start === -1) return null;
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      let quote = null;
+      for (let i = start; i < str.length; i++) {
+        const c = str[i];
+        if (escape) { escape = false; continue; }
+        if (c === "\\" && inString) { escape = true; continue; }
+        if (!inString) {
+          if (c === '"' || c === "'") { inString = true; quote = c; continue; }
+          if (c === "{") depth++;
+          else if (c === "}") { depth--; if (depth === 0) return str.slice(start, i + 1); }
+          continue;
+        }
+        if (c === quote) inString = false;
+      }
+      return null;
+    }
+
+    // Trailing comma 제거 (AI가 자주 넣는 불필요한 쉼표)
+    function stripTrailingCommas(s) {
+      let prev = "";
+      while (prev !== s) {
+        prev = s;
+        s = s.replace(/,\s*\]/g, "]").replace(/,\s*\}/g, "}");
+      }
+      return s;
+    }
+
+    // 잘린 JSON 끝 보정: 열린 괄호만큼 ] } 추가
+    function tryCloseTruncated(str) {
+      const trimmed = str.trim();
+      if (trimmed.endsWith("}") && !trimmed.endsWith(",\n")) return trimmed;
+      let depth = 0;
+      let arrayDepth = 0;
+      let inString = false;
+      let escape = false;
+      let q = null;
+      for (let i = trimmed.indexOf("{"); i < trimmed.length; i++) {
+        const c = trimmed[i];
+        if (escape) { escape = false; continue; }
+        if (c === "\\" && inString) { escape = true; continue; }
+        if (!inString) {
+          if (c === '"' || c === "'") { inString = true; q = c; continue; }
+          if (c === "{") depth++;
+          else if (c === "}") depth--;
+          else if (c === "[") arrayDepth++;
+          else if (c === "]") arrayDepth--;
+          continue;
+        }
+        if (c === q) inString = false;
+      }
+      let suffix = "";
+      while (arrayDepth > 0) { suffix += "]"; arrayDepth--; }
+      while (depth > 0) { suffix += "}"; depth--; }
+      return trimmed + suffix;
+    }
+
     let parsed;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(raw);
     } catch {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try { parsed = JSON.parse(jsonMatch[0]); } catch { /* fall through */ }
+      let candidate = extractFirstJson(raw) || raw.match(/\{[\s\S]*\}/)?.[0] || raw;
+      candidate = stripTrailingCommas(candidate);
+      try {
+        parsed = JSON.parse(candidate);
+      } catch {
+        candidate = tryCloseTruncated(candidate);
+        candidate = stripTrailingCommas(candidate);
+        try {
+          parsed = JSON.parse(candidate);
+        } catch {
+          /* fall through */
+        }
       }
       if (!parsed) {
-        return { message: text, items: [], error: null };
+        console.warn("[GeminiService] Recommend JSON parse failed. Raw (first 600 chars):", raw.slice(0, 600));
+        return { message: "응답을 처리하지 못했어요. 다시 한번 말씀해 주실래요?", items: [], error: null, choices: [] };
       }
     }
 
@@ -424,12 +559,13 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
       .filter((item) => item && item.desc)
       .map((item) => {
         const itemType = ["food", "spot", "shop", "move", "flight", "stay", "info"].includes(item.type) ? item.type : "info";
+        const ragId = item.rag_id ?? item._ragId;
         return {
           time: (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0"),
           type: itemType,
           desc: item.desc,
           sub: item.sub || "",
-          ...(item._ragId != null ? { _ragId: item._ragId } : {}),
+          ...(ragId != null ? { _ragId: ragId } : {}),
           ...(item.detail && Object.keys(item.detail).some((k) => item.detail[k])
             ? {
                 detail: {
@@ -448,41 +584,30 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
         };
       });
 
-    // 상세페이지 채팅으로 추가할 때도 여행 생성과 동일하게 RAG로 이미지·placeId 주입 (같은 식당이면 같은 이미지)
-    const destinations = options?.destinations;
-    if (Array.isArray(destinations) && destinations.length > 0) {
-      try {
-        const rag = await getRAGContext({ destinations, preferences: "", duration: 1 });
-        const ragPlaces = rag.places || [];
-        for (const item of items) {
-          const match = findRAGMatch(item, ragPlaces);
-          if (match) {
-            if (!item.detail) item.detail = { name: item.desc, category: TYPE_CAT2[item.type] || "정보" };
-            if (match.image_url) item.detail.image = match.image_url;
-            if (match.google_place_id) item.detail.placeId = match.google_place_id;
-            if (match.address) {
-              const namePrefix = match.name_ko && !match.address.includes(match.name_ko) ? `${match.name_ko}, ` : "";
-              item.detail.address = namePrefix + match.address;
-            }
-            if (match.lat != null && match.lon != null) {
-              item.detail.lat = match.lat;
-              item.detail.lon = match.lon;
-            }
-          }
-          delete item._ragId;
+    // RAG로 이미지·placeId·주소 주입 (위에서 가져온 ragPlaces 사용)
+    for (const item of items) {
+      const match = findRAGMatch(item, ragPlaces);
+      if (match) {
+        if (!item.detail) item.detail = { name: item.desc, category: TYPE_CAT2[item.type] || "정보" };
+        if (match.image_url) item.detail.image = match.image_url;
+        if (match.google_place_id) item.detail.placeId = match.google_place_id;
+        if (match.address) {
+          const namePrefix = match.name_ko && !match.address.includes(match.name_ko) ? `${match.name_ko}, ` : "";
+          item.detail.address = namePrefix + match.address;
         }
-      } catch (e) {
-        console.warn("[GeminiService] RAG injection for chat recommendation skipped:", e);
-        items.forEach((item) => delete item._ragId);
+        if (match.lat != null && match.lon != null) {
+          item.detail.lat = match.lat;
+          item.detail.lon = match.lon;
+        }
       }
-    } else {
-      items.forEach((item) => delete item._ragId);
+      delete item._ragId;
     }
 
-    return { message, items, error: null };
+    const choices = Array.isArray(parsed.choices) ? parsed.choices : [];
+    return { message, items, error: null, choices };
   } catch (err) {
     console.error("[GeminiService] Recommendation error:", err);
-    return { message: "", items: [], error: `네트워크 오류: ${err.message}` };
+    return { message: "", items: [], error: `네트워크 오류: ${err.message}`, choices: [] };
   }
 }
 

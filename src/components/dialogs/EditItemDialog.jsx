@@ -6,6 +6,7 @@ import Field from '../common/Field';
 import Tab from '../common/Tab';
 import AddressSearch from '../common/AddressSearch';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import BottomSheet from '../common/BottomSheet';
 import { MultiImagePicker } from '../common/ImagePicker';
 import { uploadImage, generateImagePath } from '../../services/imageService';
 import { TIMETABLE_DB, findBestTrain, matchTimetableRoute } from '../../data/timetable';
@@ -109,9 +110,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const [fileError, setFileError] = useState("");
 
   /* ── AI Recommendation (chat) state ── */
-  const [chatMessages, setChatMessages] = useState([]); // {role: "user"|"ai", text: string, items?: Array}
+  const [chatMessages, setChatMessages] = useState([]); // {role: "user"|"ai", text: string, items?: Array, choices?: string[]}
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [expandedRecommendIndex, setExpandedRecommendIndex] = useState(null); // which AI bubble shows all items
+  const [choicesSheet, setChoicesSheet] = useState(null); // { question: string, choices: string[] } when AI asks with choices
   const chatScrollRef = useRef(null);
   const chatInputRef = useRef(null);
 
@@ -138,13 +141,24 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   }, []);
 
   const handleSendChat = useCallback(async () => {
-    const msg = chatInput.trim();
-    if (!msg || chatLoading) return;
+    const raw = (chatInputRef.current?.value ?? chatInput).trim();
+    if (!raw || chatLoading) return;
 
-    const userMsg = { role: "user", text: msg };
+    const userMsg = { role: "user", text: raw };
     setChatMessages((prev) => [...prev, userMsg]);
     setChatInput("");
+    if (chatInputRef.current) chatInputRef.current.value = "";
+    requestAnimationFrame(() => {
+      setChatInput("");
+      if (chatInputRef.current) chatInputRef.current.value = "";
+    });
     setChatLoading(true);
+    const msg = raw;
+
+    // 스크롤을 맨 아래로 (방금 추가한 내 메시지 위치)
+    setTimeout(() => {
+      chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
+    }, 0);
 
     // Build history for API (only text, no items)
     const history = chatMessages.map((m) => ({
@@ -152,26 +166,141 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       text: m.role === "ai" ? (m.text || "") : m.text,
     }));
 
+    // Follow-up: pass last AI's items so model can patch instead of replacing whole schedule
+    const lastAi = [...chatMessages].reverse().find((m) => m.role === "ai" && m.items?.length);
+    const currentItems = lastAi?.items ?? undefined;
+
     const dayContext = currentDay?.label || "";
-    const { message, items, error } = await getAIRecommendation(msg, history, dayContext, {
+    const { message, items, error, choices } = await getAIRecommendation(msg, history, dayContext, {
       onStatus: (s) => setAiStatusMsg(s),
       destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean) : undefined,
+      currentItems,
     });
     setChatLoading(false);
     setAiStatusMsg("");
 
     if (error) {
-      setChatMessages((prev) => [...prev, { role: "ai", text: `오류가 발생했습니다: ${error}` }]);
+      setChatMessages((prev) => [...prev, {
+        role: "ai",
+        text: "일시적인 오류가 발생했어요. 네트워크나 서버 상태 때문일 수 있어요.",
+        isError: true,
+        lastUserText: msg,
+      }]);
       return;
     }
 
-    setChatMessages((prev) => [...prev, { role: "ai", text: message, items }]);
+    const choicesArr = Array.isArray(choices) ? choices : [];
+    setChatMessages((prev) => {
+      const next = [...prev, { role: "ai", text: message, items, choices: choicesArr }];
+      if (items.length === 0 && choicesArr.length > 0) {
+        setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
+      }
+      return next;
+    });
 
     // Auto-scroll to bottom
     setTimeout(() => {
       chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
     }, 100);
   }, [chatInput, chatLoading, chatMessages, currentDay, destinations]);
+
+  const handleChoiceSelect = useCallback((choiceText) => {
+    setChoicesSheet(null);
+    const history = chatMessages.map((m) => ({
+      role: m.role,
+      text: m.role === "ai" ? (m.text || "") : m.text,
+    }));
+    setChatMessages((prev) => [...prev, { role: "user", text: choiceText }]);
+    setChatLoading(true);
+    const lastAi = [...chatMessages].reverse().find((m) => m.role === "ai" && m.items?.length);
+    const currentItems = lastAi?.items ?? undefined;
+    const dayContext = currentDay?.label || "";
+    const opts = {
+      onStatus: (s) => setAiStatusMsg(s),
+      destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean) : undefined,
+      currentItems,
+    };
+    getAIRecommendation(choiceText, history, dayContext, opts)
+      .then(({ message, items, error, choices }) => {
+        setChatLoading(false);
+        setAiStatusMsg("");
+        const choicesArr = Array.isArray(choices) ? choices : [];
+        if (error) {
+          setChatMessages((prev) => [...prev, {
+            role: "ai",
+            text: "일시적인 오류가 발생했어요. 네트워크나 서버 상태 때문일 수 있어요.",
+            isError: true,
+            lastUserText: choiceText,
+          }]);
+          return;
+        }
+        setChatMessages((prev) => {
+          const next = [...prev, { role: "ai", text: message, items, choices: choicesArr }];
+          if (items.length === 0 && choicesArr.length > 0) {
+            setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
+          }
+          return next;
+        });
+        setTimeout(() => chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" }), 100);
+      })
+      .catch(() => {
+        setChatLoading(false);
+        setAiStatusMsg("");
+      });
+  }, [chatMessages, currentDay, destinations]);
+
+  const handleRetryChat = useCallback((lastUserText) => {
+    const dayContext = currentDay?.label || "";
+    setChatMessages((prev) => {
+      const trimmed = prev.slice(0, -2);
+      const historyForApi = trimmed.map((m) => ({
+        role: m.role,
+        text: m.role === "ai" ? (m.text || "") : m.text,
+      }));
+      const lastAi = [...prev].reverse().find((m) => m.role === "ai" && m.items?.length);
+      const currentItems = lastAi?.items ?? undefined;
+      const opts = {
+        onStatus: (s) => setAiStatusMsg(s),
+        destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === "string" ? d : d?.name ?? "")).filter(Boolean) : undefined,
+        currentItems,
+      };
+      setChatLoading(true);
+      getAIRecommendation(lastUserText, historyForApi, dayContext, opts)
+        .then(({ message, items, error, choices }) => {
+          setChatLoading(false);
+          setAiStatusMsg("");
+          const choicesArr = Array.isArray(choices) ? choices : [];
+          if (error) {
+            setChatMessages((prev2) => [...prev2, {
+              role: "ai",
+              text: "일시적인 오류가 발생했어요. 네트워크나 서버 상태 때문일 수 있어요.",
+              isError: true,
+              lastUserText,
+            }]);
+          } else {
+            setChatMessages((prev2) => {
+              const next = [...prev2, { role: "ai", text: message, items, choices: choicesArr }];
+              if (items.length === 0 && choicesArr.length > 0) {
+                setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
+              }
+              return next;
+            });
+          }
+          setTimeout(() => chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" }), 100);
+        })
+        .catch(() => {
+          setChatLoading(false);
+          setAiStatusMsg("");
+          setChatMessages((prev2) => [...prev2, {
+            role: "ai",
+            text: "다시 시도해도 오류가 났어요. 잠시 후 다시 시도해 주세요.",
+            isError: true,
+            lastUserText,
+          }]);
+        });
+      return [...trimmed, { role: "user", text: lastUserText }];
+    });
+  }, [currentDay, destinations]);
 
   const handleApplyRecommendation = useCallback((items) => {
     if (!items || items.length === 0) return;
@@ -389,10 +518,10 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                     <Icon name="flash" size={24} style={{ color: "var(--color-primary)" }} />
                   </div>
                   <p style={{ margin: 0, fontSize: "var(--typo-body-1-n---bold-size)", fontWeight: "var(--typo-body-1-n---bold-weight)", color: "var(--color-on-surface)" }}>
-                    AI 일정 추천
+                    AI와 대화하기
                   </p>
                   <p style={{ margin: `${SPACING.md} 0 ${SPACING.xl}`, fontSize: "var(--typo-caption-1-regular-size)", color: "var(--color-on-surface-variant2)", lineHeight: 1.6 }}>
-                    어디를 가고 싶은지, 뭘 먹고 싶은지<br/>자유롭게 말해주세요
+                    어디로 갈지, 뭘 먹을지 말해보세요.<br/>일정이 필요하면 말해주시면 그때 맞춰 드릴게요.
                   </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: SPACING.md }}>
                     {[
@@ -435,56 +564,105 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                       : "var(--radius-md, 8px) var(--radius-md, 8px) var(--radius-md, 8px) 2px",
                     background: msg.role === "user"
                       ? "var(--color-primary)"
-                      : "var(--color-surface-container-lowest)",
+                      : msg.isError
+                        ? "var(--color-error-container, #FEE2E2)"
+                        : "var(--color-surface-container-lowest)",
                     color: msg.role === "user"
                       ? "var(--color-on-primary)"
-                      : "var(--color-on-surface)",
+                      : msg.isError
+                        ? "var(--color-error)"
+                        : "var(--color-on-surface)",
                     fontSize: "var(--typo-caption-1-regular-size)",
                     lineHeight: 1.5,
                     wordBreak: "break-word",
                   }}>
                     {msg.text && <p style={{ margin: 0 }}>{msg.text}</p>}
 
-                    {/* AI recommendation items preview */}
-                    {msg.role === "ai" && msg.items && msg.items.length > 0 && (
-                      <div style={{ marginTop: msg.text ? SPACING.ml : 0 }}>
-                        <div style={{
-                          borderTop: msg.text ? "1px solid var(--color-outline-variant)" : "none",
-                          paddingTop: msg.text ? SPACING.ml : 0,
-                          display: "flex", flexDirection: "column", gap: SPACING.ms,
-                        }}>
-                          {msg.items.slice(0, 6).map((it, j) => (
-                            <div key={j} style={{
-                              display: "flex", alignItems: "center", gap: SPACING.md,
-                              padding: `${SPACING.ms} ${SPACING.md}`,
-                              background: "var(--color-surface-container-lowest)",
-                              borderRadius: "6px",
-                              fontSize: "var(--typo-caption-2-regular-size)",
-                            }}>
-                              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-primary)", width: "36px", flexShrink: 0 }}>
-                                {it.time || "--:--"}
-                              </span>
-                              <span style={{ flex: 1, color: "var(--color-on-surface)", fontWeight: 500 }}>
-                                {it.desc}
-                              </span>
-                            </div>
-                          ))}
-                          {msg.items.length > 6 && (
-                            <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)", textAlign: "center" }}>
-                              외 {msg.items.length - 6}개 일정
-                            </p>
-                          )}
-                        </div>
-                        <Button
-                          variant="primary" size="sm"
-                          onClick={() => handleApplyRecommendation(msg.items)}
-                          fullWidth
-                          style={{ marginTop: SPACING.ml }}
-                        >
-                          이 일정 적용하기 ({msg.items.length}개)
-                        </Button>
-                      </div>
+                    {/* 오류 시 다시 시도하기 */}
+                    {msg.role === "ai" && msg.isError && msg.lastUserText && (
+                      <Button
+                        variant="neutral"
+                        size="sm"
+                        onClick={() => handleRetryChat(msg.lastUserText)}
+                        disabled={chatLoading}
+                        style={{ marginTop: SPACING.ml }}
+                      >
+                        다시 시도하기
+                      </Button>
                     )}
+
+                    {/* AI recommendation items preview */}
+                    {msg.role === "ai" && msg.items && msg.items.length > 0 && (() => {
+                      const VISIBLE_COUNT = 4;
+                      const isExpanded = expandedRecommendIndex === i;
+                      const showAll = isExpanded || msg.items.length <= VISIBLE_COUNT;
+                      const list = showAll ? msg.items : msg.items.slice(0, VISIBLE_COUNT);
+                      const hasMore = msg.items.length > VISIBLE_COUNT;
+                      return (
+                        <div style={{ marginTop: msg.text ? SPACING.ml : 0 }}>
+                          <div style={{
+                            borderTop: msg.text ? "1px solid var(--color-outline-variant)" : "none",
+                            paddingTop: msg.text ? SPACING.ml : 0,
+                            display: "flex", flexDirection: "column", gap: SPACING.ms,
+                          }}>
+                            {list.map((it, j) => (
+                              <div key={j} style={{
+                                display: "flex", alignItems: "center", gap: SPACING.md,
+                                padding: `${SPACING.ms} ${SPACING.md}`,
+                                background: "var(--color-surface-container-lowest)",
+                                borderRadius: "6px",
+                                fontSize: "var(--typo-caption-2-regular-size)",
+                              }}>
+                                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-primary)", width: "36px", flexShrink: 0 }}>
+                                  {it.time || "--:--"}
+                                </span>
+                                <span style={{ flex: 1, color: "var(--color-on-surface)", fontWeight: 500 }}>
+                                  {it.desc}
+                                </span>
+                              </div>
+                            ))}
+                            {hasMore && !isExpanded && (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedRecommendIndex(i)}
+                                style={{
+                                  margin: 0, padding: `${SPACING.sm} ${SPACING.md}`,
+                                  fontSize: "var(--typo-caption-2-regular-size)",
+                                  color: "var(--color-primary)", background: "transparent",
+                                  border: "none", cursor: "pointer", fontWeight: 600,
+                                  textAlign: "center",
+                                }}
+                              >
+                                전체보기 ({msg.items.length}개)
+                              </button>
+                            )}
+                            {hasMore && isExpanded && (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedRecommendIndex(null)}
+                                style={{
+                                  margin: 0, padding: `${SPACING.sm} ${SPACING.md}`,
+                                  fontSize: "var(--typo-caption-2-regular-size)",
+                                  color: "var(--color-on-surface-variant2)", background: "transparent",
+                                  border: "none", cursor: "pointer", fontWeight: 600,
+                                  textAlign: "center",
+                                }}
+                              >
+                                접기
+                              </button>
+                            )}
+                          </div>
+                          <Button
+                            variant="primary" size="sm"
+                            onClick={() => handleApplyRecommendation(msg.items)}
+                            fullWidth
+                            style={{ marginTop: SPACING.ml }}
+                          >
+                            자세히보기 ({msg.items.length}개)
+                          </Button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
@@ -512,7 +690,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                       color: aiStatusMsg.includes("재시도") ? COLOR.warning : "var(--color-on-surface-variant2)",
                       fontWeight: aiStatusMsg.includes("재시도") ? 600 : 400,
                     }}>
-                      {aiStatusMsg || "추천 일정을 만들고 있어요..."}
+                      {aiStatusMsg || "답변을 준비하고 있어요..."}
                     </span>
                   </div>
                 </div>
@@ -541,6 +719,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
+                    if (e.nativeEvent.isComposing) return;
                     handleSendChat();
                   }
                 }}
@@ -854,5 +1033,31 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     </div>
   );
 
-  return createPortal(fullScreenModal, document.body);
+  return createPortal(
+    <>
+      {fullScreenModal}
+      {choicesSheet && (
+        <BottomSheet
+          onClose={() => setChoicesSheet(null)}
+          title={choicesSheet.question}
+          zIndex={9500}
+        >
+          <div style={{ padding: SPACING.xxl, display: "flex", flexDirection: "column", gap: SPACING.md }}>
+            {choicesSheet.choices.map((label) => (
+              <Button
+                key={label}
+                variant="neutral"
+                size="lg"
+                fullWidth
+                onClick={() => handleChoiceSelect(label)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        </BottomSheet>
+      )}
+    </>,
+    document.body
+  );
 }

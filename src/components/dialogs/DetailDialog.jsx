@@ -218,8 +218,8 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           <SectionWrap label="부가정보" px={px}>
             <p style={{
               margin: 0,
-              fontSize: "var(--typo-body-2-n---regular-size)",
-              lineHeight: "var(--typo-body-2-n---regular-line-height)",
+              fontSize: "var(--typo-label-1-n---regular-size)",
+              lineHeight: "var(--typo-label-1-n---regular-line-height)",
               color: "var(--color-on-surface-variant)",
               whiteSpace: "pre-line",
               wordBreak: "break-word",
@@ -236,8 +236,8 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{
                   margin: 0,
-                  fontSize: "var(--typo-body-2-n---regular-size)",
-                  lineHeight: "var(--typo-body-2-n---regular-line-height)",
+                  fontSize: "var(--typo-label-1-n---regular-size)",
+                  lineHeight: "var(--typo-label-1-n---regular-line-height)",
                   color: "var(--color-on-surface-variant)",
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-word",
@@ -247,8 +247,8 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
                 {detail.hours && (
                   <p style={{
                     margin: "var(--spacing-sp20) 0 0",
-                    fontSize: "var(--typo-caption-1-regular-size)",
-                    lineHeight: "var(--typo-caption-1-regular-line-height)",
+                    fontSize: "var(--typo-caption-2-regular-size)",
+                    lineHeight: "var(--typo-caption-2-regular-line-height)",
                     color: "var(--color-on-surface-variant2)",
                   }}>
                     {detail.hours}
@@ -282,8 +282,8 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           <SectionWrap label="메모" px={px}>
             <p style={{
               margin: 0,
-              fontSize: "var(--typo-body-2-n---regular-size)",
-              lineHeight: "var(--typo-body-2-n---regular-line-height)",
+              fontSize: "var(--typo-label-1-n---regular-size)",
+              lineHeight: "var(--typo-label-1-n---regular-line-height)",
               color: "var(--color-on-surface-variant)",
               whiteSpace: "pre-line",
             }}>
@@ -312,8 +312,8 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
                         flexShrink: 0, marginTop: SPACING.ms,
                       }} />
                       <span style={{
-                        fontSize: "var(--typo-label-1-n---regular-size)",
-                        lineHeight: "var(--typo-label-1-n---regular-line-height)",
+                        fontSize: "var(--typo-caption-1-regular-size)",
+                        lineHeight: "var(--typo-caption-1-regular-line-height)",
                         color: isNote ? COLOR.onSurfaceVariant : COLOR.onSurface,
                       }}>
                         {h}
