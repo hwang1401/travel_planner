@@ -600,8 +600,10 @@ export default function TravelPlanner() {
       return { ...next };
     });
     setEditTarget(null);
-    // 수정 저장 직후 머지된 데이터를 즉시 서버에 저장 (시간표·detail 누락 방지). customData 기반으로 next 계산 후 저장.
+    // 수정 저장 직후 머지된 데이터를 즉시 서버에 저장 (시간표·detail 누락 방지).
+    // 기존 일정(baseLen > 0)에서도 시간표가 유지되도록, 저장 시 소스는 DAYS(화면에 보이는 머지 결과) 기준으로 사용.
     const prev = customData;
+    const mergedDayForSave = DAYS.find((_, i) => toOrigIdx(i) === dayIdx);
     const nextForSave = (() => {
       const next = { ...prev };
       if (sectionIdx === -1) {
@@ -622,28 +624,29 @@ export default function TravelPlanner() {
       } else {
         if (!next[dayIdx]) next[dayIdx] = {};
         if (!next[dayIdx].sections) next[dayIdx].sections = {};
-        if (!next[dayIdx].sections[sectionIdx]) {
-          const sourceSec = baseLen > 0 ? BASE_DAYS[dayIdx]?.sections?.[sectionIdx] : next._extraDays?.[dayIdx - baseLen]?.sections?.[sectionIdx];
-          next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec?.items || [])] };
-        }
+        // 기존/신규 구분 없이, 화면에 보이는(머지된) 해당 섹션 아이템을 기준으로 저장 → 로드 시 동일하게 반영
+        const displayedItems = mergedDayForSave?.sections?.[sectionIdx]?.items ?? [];
+        const baseItems = Array.isArray(displayedItems) ? [...displayedItems] : [];
         if (itemIdx !== undefined && itemIdx !== null) {
-          next[dayIdx] = { ...next[dayIdx] };
-          next[dayIdx].sections = { ...next[dayIdx].sections };
-          const sec = next[dayIdx].sections[sectionIdx];
-          const newItems = [...(sec.items || [])];
+          const newItems = baseItems.length > itemIdx ? [...baseItems] : [...baseItems];
+          if (newItems.length <= itemIdx) {
+            while (newItems.length <= itemIdx) newItems.push(null);
+          }
           newItems[itemIdx] = newItem;
-          next[dayIdx].sections[sectionIdx] = { ...sec, items: newItems };
-          if (baseLen === 0 && next._extraDays?.[dayIdx]) {
-            const ed = next._extraDays[dayIdx];
-            const edSections = ed.sections || [];
-            const edSec = edSections[sectionIdx];
-            if (edSec && Array.isArray(edSec.items) && itemIdx < edSec.items.length) {
-              const edNewItems = [...edSec.items];
-              edNewItems[itemIdx] = newItem;
-              const nextExtra = [...next._extraDays];
-              nextExtra[dayIdx] = { ...ed, sections: edSections.map((s, i) => (i === sectionIdx ? { ...s, items: edNewItems } : s)) };
-              next._extraDays = nextExtra;
-            }
+          next[dayIdx].sections[sectionIdx] = { items: newItems };
+        } else {
+          next[dayIdx].sections[sectionIdx] = { items: baseItems };
+        }
+        if (baseLen === 0 && next._extraDays?.[dayIdx]) {
+          const ed = next._extraDays[dayIdx];
+          const edSections = ed.sections || [];
+          const edSec = edSections[sectionIdx];
+          const edItems = Array.isArray(edSec?.items) ? [...edSec.items] : [];
+          if (itemIdx !== undefined && itemIdx !== null && itemIdx < edItems.length) {
+            edItems[itemIdx] = newItem;
+            const nextExtra = [...(next._extraDays || [])];
+            nextExtra[dayIdx] = { ...ed, sections: edSections.map((s, i) => (i === sectionIdx ? { ...s, items: edItems } : s)) };
+            next._extraDays = nextExtra;
           }
         }
       }
