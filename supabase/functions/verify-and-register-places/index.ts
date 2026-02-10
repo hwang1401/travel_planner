@@ -1,6 +1,12 @@
 // RAG auto-expand: verify unmatched places via Google Places, insert into rag_places, fetch photo.
 // Invoked fire-and-forget from geminiService after injectRAGData.
 
+declare const Deno: {
+  serve: (handler: (req: Request) => Promise<Response>) => void;
+  env: { get: (key: string) => string | undefined };
+};
+
+// @ts-ignore — ESM URL import; valid in Deno runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
@@ -278,8 +284,25 @@ Deno.serve(async (req) => {
     });
   }
 
-  const [lat, lng] = getRegionHintCenter(regionHint || "후쿠오카");
   const supabase = createClient(supabaseUrl, supabaseKey);
+  const DAILY_LIMIT = 50;
+  const startOfTodayUtc = new Date().toISOString().slice(0, 10) + "T00:00:00.000Z";
+  const { count: todayCount, error: countErr } = await supabase
+    .from("rag_places")
+    .select("id", { count: "exact", head: true })
+    .eq("confidence", "auto_verified")
+    .gte("created_at", startOfTodayUtc);
+  const alreadyToday = countErr ? 0 : (todayCount ?? 0);
+  const remaining = Math.max(0, DAILY_LIMIT - alreadyToday);
+  const toProcess = places.slice(0, remaining);
+  if (toProcess.length === 0) {
+    return new Response(
+      JSON.stringify({ ok: true, registered: 0, daily_limit_reached: true }),
+      { status: 202, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
+    );
+  }
+
+  const [lat, lng] = getRegionHintCenter(regionHint || "후쿠오카");
   const BUCKET = "images";
 
   const processOne = async (
@@ -362,7 +385,7 @@ Deno.serve(async (req) => {
   };
 
   let registered = 0;
-  for (const place of places) {
+  for (const place of toProcess) {
     try {
       const { ok } = await processOne(place);
       if (ok) registered++;

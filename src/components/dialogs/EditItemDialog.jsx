@@ -18,7 +18,28 @@ import { SPACING, RADIUS, COLOR } from '../../styles/tokens';
 import TimetableSearchDialog from './TimetableSearchDialog';
 
 /* ── Edit Item Dialog (일정 추가/수정) ── */
-export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color, tripId, currentDay, onBulkImport, initialTab = 0, aiOnly = false, destinations }) {
+const PLACE_TYPES = ['food', 'spot', 'shop', 'stay'];
+
+/** Build short summary of all days' place names for AI context (avoid duplicate recommendations). */
+function buildTripScheduleSummary(allDays) {
+  if (!Array.isArray(allDays) || allDays.length === 0) return '';
+  const lines = [];
+  for (const day of allDays) {
+    const names = [];
+    for (const sec of day.sections || []) {
+      for (const it of sec.items || []) {
+        if (it?.desc && PLACE_TYPES.includes(it.type)) names.push(it.desc.trim());
+      }
+    }
+    if (names.length > 0) {
+      const label = day.label || `Day ${day.day}`;
+      lines.push(`${day.day}일차(${label}): ${names.join(', ')}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSave, onDelete, onClose, color, tripId, currentDay, onBulkImport, initialTab = 0, aiOnly = false, destinations, allDays }) {
   const isNew = !item;
   const [activeTab, setActiveTab] = useState(aiOnly ? 2 : (isNew ? initialTab : 0));
   const [time, setTime] = useState(item?.time || "");
@@ -171,10 +192,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     const currentItems = lastAi?.items ?? undefined;
 
     const dayContext = currentDay?.label || "";
+    const tripScheduleSummary = buildTripScheduleSummary(allDays || []);
     const { message, items, error, choices } = await getAIRecommendation(msg, history, dayContext, {
       onStatus: (s) => setAiStatusMsg(s),
       destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean) : undefined,
       currentItems,
+      tripScheduleSummary,
     });
     setChatLoading(false);
     setAiStatusMsg("");
@@ -202,7 +225,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     setTimeout(() => {
       chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
     }, 100);
-  }, [chatInput, chatLoading, chatMessages, currentDay, destinations]);
+  }, [chatInput, chatLoading, chatMessages, currentDay, destinations, allDays]);
 
   const handleChoiceSelect = useCallback((choiceText) => {
     setChoicesSheet(null);
@@ -215,10 +238,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     const lastAi = [...chatMessages].reverse().find((m) => m.role === "ai" && m.items?.length);
     const currentItems = lastAi?.items ?? undefined;
     const dayContext = currentDay?.label || "";
+    const tripScheduleSummary = buildTripScheduleSummary(allDays || []);
     const opts = {
       onStatus: (s) => setAiStatusMsg(s),
       destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean) : undefined,
       currentItems,
+      tripScheduleSummary,
     };
     getAIRecommendation(choiceText, history, dayContext, opts)
       .then(({ message, items, error, choices }) => {
@@ -247,10 +272,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         setChatLoading(false);
         setAiStatusMsg("");
       });
-  }, [chatMessages, currentDay, destinations]);
+  }, [chatMessages, currentDay, destinations, allDays]);
 
   const handleRetryChat = useCallback((lastUserText) => {
     const dayContext = currentDay?.label || "";
+    const tripScheduleSummary = buildTripScheduleSummary(allDays || []);
     setChatMessages((prev) => {
       const trimmed = prev.slice(0, -2);
       const historyForApi = trimmed.map((m) => ({
@@ -263,6 +289,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         onStatus: (s) => setAiStatusMsg(s),
         destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === "string" ? d : d?.name ?? "")).filter(Boolean) : undefined,
         currentItems,
+        tripScheduleSummary,
       };
       setChatLoading(true);
       getAIRecommendation(lastUserText, historyForApi, dayContext, opts)
@@ -300,7 +327,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         });
       return [...trimmed, { role: "user", text: lastUserText }];
     });
-  }, [currentDay, destinations]);
+  }, [currentDay, destinations, allDays]);
 
   const handleApplyRecommendation = useCallback((items) => {
     if (!items || items.length === 0) return;

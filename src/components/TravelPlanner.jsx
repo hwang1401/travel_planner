@@ -1481,6 +1481,7 @@ export default function TravelPlanner() {
           initialTab={openAiTab ? 2 : 0}
           aiOnly={openAiTab}
           destinations={tripMeta?.destinations}
+          allDays={DAYS}
         />
       )}
 

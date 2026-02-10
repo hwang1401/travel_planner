@@ -208,7 +208,7 @@ function destinationsToRegions(destinations) {
  * @param {string} preferences - natural language e.g. "현지인 맛집, 가성비, 아이랑"
  * @returns {string[]} tags e.g. ["현지인맛집", "가성비", "아이동반"]
  */
-function extractTagsFromPreferences(preferences) {
+export function extractTagsFromPreferences(preferences) {
   if (!preferences || typeof preferences !== 'string') return [];
   const text = preferences.trim().toLowerCase();
   const tags = new Set();

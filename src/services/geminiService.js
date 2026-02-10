@@ -3,7 +3,7 @@
  * Also provides AI-powered schedule recommendations via chat.
  */
 
-import { getRAGContext } from './ragService.js';
+import { getRAGContext, extractTagsFromPreferences } from './ragService.js';
 import { matchTimetableRoute, findBestTrain } from '../data/timetable.js';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -342,7 +342,7 @@ message 작성 시:
 
 items: 추가 정보가 필요해 사용자에게 물어볼 때는 items를 빈 배열 []로 두세요. 일정을 만들 때만 items를 채우세요.
 choices: items가 빈 배열일 때만 사용하세요. 사용자가 고를 수 있는 선택지 2~4개를 문자열 배열로 넣으세요. 예: "점심? 저녁?" → choices: ["점심", "저녁"]. 일정을 만들 때(items를 채울 때)는 choices를 빈 배열 []로 두세요.
-rag_id: 사용자 메시지에 [참고 장소] 목록이 있으면, 식사·관광·쇼핑·숙소 추천 시 반드시 그 목록에 있는 장소만 사용하고, 해당 장소의 rag_id를 item에 넣으세요. rag_id는 반드시 문자열로 쓰세요 (예: "rag_id": "775b0632"). JSON에서 배열·객체 마지막 항목 뒤에는 쉼표를 넣지 마세요.
+rag_id: [참고 장소] 목록이 있으면 목록에 있는 장소를 우선 사용하고, 부족하면 직접 추천도 가능합니다. 목록에서 고른 장소는 해당 rag_id를 item에 넣으세요(문자열, 예: "rag_id": "775b0632"). 직접 추천한 장소는 rag_id를 생략하세요. JSON에서 배열·객체 마지막 항목 뒤에는 쉼표를 넣지 마세요.
 
 타입 기준:
 - food: 식사, 카페, 간식
@@ -354,27 +354,28 @@ rag_id: 사용자 메시지에 [참고 장소] 목록이 있으면, 식사·관�
 - info: 기타 정보
 
 규칙:
-1. 시간순으로 현실적인 일정을 구성해주세요 (이동 시간 고려).
-2. 사용자가 언급한 장소/음식을 반드시 포함하세요.
-3. 이동 구간도 포함하여 실제로 따라할 수 있게 해주세요.
-4. 식사·관광·쇼핑·숙소는 반드시 구체적인 장소명(실제 맛집/명소 이름)을 desc에 넣으세요. "OO 라멘으로 아침"처럼 모호하게 쓰지 말고 "이치란 하카타"처럼 장소명을 쓰세요.
-5. [참고 장소] 목록이 주어지면 그 목록에 있는 장소만 사용하고, 각 item에 rag_id를 반드시 넣으세요.
+1. 시간: 장소당 최소 체류(식사 1시간, 관광·쇼핑 1~2시간)와 이동 시간을 고려해 현실적인 간격을 두세요. 하루에 food+spot+shop 합쳐 최대 6~7개를 넘기지 마세요.
+2. 동선: [현재 일정]이나 [이번 여행 전체 일정 요약]이 있으면 이미 있는 장소 근처·같은 권역으로 이어지게 배치하세요. 왔다갔다 하지 마세요.
+3. [참고 장소] 목록에 태그(현지인맛집, 가성비 등)가 있으면 그 태그가 붙은 장소를 우선 활용하세요. 관광객용 뻔한 곳만 쓰지 말고 다양하게 골라주세요.
+4. 사용자가 언급한 장소/음식을 반드시 포함하세요. 식사·관광·쇼핑·숙소는 구체적인 장소명을 desc에 넣으세요.
+5. [참고 장소] 목록이 주어지면 목록에 있는 장소를 우선 사용하되, 부족하면 직접 추천도 가능합니다. 목록에서 고른 item에만 rag_id를 넣고, 직접 추천 시 rag_id는 생략하세요.
 6. sub에 예상 비용이나 소요시간을 넣어주세요.
-7. food, spot, shop, stay 타입은 반드시 detail.address를 포함하세요 (실제 주소 또는 구글맵에서 검색 가능한 장소명).
-8. detail 객체는 address가 있으면 반드시 포함하세요.
-9. message는 존댓말(해요체)로, 가이드/공식 톤 말고 친구에게 말하듯 편하게 쓰고, 환영 문구는 쓰지 말고, 추천 코스만 간단히 설명하세요. 이모지는 사용하지 마세요.
-10. 보통 하루 일정은 5~10개 항목이 적당합니다.
-11. detail.highlights에는 해당 장소의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등). food, spot, shop 타입은 반드시 포함.
-12. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요.
+7. food, spot, shop, stay 타입은 반드시 detail.address를 포함하세요.
+8. message는 존댓말(해요체)로, 친구에게 말하듯 편하게 쓰세요. 이모지는 사용하지 마세요.
+9. detail.highlights에는 해당 장소의 핵심 포인트를 2~4개 작성하세요. food, spot, shop 타입은 반드시 포함.
+10. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon을 포함하세요. 참고 목록에 좌표가 있으면 사용하세요.
 
 부분 수정 (대화가 이어질 때):
 - 사용자에게 [현재 일정]이 주어지면, 사용자가 "OO 말고 XX로", "OO만 바꿔줘", "그거 대신 ~" 등 일부만 수정을 요청한 것으로 간주하세요.
 - 이 경우 전체 일정을 새로 만들지 말고, 기존 일정에서 요청한 부분만 바꾸고 나머지는 그대로 유지한 뒤, 수정된 전체 일정을 items로 반환하세요.
 - message는 "OO 대신 XX로 바꿔뒀어요."처럼 무엇만 바뀌었는지 짧게만 쓰세요.
-- "~시까지 뭐 할 거 없어?", "~시까지 다른 거 없어?", "10시까지 뭐 하라고?"처럼 말하면: 그 시간까지 할 다른 활동(쇼핑, 구경, 산책 등)을 추천해 달라는 뜻입니다. 기존 구간의 시간을 줄이지 말고, 그 시간까지 채울 새 일정(이동+활동)을 추가하세요.
+- "~시까지 뭐 할 거 없어?", "~시까지 다른 거 없어?"처럼 말하면: 그 시간까지 할 다른 활동을 추천해 달라는 뜻입니다. 기존 구간의 시간을 줄이지 말고, 그 시간까지 채울 새 일정(이동+활동)을 추가하세요.
+기존 일정 맥락 ([이번 여행 전체 일정 요약]이 주어질 때):
+- 이미 다른 날에 간 장소를 다시 추천하지 마세요. 미방문 지역·아직 안 간 장소를 우선하세요.
+- 오늘 일정은 이미 있는 장소 근처·같은 권역으로 이어지게 배치하세요.
 
 참고 장소 사용 (내부: 사용자 메시지에 붙는 장소 목록. 사용자에게 "참고 장소"라고 말하지 말 것):
-- 사용자 메시지에 [참고 장소] 목록이 포함되어 있으면, 식사·관광·쇼핑·숙소 항목은 반드시 그 목록에 있는 장소만 사용하고, 각 item에 해당 장소의 rag_id를 넣으세요. 목록에 없는 장소는 절대 넣지 마세요 (예: 목록에 돈까스 맛집이 없으면 "돈까스 맛집" 같은 항목을 임의로 만들지 말고, 목록에 있는 라멘/우동 등으로만 구성).
+- [참고 장소] 목록이 있으면 목록에 있는 장소를 우선 사용하되, 부족하면 직접 추천도 가능합니다. 목록에서 고른 item에는 해당 장소의 rag_id를 넣고, 직접 추천한 item은 rag_id를 생략하세요. 가상의 장소명은 만들지 마세요.
 - 사용자가 특정 지역을 말하면 (예: "유후인에서 구경할거리 찾아줘") [참고 장소]에서 해당 지역(region)이 붙은 장소([yufuin] 등)를 골라 사용하세요. 목록에 그 지역 장소가 있으면 "OO엔 추천 목록이 없어요"라고 말하지 마세요.
 - 사용자가 "하카타에서 뭐 추천해줘"처럼만 말해도, [참고 장소] 목록이 주어졌으면 그 목록 안의 장소만 사용하세요. 목록에 없는 메뉴/장소 타입(예: 돈까스)을 꾸며 넣지 마세요.
 - 사용자가 요청한 메뉴/장소가 그 목록에 없을 때, message에서는 "추천 목록에 OO이 없어서요", "저희가 가진 맛집 정보에는 OO이 없어서요"처럼만 쓰고, "[참고 장소]"라는 말은 쓰지 마세요.
@@ -392,9 +393,10 @@ rag_id: 사용자 메시지에 [참고 장소] 목록이 있으면, 식사·관�
  * @param {string} userMessage - user's natural language input
  * @param {Array} chatHistory - previous chat messages [{role, text}]
  * @param {string} [dayContext] - e.g. "Day 2 오사카"
+ * @param {Object} [opts] - optional: onStatus, destinations, currentItems, tripScheduleSummary (전체 일정 요약 문자열)
  * @returns {Promise<{ message: string, items: Array, error: string|null }>}
  */
-export async function getAIRecommendation(userMessage, chatHistory = [], dayContext = "", { onStatus, destinations, currentItems } = {}) {
+export async function getAIRecommendation(userMessage, chatHistory = [], dayContext = "", { onStatus, destinations, currentItems, tripScheduleSummary } = {}) {
   if (!API_KEY) {
     return { message: "", items: [], error: "Gemini API 키가 설정되지 않았습니다" };
   }
@@ -430,12 +432,15 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
     });
   }
 
-  // Current user message; if follow-up with existing schedule, append [현재 일정]; if RAG 있으면 [참고 장소] 추가
+  // Current user message; [여행 일정], [현재 일정], [이번 여행 전체 일정 요약], [참고 장소] 순으로 붙임
   const contextPrefix = dayContext ? `[여행 일정: ${dayContext}] ` : "";
   let currentUserText = contextPrefix + userMessage;
   if (Array.isArray(currentItems) && currentItems.length > 0) {
     const scheduleBlock = formatBookedItemsForPrompt(currentItems);
     if (scheduleBlock) currentUserText += "\n\n[현재 일정]\n" + scheduleBlock;
+  }
+  if (tripScheduleSummary && typeof tripScheduleSummary === "string" && tripScheduleSummary.trim()) {
+    currentUserText += "\n\n[이번 여행 전체 일정 요약]\n" + tripScheduleSummary.trim();
   }
   if (ragPlacesText) currentUserText += "\n\n" + ragPlacesText;
   contents.push({
@@ -676,20 +681,20 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 
 규칙:
 1. 각 날짜를 오전/오후/저녁 세 섹션으로 나누세요.
-2. 이동 구간(move)을 포함하여 실제로 따라할 수 있는 동선을 만들어주세요.
-3. 시간은 현실적으로 (이동시간 포함, 식사 1시간, 관광 1~2시간).
-4. 해당 여행지의 실제 유명 장소, 맛집, 관광지를 추천해주세요.
-5. sub에 예상 비용, 소요시간, 추천 메뉴 등을 넣어주세요.
-6. 첫날은 도착, 마지막 날은 출발 일정을 고려하세요.
-7. label은 그 날의 핵심 테마를 간결하게 표현하세요.
-8. 식사는 하루 3끼 (아침은 간단하게도 OK), 각 지역 특색 음식 위주로.
-9. detail.tip에는 꿀팁, 추천 메뉴, 할인 정보 등을 넣어주세요.
-10. 여행 첫날이나 마지막날은 이동이 많으므로 일정을 가볍게 잡으세요.
-11. detail.highlights에는 해당 장소/일정의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등).
-12. food, spot, shop 타입은 반드시 highlights를 포함하세요.
-13. 모든 타입에 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요. 특히 move, flight 타입은 도착지의 좌표를, stay는 숙소 좌표를, food/spot/shop은 장소 좌표를 반드시 넣어주세요. 공항, 역, 터미널 등 주요 교통 시설의 좌표는 알고 있다면 꼭 포함하세요.
-14. 참고 데이터/참고 장소가 제공되면, 식사·관광·쇼핑·숙소 항목은 반드시 그 목록에 있는 장소만 사용하세요. "말고기 전문점", "OO 맛집"처럼 목록에 없는 가상의 장소명을 만들지 마세요. 목록에 해당 타입이 없으면 목록에 있는 다른 장소로 구성하거나, desc를 "저녁 식사"처럼 일반적으로만 쓰고 rag_id는 넣지 마세요.
-15. 참고 장소에 [rag_id:숫자] 형태의 ID가 있으면, 해당 장소를 사용할 때 반드시 rag_id 필드에 그 숫자(문자열)를 넣어주세요. 참고 목록이 없을 때만 직접 추천 장소를 쓰고 rag_id를 생략하세요.`;
+2. 동선: 같은 날 장소는 지리적으로 가까운 순으로 묶으세요. 참고 데이터에 lat/lon이 있으면 좌표를 활용해 같은 권역·에리어 단위로 배치하고, 동쪽→서쪽→동쪽처럼 왔다갔다 하지 마세요.
+3. 시간: 장소당 최소 체류(식사 1시간, 관광·쇼핑 1~2시간), 이동 시간을 포함해 현실적인 간격을 두세요. 하루에 food+spot+shop 합쳐 최대 6~7개를 넘기지 마세요.
+4. 장소 구성: 관광객 필수 코스만 쓰지 말고, 참고 목록에 태그(현지인맛집, 가성비, 데이트 등)가 붙은 장소를 적극 활용하세요. "사용자 선호 태그"가 있으면 그 태그가 붙은 장소를 우선 선택하세요.
+5. 사용자 요청(선호도)이 있으면 반드시 일정 전체에 걸쳐 반영하세요. 가볍게 무시하지 마세요.
+6. sub에 예상 비용, 소요시간, 추천 메뉴 등을 넣어주세요.
+7. 첫날은 도착, 마지막 날은 출발 일정을 고려하세요.
+8. label은 그 날의 핵심 테마를 간결하게 표현하세요.
+9. 식사는 하루 3끼 (아침은 간단하게도 OK), 각 지역 특색 음식 위주로.
+10. detail.tip에는 꿀팁, 추천 메뉴, 할인 정보 등을 넣어주세요.
+11. 여행 첫날이나 마지막날은 이동이 많으므로 일정을 가볍게 잡으세요.
+12. detail.highlights에는 해당 장소/일정의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등). food, spot, shop 타입은 반드시 highlights를 포함하세요.
+13. 모든 타입에 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요. 참고 목록에 좌표가 있으면 그대로 사용하세요.
+14. 참고 데이터/참고 장소가 제공되면, 목록에 있는 장소를 우선 사용하되, 부족하면 직접 추천도 가능합니다. 목록에서 고른 장소는 rag_id를 넣고, 직접 추천한 장소는 rag_id를 생략하세요. "말고기 전문점", "OO 맛집"처럼 가상의 장소명은 만들지 마세요.
+15. 참고 장소에 [rag_id:숫자] 형태가 있으면, 그 목록에서 고를 때만 rag_id 필드에 그 숫자(문자열)를 넣어주세요. 직접 추천 시에는 rag_id를 생략하세요.`;
 
 /**
  * Match an item against RAG places.
@@ -849,12 +854,14 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
 
   const destStr = Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean).join(", ") : "";
   const dateInfo = startDate ? `출발일: ${startDate}` : "";
+  const preferredTags = preferences?.trim() ? extractTagsFromPreferences(preferences) : [];
+  const preferredTagsLine = preferredTags.length > 0 ? `\n사용자 선호 태그: ${preferredTags.join(', ')} (아래 참고 목록에서 이 태그가 붙은 장소를 우선 활용하세요.)` : "";
 
   let baseUserPrompt = `여행지: ${destStr}\n기간: ${duration}일\n${dateInfo}` +
-    (preferences?.trim() ? `\n\n사용자 요청:\n${preferences.trim()}` : "") +
+    (preferences?.trim() ? `\n\n사용자 요청 (반드시 일정 전체에 반영하세요):\n${preferences.trim()}${preferredTagsLine}` : "") +
     (bookedItems?.trim() ? `\n\n이미 예약된 것 (티켓·숙소 등). 이에 맞춰 일정을 잡아주세요:\n${bookedItems.trim()}` : "");
   if (placesText) {
-    baseUserPrompt += "\n\n## 참고 데이터 (식사·관광·쇼핑·숙소는 아래 목록에 있는 장소만 사용하세요. 목록에 없는 'OO 전문점', 'OO 맛집' 같은 가상 장소는 넣지 마세요.)\n\n" + placesText;
+    baseUserPrompt += "\n\n## 참고 데이터 (아래 목록에 있는 장소를 우선 사용하되, 부족하면 직접 추천도 가능합니다. 목록에서 고를 때만 rag_id를 넣고, 직접 추천 시 rag_id는 생략하세요.)\n\n" + placesText;
   }
 
   const normalizeDays = (rawDays, dayOffset = 0) => {
