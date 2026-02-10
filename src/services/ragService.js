@@ -224,12 +224,28 @@ function extractTagsFromPreferences(preferences) {
 }
 
 /**
+ * 권역(큐슈, 간사이 등)에 속한 region이 하나라도 있으면 해당 권역 전체 region을 추가.
+ * 채팅에서 "모든 RAG 열어두기"용 (벳푸·유후인 등도 한 번에 조회).
+ */
+function expandRegionsToAreas(regions) {
+  if (!Array.isArray(regions) || regions.length === 0) return regions;
+  const set = new Set(regions);
+  for (const areaRegions of Object.values(AREA_TO_REGIONS)) {
+    if (areaRegions.some((r) => set.has(r))) {
+      areaRegions.forEach((r) => set.add(r));
+    }
+  }
+  return Array.from(set);
+}
+
+/**
  * Build RAG context for itinerary generation.
- * @param {{ destinations: string[], preferences?: string, duration?: number, hintText?: string }} params
+ * @param {{ destinations: string[], preferences?: string, duration?: number, hintText?: string, expandToArea?: boolean }} params
  * @param {string} [params.hintText] - 사용자 메시지 등. 여기서 추출한 여행지명(구마모토 등)을 RAG 조회에 추가함.
+ * @param {boolean} [params.expandToArea] - true면 권역 확장(예: 후쿠오카+구마모토 → 큐슈 전 지역). 채팅에서 "모든 RAG 열어두기"용.
  * @returns {Promise<{ placesText: string, placeCount: number, places: Array }>}
  */
-export async function getRAGContext({ destinations, preferences, duration, hintText }) {
+export async function getRAGContext({ destinations, preferences, duration, hintText, expandToArea }) {
   const result = { placesText: '', placeCount: 0, places: [] };
   try {
     let destList = Array.isArray(destinations) ? [...destinations] : [];
@@ -243,7 +259,10 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
         }
       }
     }
-    const regions = destinationsToRegions(destList);
+    let regions = destinationsToRegions(destList);
+    if (expandToArea && regions.length > 0) {
+      regions = expandRegionsToAreas(regions);
+    }
     if (regions.length === 0) return result;
 
     const selectCols = 'id, region, name_ko, type, description, tags, price_range, opening_hours, image_url, google_place_id, address, lat, lon';

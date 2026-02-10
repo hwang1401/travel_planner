@@ -407,6 +407,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
         preferences: "",
         duration: 1,
         hintText: userMessage,
+        expandToArea: true, // 채팅에서는 해당 권역 전체 RAG 열어두기 (벳푸·유후인·가고시마 등 포함)
       });
       ragPlaces = rag.places || [];
       ragPlacesText = rag.placesText || "";
