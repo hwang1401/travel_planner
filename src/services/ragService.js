@@ -378,10 +378,10 @@ const NEARBY_FETCH_LIMIT = 80;
 
 /**
  * 주변 장소 조회 (lat/lon 기준, region으로 Supabase 조회 후 클라이언트에서 거리 필터).
- * @param {{ lat: number, lon: number, excludeName?: string, radius?: number, limit?: number }} params
+ * @param {{ lat: number, lon: number, excludeName?: string, excludeId?: string, radius?: number, limit?: number }} params
  * @returns {Promise<{ food: Array, spot: Array, shop: Array }>}
  */
-export async function getNearbyPlaces({ lat, lon, excludeName, radius = 1.5, limit = 20 }) {
+export async function getNearbyPlaces({ lat, lon, excludeName, excludeId, radius = 1.5, limit = 20 }) {
   const out = { food: [], spot: [], shop: [] };
   if (lat == null || lon == null || Number.isNaN(lat) || Number.isNaN(lon)) return out;
   const region = findRegionByCoords(lat, lon);
@@ -411,6 +411,7 @@ export async function getNearbyPlaces({ lat, lon, excludeName, radius = 1.5, lim
     };
     const withDist = rows
       .filter((p) => p.lat != null && p.lon != null)
+      .filter((p) => (excludeId && p.id === excludeId) ? false : true)
       .filter((p) => !exclude || !isSamePlace(p.name_ko, exclude))
       .map((p) => ({ ...p, _distKm: geoDistance(lat, lon, Number(p.lat), Number(p.lon)) }))
       .filter((p) => p._distKm <= radius)

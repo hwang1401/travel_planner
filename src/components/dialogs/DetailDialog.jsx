@@ -138,18 +138,19 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
     const lat = Number(effectiveDetail.lat);
     const lon = Number(effectiveDetail.lon);
     if (Number.isNaN(lat) || Number.isNaN(lon)) return;
-    const key = `${lat},${lon}`;
+    const excludeId = overlayPlace?.id ?? null;
+    const key = `${lat},${lon},${excludeId ?? ''}`;
     if (nearbyCacheRef.current[key]) {
       setNearbyByType(nearbyCacheRef.current[key]);
       return;
     }
     setNearbyLoading(true);
-    getNearbyPlaces({ lat, lon, excludeName: effectiveDetail.name }).then((byType) => {
+    getNearbyPlaces({ lat, lon, excludeName: effectiveDetail.name, excludeId }).then((byType) => {
       nearbyCacheRef.current[key] = byType;
       setNearbyByType(byType);
       setNearbyLoading(false);
     }).catch(() => setNearbyLoading(false));
-  }, [showNearby, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.name]);
+  }, [showNearby, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.name, overlayPlace?.id]);
 
   /* 주변 장소 overlay 열릴 때 스크롤 맨 위로 초기화 */
   useEffect(() => {
