@@ -1,12 +1,14 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import BottomSheet from '../common/BottomSheet';
 import ImageViewer from '../common/ImageViewer';
-import InfoRow from '../common/InfoRow';
 import CategoryBadge from '../common/CategoryBadge';
 import TimetablePreview from '../common/TimetablePreview';
+import NearbyPlaceCard from './NearbyPlaceCard';
+import { getNearbyPlaces } from '../../services/ragService';
 import { COLOR, SPACING, RADIUS } from '../../styles/tokens';
+import { TYPE_LABELS } from '../../styles/tokens';
 
 /**
  * ── DetailDialog ──
@@ -51,47 +53,106 @@ const SectionWrap = ({ label, children, px }) => (
 
 /* ── 컴포넌트 ── */
 
-export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDelete, allDetailPayloads, currentDetailIndex, onNavigateToIndex }) {
+/** RAG place → detail shape for overlay view (일정 상세와 동일한 UI: 부가정보, 메모, 주소, 정보, 포인트) */
+function ragPlaceToDetail(place) {
+  if (!place) return null;
+  const cat = TYPE_LABELS[place.type];
+  const tags = place.tags;
+  const highlights = Array.isArray(tags) && tags.length > 0
+    ? tags
+    : typeof tags === "string" && tags.trim() ? [tags.trim()] : [];
+  return {
+    name: place.name_ko,
+    address: place.address,
+    lat: place.lat,
+    lon: place.lon,
+    image: place.image_url,
+    placeId: place.google_place_id,
+    categories: cat ? [cat] : [],
+    tip: null,
+    highlights: highlights.length > 0 ? highlights : null,
+    _item: {
+      desc: place.name_ko,
+      sub: place.description || "",
+    },
+  };
+}
+
+export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDelete, onMoveToDay, moveDayOptions = [], currentDayDisplayIdx, allDetailPayloads, currentDetailIndex, onNavigateToIndex, onAddToSchedule }) {
   if (!detail) return null;
   const [viewImage, setViewImage] = useState(null);
+  const [overlayDetail, setOverlayDetail] = useState(null);
+  const [overlayPlace, setOverlayPlace] = useState(null);
+  const [showMoveSheet, setShowMoveSheet] = useState(false);
+  const [showMoreSheet, setShowMoreSheet] = useState(false);
+  const [nearbyByType, setNearbyByType] = useState({ food: [], spot: [], shop: [] });
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const nearbyCacheRef = useRef({});
+  const effectiveDetail = overlayDetail || detail;
   const accentColor = dayColor || COLOR.primary;
   const swipeStart = useRef({ x: 0, y: 0, pointerId: null });
   const curIdx = typeof currentDetailIndex === "number" ? currentDetailIndex : 0;
   const total = allDetailPayloads?.length ?? 0;
 
   /* Images: stored only (no auto-fetch) */
-  const images = detail.images && Array.isArray(detail.images) && detail.images.length > 0
-    ? detail.images
-    : detail.image ? [detail.image] : [];
-  const displayImages = detail.image && images.length > 1
-    ? [detail.image, ...images.filter((img) => img !== detail.image)]
+  const images = effectiveDetail.images && Array.isArray(effectiveDetail.images) && effectiveDetail.images.length > 0
+    ? effectiveDetail.images
+    : effectiveDetail.image ? [effectiveDetail.image] : [];
+  const displayImages = effectiveDetail.image && images.length > 1
+    ? [effectiveDetail.image, ...images.filter((img) => img !== effectiveDetail.image)]
     : images;
 
   /* URLs */
-  const directionsUrl = detail.placeId
-    ? `https://www.google.com/maps/dir/?api=1&destination=place_id:${detail.placeId}&destination_place_id=${detail.placeId}`
-    : detail.address
-      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(detail.address)}`
+  const directionsUrl = effectiveDetail.placeId
+    ? `https://www.google.com/maps/dir/?api=1&destination=place_id:${effectiveDetail.placeId}&destination_place_id=${effectiveDetail.placeId}`
+    : effectiveDetail.address
+      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(effectiveDetail.address)}`
       : null;
 
   const px = "var(--spacing-sp200)";
 
   /* Data checks — 시간표는 detail 또는 _item.detail에서 가져옴 (리스트/merge 경로와 무관하게 노출) */
-  const effectiveTimetable = (detail.timetable?.trains?.length ? detail.timetable : null)
-    ?? (detail._item?.detail?.timetable?.trains?.length ? detail._item.detail.timetable : null);
+  const effectiveTimetable = (effectiveDetail.timetable?.trains?.length ? effectiveDetail.timetable : null)
+    ?? (effectiveDetail._item?.detail?.timetable?.trains?.length ? effectiveDetail._item.detail.timetable : null);
   const hasTimetable = !!effectiveTimetable?.trains?.length;
 
-  const hasPrice = !!detail.price;
-  const hasTip = !!detail.tip;
-  const hasHighlights = detail.highlights && detail.highlights.length > 0;
+  const hasTip = !!effectiveDetail.tip;
+  const hasHighlights = effectiveDetail.highlights && effectiveDetail.highlights.length > 0;
 
-  const itemDesc = detail._item?.desc;
-  const itemSub = detail._item?.sub;
+  const itemDesc = effectiveDetail._item?.desc;
+  const itemSub = effectiveDetail._item?.sub;
   const hasExtraText = !!(itemDesc || itemSub);
+
+  /* 주변 추천: effectiveDetail에 lat/lon 있으면 조회 (캐시 by coords) */
+  const hasCoords = effectiveDetail.lat != null && effectiveDetail.lon != null;
+  const showNearby = hasCoords;
+  useEffect(() => {
+    setOverlayDetail(null);
+    setOverlayPlace(null);
+  }, [detail]);
+
+  useEffect(() => {
+    if (!showNearby) return;
+    const lat = Number(effectiveDetail.lat);
+    const lon = Number(effectiveDetail.lon);
+    if (Number.isNaN(lat) || Number.isNaN(lon)) return;
+    const key = `${lat},${lon}`;
+    if (nearbyCacheRef.current[key]) {
+      setNearbyByType(nearbyCacheRef.current[key]);
+      return;
+    }
+    setNearbyLoading(true);
+    getNearbyPlaces({ lat, lon, excludeName: effectiveDetail.name }).then((byType) => {
+      nearbyCacheRef.current[key] = byType;
+      setNearbyByType(byType);
+      setNearbyLoading(false);
+    }).catch(() => setNearbyLoading(false));
+  }, [showNearby, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.name]);
 
   /* 스와이프: 왼쪽(끝<시작) → 다음 인덱스, 오른쪽(끝>시작) → 이전 인덱스. 이동할 인덱스만 부모에 전달 */
   const MIN_SWIPE_PX = 60;
   const handleSwipeEnd = useCallback((endX, endY) => {
+    if (overlayDetail) return;
     const { x: startX, y: startY } = swipeStart.current;
     const dx = endX - startX;
     const dy = endY - startY;
@@ -100,7 +161,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
     if (adx < MIN_SWIPE_PX || adx <= ady || typeof onNavigateToIndex !== "function") return;
     if (dx < 0 && curIdx < total - 1) onNavigateToIndex(curIdx + 1);
     else if (dx > 0 && curIdx > 0) onNavigateToIndex(curIdx - 1);
-  }, [onNavigateToIndex, curIdx, total]);
+  }, [overlayDetail, onNavigateToIndex, curIdx, total]);
 
   const handleStart = useCallback((clientX, clientY, pointerId) => {
     swipeStart.current = { x: clientX, y: clientY, pointerId };
@@ -143,6 +204,9 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           display: "flex", alignItems: "center", gap: "var(--spacing-sp80)",
           borderBottom: "1px solid var(--color-outline-variant)",
         }}>
+          {overlayDetail && (
+            <Button variant="ghost-neutral" size="sm" iconOnly="chevronLeft" onClick={() => setOverlayDetail(null)} style={{ flexShrink: 0 }} title="이전" />
+          )}
           <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: SPACING.md, overflow: "hidden" }}>
             <h3 style={{
               margin: 0,
@@ -152,17 +216,20 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               color: "var(--color-on-surface)",
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
             }}>
-              {detail.name}
+              {effectiveDetail.name}
             </h3>
             <span style={{ display: "inline-flex", alignItems: "center", gap: SPACING.sm, flexWrap: "nowrap", flexShrink: 0 }}>
-              {(detail.categories && detail.categories.length > 0
-                ? detail.categories
-                : detail.category ? [detail.category] : []
+              {(effectiveDetail.categories && effectiveDetail.categories.length > 0
+                ? effectiveDetail.categories
+                : effectiveDetail.category ? [effectiveDetail.category] : []
               ).map((cat) => (
                 <CategoryBadge key={cat} category={cat} />
               ))}
             </span>
           </div>
+          {!overlayDetail && onMoveToDay && moveDayOptions.length > 1 && (
+            <Button variant="ghost-neutral" size="sm" iconOnly="moreHorizontal" onClick={() => setShowMoreSheet(true)} style={{ flexShrink: 0 }} title="더보기" />
+          )}
           <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
         </div>
 
@@ -189,7 +256,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               cursor: "zoom-in",
               background: COLOR.surfaceLowest,
             }}>
-            <img src={displayImages[0]} alt={detail.name}
+            <img src={displayImages[0]} alt={effectiveDetail.name}
               style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} />
           </div>
         )}
@@ -206,7 +273,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
                 borderRadius: RADIUS.md, overflow: "hidden",
                 cursor: "zoom-in", background: COLOR.surfaceLowest,
               }}>
-                <img src={img} alt={`${detail.name} ${i + 1}`}
+                <img src={img} alt={`${effectiveDetail.name} ${i + 1}`}
                   style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               </div>
             ))}
@@ -230,7 +297,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
         )}
 
         {/* ── 주소: 라벨 + 본문 (카드·구분선 없음) ── */}
-        {detail.address && (
+        {effectiveDetail.address && (
           <SectionWrap label="주소" px={px}>
             <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sp120)", flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -242,18 +309,8 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-word",
                 }}>
-                  {detail.address}
+                  {effectiveDetail.address}
                 </p>
-                {detail.hours && (
-                  <p style={{
-                    margin: "var(--spacing-sp20) 0 0",
-                    fontSize: "var(--typo-caption-2-regular-size)",
-                    lineHeight: "var(--typo-caption-2-regular-line-height)",
-                    color: "var(--color-on-surface-variant2)",
-                  }}>
-                    {detail.hours}
-                  </p>
-                )}
               </div>
               {directionsUrl && (
                 <Button variant="primary" size="sm" iconLeft="navigation"
@@ -268,15 +325,6 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
 
         <ImageViewer src={viewImage} alt={detail.name} onClose={() => setViewImage(null)} />
 
-        {/* ── 정보 섹션: 비용, 영업시간 ── */}
-        {hasPrice && (
-          <SectionWrap label="정보" px={px}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-sp80)" }}>
-              {hasPrice && <InfoRow icon="pricetag">{detail.price}</InfoRow>}
-            </div>
-          </SectionWrap>
-        )}
-
         {/* ── 메모: 라벨 + 본문 (카드 없음) ── */}
         {hasTip && (
           <SectionWrap label="메모" px={px}>
@@ -287,7 +335,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               color: "var(--color-on-surface-variant)",
               whiteSpace: "pre-line",
             }}>
-              {detail.tip}
+              {effectiveDetail.tip}
             </p>
           </SectionWrap>
         )}
@@ -302,7 +350,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               border: "1px solid var(--color-outline-variant)",
             }}>
               <div style={{ display: "flex", flexDirection: "column", gap: SPACING.md }}>
-                {detail.highlights.map((h, i) => {
+                {effectiveDetail.highlights.map((h, i) => {
                   const isNote = h.startsWith("[");
                   return (
                     <div key={i} style={{ display: "flex", gap: SPACING.lg, alignItems: "flex-start" }}>
@@ -326,6 +374,75 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           </SectionWrap>
         )}
 
+        {/* ── 주변 추천 (가로 스크롤 카드) ── */}
+        {showNearby && (
+          <>
+            {nearbyLoading && (
+              <SectionWrap label="주변 추천" px={px}>
+                <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>불러오는 중...</p>
+              </SectionWrap>
+            )}
+            {!nearbyLoading && (nearbyByType.food?.length > 0 || nearbyByType.spot?.length > 0 || nearbyByType.shop?.length > 0) && (
+              <>
+                {nearbyByType.food?.length > 0 && (
+                  <SectionWrap label="주변 맛집" px={px}>
+                    <div style={{
+                      display: "flex", gap: SPACING.lg, overflowX: "auto", overflowY: "hidden",
+                      scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
+                      paddingBottom: SPACING.sm,
+                    }}>
+                      {nearbyByType.food.map((p) => (
+                        <NearbyPlaceCard
+                          key={p.id || p.name_ko}
+                          place={p}
+                          onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }}
+                          onAddToSchedule={onAddToSchedule}
+                        />
+                      ))}
+                    </div>
+                  </SectionWrap>
+                )}
+                {nearbyByType.spot?.length > 0 && (
+                  <SectionWrap label="주변 볼거리" px={px}>
+                    <div style={{
+                      display: "flex", gap: SPACING.lg, overflowX: "auto", overflowY: "hidden",
+                      scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
+                      paddingBottom: SPACING.sm,
+                    }}>
+                      {nearbyByType.spot.map((p) => (
+                        <NearbyPlaceCard
+                          key={p.id || p.name_ko}
+                          place={p}
+                          onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }}
+                          onAddToSchedule={onAddToSchedule}
+                        />
+                      ))}
+                    </div>
+                  </SectionWrap>
+                )}
+                {nearbyByType.shop?.length > 0 && (
+                  <SectionWrap label="주변 쇼핑" px={px}>
+                    <div style={{
+                      display: "flex", gap: SPACING.lg, overflowX: "auto", overflowY: "hidden",
+                      scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
+                      paddingBottom: SPACING.sm,
+                    }}>
+                      {nearbyByType.shop.map((p) => (
+                        <NearbyPlaceCard
+                          key={p.id || p.name_ko}
+                          place={p}
+                          onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }}
+                          onAddToSchedule={onAddToSchedule}
+                        />
+                      ))}
+                    </div>
+                  </SectionWrap>
+                )}
+              </>
+            )}
+          </>
+        )}
+
         {/* ── 교통 타임테이블 (공통 컴포넌트) ── */}
         {hasTimetable && (
           <SectionWrap label={`${effectiveTimetable.station} → ${effectiveTimetable.direction}`} px={px}>
@@ -336,8 +453,8 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
         {(!onEdit && !onDelete) && <div style={{ height: "var(--spacing-sp120)" }} />}
         </div>
 
-        {/* ── 컨텐츠 하단: 일정 개수만큼 dot, 현재만 강조 ── */}
-        {allDetailPayloads && allDetailPayloads.length > 1 && (
+        {/* ── 컨텐츠 하단: 일정 개수만큼 dot, 현재만 강조 (주변 장소 overlay 중에는 숨김) ── */}
+        {!overlayDetail && allDetailPayloads && allDetailPayloads.length > 1 && (
           <div style={{
             flexShrink: 0,
             padding: "var(--spacing-sp80) var(--spacing-sp200)",
@@ -366,8 +483,22 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           </div>
         )}
 
-        {/* ── 하단 고정: 삭제 + 수정하기. 세이프에리어는 BottomSheet 시트가 이미 적용함 → 푸터에서는 제외(중복 시 iOS 하단 여백 두 배) ── */}
-        {(onEdit || onDelete) && (
+        {/* ── 하단 고정: 주변 장소 상세(overlay)일 때 일정추가 ── */}
+        {overlayDetail && onAddToSchedule && overlayPlace && (
+          <div style={{
+            flexShrink: 0,
+            padding: `${SPACING.xl} ${SPACING.xxl}`,
+            borderTop: "1px solid var(--color-outline-variant)",
+            background: "var(--color-surface)",
+          }}>
+            <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => onAddToSchedule(overlayPlace)}>
+              일정추가
+            </Button>
+          </div>
+        )}
+
+        {/* ── 하단 고정: 삭제 + 수정하기 (일정 아이템 상세일 때만) ── */}
+        {!overlayDetail && (onEdit || onDelete) && (
           <div style={{
             flexShrink: 0,
             padding: `${SPACING.xl} ${SPACING.xxl}`,
@@ -377,16 +508,74 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
             background: "var(--color-surface)",
           }}>
             {onDelete && (
-              <Button variant="ghost-danger" size="lg" iconLeft="trash" onClick={() => onDelete(detail)}>
+              <Button variant="ghost-danger" size="lg" iconLeft="trash" onClick={() => onDelete(effectiveDetail)}>
                 삭제
               </Button>
             )}
             {onEdit && (
-              <Button variant="primary" size="lg" iconLeft="edit" onClick={() => onEdit(detail)} fullWidth style={{ flex: 1 }}>
+              <Button variant="primary" size="lg" iconLeft="edit" onClick={() => onEdit(effectiveDetail)} fullWidth style={{ flex: 1 }}>
                 수정하기
               </Button>
             )}
           </div>
+        )}
+
+        {/* 헤더 더보기 액션 시트: 다른 Day로 이동 */}
+        {showMoreSheet && (
+          <BottomSheet onClose={() => setShowMoreSheet(false)} maxHeight="auto" zIndex={3100} title="">
+            <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}` }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreSheet(false);
+                  setShowMoveSheet(true);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: SPACING.md,
+                  width: "100%",
+                  padding: `${SPACING.lg} ${SPACING.xl}`,
+                  border: "none",
+                  borderRadius: "var(--radius-md)",
+                  background: "transparent",
+                  color: "var(--color-on-surface)",
+                  fontSize: "var(--typo-label-2-medium-size)",
+                  fontWeight: "var(--typo-label-2-medium-weight)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <Icon name="pin" size={20} style={{ opacity: 0.7 }} />
+                다른 Day로 이동
+              </button>
+            </div>
+          </BottomSheet>
+        )}
+
+        {/* Day 선택 시트 (다른 Day로 이동) */}
+        {showMoveSheet && (
+          <BottomSheet onClose={() => setShowMoveSheet(false)} maxHeight="70vh" zIndex={3100} title="어느 날로 옮길까요?">
+            <div style={{ padding: SPACING.xxxl, display: "flex", flexDirection: "column", gap: SPACING.sm }}>
+              {moveDayOptions
+                .filter((opt) => opt.displayIdx !== currentDayDisplayIdx)
+                .map((opt) => (
+                  <Button
+                    key={opt.displayIdx}
+                    variant="ghost-neutral"
+                    size="lg"
+                    fullWidth
+                    onClick={() => {
+                      onMoveToDay(effectiveDetail, opt.displayIdx);
+                      setShowMoveSheet(false);
+                    }}
+                    style={{ justifyContent: "flex-start" }}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+            </div>
+          </BottomSheet>
         )}
       </div>
     </BottomSheet>

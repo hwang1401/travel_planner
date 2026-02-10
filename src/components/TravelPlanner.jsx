@@ -29,6 +29,7 @@ import IconContainer from "./common/IconContainer";
 
 /* Dialog imports */
 import DetailDialog from "./dialogs/DetailDialog";
+import AddRAGPlaceSheet from "./dialogs/AddRAGPlaceSheet";
 import DocumentDialog from "./dialogs/DocumentDialog";
 import ShoppingGuideDialog from "./dialogs/ShoppingGuideDialog";
 import DayInfoDialog from "./dialogs/DayInfoDialog";
@@ -86,6 +87,7 @@ export default function TravelPlanner() {
   const [showReorder, setShowReorder] = useState(false);
   const [reorderList, setReorderList] = useState([]);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [addNearbyPlace, setAddNearbyPlace] = useState(null);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showAddPlace, setShowAddPlace] = useState(false);
   const [showPasteInfo, setShowPasteInfo] = useState(false);
@@ -239,6 +241,31 @@ export default function TravelPlanner() {
     return mergeData(base, customData);
   }, [customData, baseLen]);
 
+  /* ── 새 일정 생성 시 Day 1 자동 생성: standalone이고 일정이 비어 있으면 Day 1 하나 생성 ── */
+  const defaultDay1 = useMemo(() => ({
+    day: 1,
+    date: "Day 1",
+    label: "Day 1",
+    color: "var(--color-primary)",
+    icon: "pin",
+    stay: "",
+    booked: false,
+    sections: [
+      { title: "오전", items: [] },
+      { title: "오후", items: [] },
+      { title: "저녁", items: [] },
+    ],
+    notes: "",
+    _custom: true,
+  }), []);
+  useEffect(() => {
+    if (isLegacy || scheduleLoading) return;
+    if (baseLen !== 0) return;
+    const extra = customData._extraDays;
+    if (extra && extra.length > 0) return;
+    updateCustomData((prev) => ({ ...prev, _standalone: true, _extraDays: [defaultDay1] }));
+  }, [isLegacy, scheduleLoading, baseLen, customData._extraDays, updateCustomData, defaultDay1]);
+
   const current = DAYS[selectedDay];
 
   /* ── Auto-select today's day (once) ── */
@@ -325,6 +352,32 @@ export default function TravelPlanner() {
     }
   }, [allDetailPayloads]);
 
+  /** RAG place → schedule item for 일정추가 */
+  const ragPlaceToItem = useCallback((place) => ({
+    desc: place.name_ko || "",
+    type: place.type || "info",
+    time: "12:00",
+    detail: {
+      name: place.name_ko,
+      address: place.address,
+      lat: place.lat,
+      lon: place.lon,
+      image: place.image_url,
+      placeId: place.google_place_id,
+    },
+    _custom: true,
+  }), []);
+
+  /** First section index that has an item of this type, or -1 (extraItems) */
+  const sectionIdxForType = useCallback((day, type) => {
+    if (!day?.sections) return -1;
+    for (let si = 0; si < day.sections.length; si++) {
+      const items = day.sections[si]?.items || [];
+      if (items.some((it) => it?.type === type)) return si;
+    }
+    return -1;
+  }, []);
+
   /* ── Compute route summary for current day ── */
   const routeSummary = useMemo(() => {
     if (!current) return null;
@@ -395,16 +448,20 @@ export default function TravelPlanner() {
   }, [DAYS, isLegacy, tripMeta?.startDate]);
 
   /* ── Handlers ── */
-  const handleAddDay = useCallback((label, icon, dayNum, overwrite = false) => {
+  const handleAddDay = useCallback((labelOrEmpty) => {
+    const labelTrimmed = (labelOrEmpty || "").trim();
+    const nextDayNum = DAYS.length === 0 ? 1 : Math.max(...DAYS.map((d) => d.day), 0) + 1;
+    const displayLabel = labelTrimmed || `Day ${nextDayNum}`;
+
     updateCustomData((prev) => {
       const next = { ...prev };
       const existingExtra = next._extraDays || [];
       const newDay = {
-        day: dayNum,
-        date: `Day ${dayNum}`,
-        label: label,
+        day: nextDayNum,
+        date: `Day ${nextDayNum}`,
+        label: displayLabel,
         color: "var(--color-primary)",
-        icon: icon || "pin",
+        icon: "pin",
         stay: "",
         booked: false,
         sections: [
@@ -415,33 +472,15 @@ export default function TravelPlanner() {
         notes: "",
         _custom: true,
       };
-      if (overwrite) {
-        const idx = existingExtra.findIndex((d) => d.day === dayNum);
-        if (idx >= 0) {
-          next._extraDays = [...existingExtra];
-          next._extraDays[idx] = newDay;
-        } else {
-          next._extraDays = [...existingExtra, newDay];
-        }
-      } else {
-        next._extraDays = [...existingExtra, newDay];
-      }
-      // Clear day order — indices are now stale
+      next._extraDays = [...existingExtra, newDay];
       delete next._dayOrder;
-      return { ...next };
+      return next;
     });
     setShowAddDay(false);
-    setToast({ message: overwrite ? `Day ${dayNum} 덮어쓰기 완료` : `Day ${dayNum} 추가 완료`, icon: "check" });
-    setTimeout(() => {
-      const extraDays = customData._extraDays || [];
-      if (overwrite) {
-        const idx = extraDays.findIndex((d) => d.day === dayNum);
-        if (idx >= 0) setSelectedDay(baseLen + idx);
-      } else {
-        setSelectedDay(baseLen + extraDays.length);
-      }
-    }, 50);
-  }, [customData, updateCustomData, baseLen]);
+    setToast({ message: `Day ${nextDayNum} 추가 완료`, icon: "check" });
+    const prevExtraLen = customData._extraDays?.length ?? 0;
+    setTimeout(() => setSelectedDay(baseLen + prevExtraLen), 50);
+  }, [DAYS, baseLen, customData._extraDays?.length, updateCustomData]);
 
   const handleEditDayLabel = useCallback((dayIdx, newLabel) => {
     updateCustomData((prev) => {
@@ -464,6 +503,10 @@ export default function TravelPlanner() {
 
   const handleDeleteDay = useCallback((dayIdx) => {
     if (dayIdx < baseLen) return;
+    if (DAYS.length <= 2) {
+      setToast({ message: "마지막 날짜는 삭제할 수 없어요. 최소 2일 이상 유지해 주세요.", icon: "info" });
+      return;
+    }
     setConfirmDialog({
       title: "날짜 삭제",
       message: "이 날짜와 포함된 모든 일정이 삭제됩니다.\n정말 삭제하시겠습니까?",
@@ -489,7 +532,7 @@ export default function TravelPlanner() {
         setToast({ message: "날짜가 삭제되었습니다", icon: "trash" });
       },
     });
-  }, [updateCustomData, baseLen]);
+  }, [updateCustomData, baseLen, DAYS.length, setToast]);
 
   /* ── Day Reorder ── */
   const handleOpenReorder = useCallback(() => {
@@ -757,6 +800,82 @@ export default function TravelPlanner() {
     });
   }, [performDeleteItem, toOrigIdx, selectedDay]);
 
+  /* 일정을 다른 Day로 이동: 현재 Day에서 제거 → 선택한 Day 마지막(extraItems)에 추가 */
+  const handleMoveToDay = useCallback((detailPayload, targetDisplayIdx) => {
+    const item = detailPayload?._item;
+    if (!item) return;
+    const sourceDayIdx = toOrigIdx(detailPayload._di ?? selectedDay);
+    const targetDayIdx = toOrigIdx(targetDisplayIdx);
+    if (sourceDayIdx === targetDayIdx) return;
+
+    const mergedSource = DAYS.find((_, i) => toOrigIdx(i) === sourceDayIdx);
+    const mergedTarget = DAYS.find((_, i) => toOrigIdx(i) === targetDayIdx);
+
+    updateCustomData((prev) => {
+      const next = { ...prev };
+      const si = detailPayload._si;
+      const ii = detailPayload._ii;
+
+      if (si === -1) {
+        if (next[sourceDayIdx]?.extraItems) {
+          next[sourceDayIdx] = { ...next[sourceDayIdx] };
+          const idx = next[sourceDayIdx].extraItems.findIndex((it) => it.time === item.time && it.desc === item.desc);
+          if (idx >= 0) {
+            next[sourceDayIdx].extraItems = [...next[sourceDayIdx].extraItems];
+            next[sourceDayIdx].extraItems.splice(idx, 1);
+          }
+          if (next[sourceDayIdx].extraItems.length === 0) delete next[sourceDayIdx].extraItems;
+        }
+      } else {
+        if (!next[sourceDayIdx]) next[sourceDayIdx] = {};
+        if (!next[sourceDayIdx].sections) next[sourceDayIdx].sections = {};
+        const sourceSec = baseLen > 0 ? BASE_DAYS[sourceDayIdx]?.sections?.[si] : next._extraDays?.[sourceDayIdx - baseLen]?.sections?.[si];
+        if (!next[sourceDayIdx].sections[si]) next[sourceDayIdx].sections[si] = { items: [...(sourceSec?.items || [])] };
+        else next[sourceDayIdx].sections[si] = { ...next[sourceDayIdx].sections[si], items: [...next[sourceDayIdx].sections[si].items] };
+        next[sourceDayIdx].sections[si].items.splice(ii, 1);
+        if (baseLen === 0 && next._extraDays?.[sourceDayIdx]) {
+          const ed = next._extraDays[sourceDayIdx];
+          const edSec = (ed.sections || [])[si];
+          const edItems = [...(edSec?.items || [])];
+          edItems.splice(ii, 1);
+          next._extraDays = [...next._extraDays];
+          next._extraDays[sourceDayIdx] = {
+            ...ed,
+            sections: (ed.sections || []).map((s, i) => i === si ? { ...s, items: edItems } : s),
+          };
+        }
+      }
+
+      const itemToAdd = { ...item, _extra: true };
+      if (baseLen === 0 && next._extraDays?.[targetDayIdx]) {
+        next._extraDays = [...next._extraDays];
+        const td = next._extraDays[targetDayIdx];
+        const sections = td.sections || [];
+        const lastIdx = sections.length - 1;
+        if (lastIdx >= 0) {
+          const lastSec = sections[lastIdx];
+          const lastItems = [...(lastSec.items || []), itemToAdd];
+          next._extraDays[targetDayIdx] = {
+            ...td,
+            sections: sections.map((s, i) => i === lastIdx ? { ...s, items: lastItems } : s),
+          };
+        } else {
+          next._extraDays[targetDayIdx] = { ...td, sections: [{ title: "오후", items: [itemToAdd] }] };
+        }
+      } else {
+        if (!next[targetDayIdx]) next[targetDayIdx] = {};
+        if (!next[targetDayIdx].extraItems) next[targetDayIdx].extraItems = [];
+        next[targetDayIdx].extraItems = [...next[targetDayIdx].extraItems, itemToAdd];
+      }
+      return next;
+    });
+
+    setActiveDetail(null);
+    const targetLabel = mergedTarget?.label || `Day ${mergedTarget?.day ?? targetDisplayIdx + 1}`;
+    setToast({ message: `${targetLabel}(으)로 이동했어요`, icon: "check" });
+    setSelectedDay(targetDisplayIdx);
+  }, [updateCustomData, DAYS, toOrigIdx, selectedDay, baseLen]);
+
   const runBulkDeleteWithPayload = useCallback((payload) => {
     if (!payload) return;
     const { keys, entries, dayIdx, baseLen: payloadBaseLen } = payload;
@@ -974,7 +1093,7 @@ export default function TravelPlanner() {
         borderBottom: "1px solid var(--color-outline-variant)",
         display: "flex", alignItems: "center", gap: SPACING.sm, flexShrink: 0,
       }}>
-        <Button variant="ghost-neutral" size="sm" iconOnly="chevronLeft"
+        <Button variant="ghost-neutral" size="md" iconOnly="chevronLeft"
           onClick={() => navigate("/")}
           style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1002,12 +1121,12 @@ export default function TravelPlanner() {
         </div>
         {/* Share button (Supabase trips only) */}
         {!isLegacy && (
-          <Button variant="ghost-neutral" size="sm" iconOnly="share"
+          <Button variant="ghost-neutral" size="md" iconOnly="share"
             onClick={() => setShowShareSheet(true)}
             title="공유 및 초대" />
         )}
         {/* More menu button */}
-        <Button variant="ghost-neutral" size="sm" iconOnly="list"
+        <Button variant="ghost-neutral" size="md" iconOnly="moreHorizontal"
           onClick={() => setShowMoreMenu(true)}
           title="더보기" />
       </div>
@@ -1144,14 +1263,14 @@ export default function TravelPlanner() {
                     <div style={{ display: "flex", gap: "var(--spacing-sp80)", flexShrink: 0, alignItems: "center" }}>
                       {!bulkDeleteMode ? (
                         <>
-                          <Button variant="neutral" size="xsm" iconLeft="trash"
+                          <Button variant="neutral" size="sm" iconLeft="trash"
                             onClick={() => { setBulkDeleteMode(true); setSelectedBulkKeys(new Set()); }}
                             style={{ borderRadius: "16px" }}
                             title="일괄 삭제"
                             aria-label="일괄 삭제">
                             일괄 삭제
                           </Button>
-                          <Button variant="primary" size="xsm" iconLeft="plus"
+                          <Button variant="primary" size="sm" iconLeft="plus"
                             onClick={() => setShowAddSheet(true)}
                             style={{ borderRadius: "16px" }}>
                             일정 추가
@@ -1387,6 +1506,19 @@ export default function TravelPlanner() {
         })()}
       </div>
 
+      {/* RAG 장소 일정추가 시트 (프리필 폼, 시간만 선택 후 저장) */}
+      {addNearbyPlace && (
+        <AddRAGPlaceSheet
+          place={addNearbyPlace}
+          onConfirm={(item) => {
+            handleSaveItem(item, toOrigIdx(selectedDay), -1, null);
+            setToast({ message: '일정에 추가되었습니다', icon: 'check' });
+            setAddNearbyPlace(null);
+          }}
+          onClose={() => setAddNearbyPlace(null)}
+        />
+      )}
+
       {/* Detail Dialog */}
       <DetailDialog
         detail={activeDetail}
@@ -1399,9 +1531,13 @@ export default function TravelPlanner() {
           }
         } : undefined}
         onDelete={canEdit && activeDetail?._item?._custom ? handleDeleteFromDetail : undefined}
+        onMoveToDay={canEdit && activeDetail?._item?._custom ? handleMoveToDay : undefined}
+        moveDayOptions={DAYS.map((d, i) => ({ label: d.label || `Day ${d.day}`, displayIdx: i }))}
+        currentDayDisplayIdx={selectedDay}
         allDetailPayloads={allDetailPayloads}
         currentDetailIndex={currentDetailIndex}
         onNavigateToIndex={allDetailPayloads.length > 1 ? onDetailNavigateToIndex : undefined}
+        onAddToSchedule={canEdit ? (place) => setAddNearbyPlace(place) : undefined}
       />
 
       {/* Document Dialog */}
@@ -1513,7 +1649,16 @@ export default function TravelPlanner() {
         }} />
 
       {/* Full Map Dialog */}
-      {showMap && <FullMapDialog days={DAYS} onClose={() => setShowMap(false)} />}
+      {showMap && (
+          <FullMapDialog
+            days={DAYS}
+            onClose={() => setShowMap(false)}
+            onAddItem={canEdit ? (dayIdx, item, sectionIdx) => {
+              handleSaveItem(item, dayIdx, sectionIdx ?? -1, null);
+              setToast({ message: '일정에 추가되었습니다', icon: 'check' });
+            } : undefined}
+          />
+        )}
 
       {/* Confirm Dialog */}
       {confirmDialog && (
@@ -1625,7 +1770,6 @@ export default function TravelPlanner() {
         <AddDayDialog
           onAdd={handleAddDay}
           onCancel={() => setShowAddDay(false)}
-          existingDays={DAYS}
         />
       )}
 
@@ -1780,20 +1924,25 @@ export default function TravelPlanner() {
 
       {/* ── Day Reorder Bottom Sheet ── */}
       {showReorder && (
-        <BottomSheet onClose={() => setShowReorder(false)} maxHeight="70vh" zIndex="var(--z-confirm)" title="Day 순서 변경">
-          <div style={{ padding: `${SPACING.md} ${SPACING.xxxl} ${SPACING.xxxl}` }}>
-            <div style={{
-              display: "flex", justifyContent: "flex-end",
-              marginBottom: SPACING.lg,
-            }}>
-              <Button variant="primary" size="sm" onClick={handleReorderConfirm}>
-                적용
-              </Button>
-            </div>
-
+        <BottomSheet
+          onClose={() => {
+            const newOrder = reorderList.map((item) => item.origIdx);
+            const current = customData._dayOrder || DAYS.map((_, i) => i);
+            const same = newOrder.length === current.length && newOrder.every((v, i) => v === current[i]);
+            if (same) {
+              setShowReorder(false);
+            } else {
+              handleReorderConfirm();
+            }
+          }}
+          maxHeight="85vh"
+          zIndex="var(--z-confirm)"
+          title="Day 순서 변경"
+        >
+          <div style={{ padding: SPACING.xxxl }}>
             <div style={{
               display: "flex", flexDirection: "column", gap: SPACING.ms,
-              maxHeight: "50vh", overflowY: "auto",
+              maxHeight: "60vh", overflowY: "auto",
             }}>
               {reorderList.map((item, i) => (
                 <div key={`${item.idx}-${i}`} style={{

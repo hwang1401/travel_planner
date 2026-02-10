@@ -5,7 +5,9 @@ import Icon from '../common/Icon';
 import Button from '../common/Button';
 import Tab from '../common/Tab';
 import DetailDialog from '../dialogs/DetailDialog';
+import AddRAGPlaceSheet from '../dialogs/AddRAGPlaceSheet';
 import { getItemCoords } from '../../data/locations';
+import { getNearbyPlaces } from '../../services/ragService';
 import { TYPE_CONFIG, TYPE_LABELS, SPACING } from '../../styles/tokens';
 import { useScrollLock } from '../../hooks/useScrollLock';
 
@@ -51,26 +53,45 @@ function FlyToPoint({ coords, zoom }) {
   return null;
 }
 
+/* ── Small icon for nearby (secondary) pins ── */
+function createNearbyIcon(type) {
+  const cfg = TYPE_CONFIG[type] || TYPE_CONFIG.info;
+  const color = cfg?.text || '#6B6B67';
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:20px;height:20px;border-radius:50%;
+      background:${color};border:2px solid var(--color-surface-container-lowest);
+      box-shadow:0 1px 4px rgba(0,0,0,0.2);
+    "></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+    popupAnchor: [0, -10],
+  });
+}
+
 /* ── Full Map Dialog ── */
-export default function FullMapDialog({ days, onClose }) {
+export default function FullMapDialog({ days, onClose, onAddItem }) {
   useScrollLock();
   const [selectedDay, setSelectedDay] = useState(0);
   const [flyTarget, setFlyTarget] = useState(null);
   const [selectedItemIdx, setSelectedItemIdx] = useState(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [addNearbyPlace, setAddNearbyPlace] = useState(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState([]);
   const [cardExpanded, setCardExpanded] = useState(true);
-  const [mapDetail, setMapDetail] = useState(null);
   const markerRefs = useRef({});
   const timelineRef = useRef(null);
 
   const day = days[selectedDay];
 
-  // ── Build allItems: every item with coords/detail ──
+  // ── Build allItems: every item with coords/detail (with section indices for payloads) ──
   const allItems = [];
   if (day) {
     let orderNum = 1;
     const seenCoords = new Set();
-    day.sections.forEach((sec) => {
-      (sec.items || []).filter(Boolean).forEach((item) => {
+    day.sections.forEach((sec, si) => {
+      (sec.items || []).filter(Boolean).forEach((item, ii) => {
         const loc = getItemCoords(item, selectedDay);
         const coords = loc ? loc.coords : null;
         const coordKey = coords ? `${coords[0]},${coords[1]}` : null;
@@ -83,7 +104,7 @@ export default function FullMapDialog({ days, onClose }) {
           ...detail,
           name: detail.name || item.desc,
           category: detail.category || TYPE_LABELS[item.type] || "정보",
-        } : null;
+        } : { name: item.desc, category: TYPE_LABELS[item.type] || "정보" };
 
         allItems.push({
           item,
@@ -97,10 +118,25 @@ export default function FullMapDialog({ days, onClose }) {
           desc: item.desc,
           type: item.type,
           label: loc?.label || item.desc,
+          sectionIdx: si,
+          itemIdxInSection: ii,
         });
       });
     });
   }
+
+  // ── Detail payloads for swipe/dots (same shape as TravelPlanner) ──
+  const allDetailPayloads = allItems.map((entry, idx) => ({
+    ...(entry.detail || {}),
+    name: entry.detail?.name ?? entry.desc,
+    category: entry.detail?.category || TYPE_LABELS[entry.type] || "정보",
+    timetable: entry.detail?.timetable,
+    _item: entry.item,
+    _si: entry.sectionIdx,
+    _ii: entry.itemIdxInSection,
+    _di: selectedDay,
+    _index: idx,
+  }));
 
   // ── Build mapPins: group by coords for map markers ──
   const mapPins = [];
@@ -160,8 +196,46 @@ export default function FullMapDialog({ days, onClose }) {
   const handlePopupDetailClick = (entry, e) => {
     e.stopPropagation();
     setSelectedItemIdx(entry.itemIdx);
-    if (entry.detail) setMapDetail(entry.detail);
+    setDetailOpen(true);
   };
+
+  const handleDetailNavigateToIndex = (index) => {
+    if (index >= 0 && index < allItems.length) {
+      setSelectedItemIdx(index);
+      const entry = allItems[index];
+      if (entry?.coords) setFlyTarget({ coords: entry.coords, ts: Date.now() });
+    }
+  };
+
+  // ── Load nearby places when a pin is selected and detail is open ──
+  useEffect(() => {
+    if (!detailOpen || selectedItemIdx == null || !day) {
+      setNearbyPlaces([]);
+      return;
+    }
+    const flat = [];
+    day.sections.forEach((sec) => {
+      (sec.items || []).filter(Boolean).forEach((item) => flat.push(item));
+    });
+    const entry = flat[selectedItemIdx];
+    if (!entry) {
+      setNearbyPlaces([]);
+      return;
+    }
+    const loc = getItemCoords(entry, selectedDay);
+    const coords = loc?.coords;
+    if (!coords || coords.length < 2) {
+      setNearbyPlaces([]);
+      return;
+    }
+    const lat = coords[0];
+    const lon = coords[1];
+    const excludeName = entry.detail?.name || entry.desc || '';
+    getNearbyPlaces({ lat, lon, excludeName }).then((byType) => {
+      const list = [...(byType.food || []), ...(byType.spot || []), ...(byType.shop || [])];
+      setNearbyPlaces(list);
+    }).catch(() => setNearbyPlaces([]));
+  }, [detailOpen, selectedItemIdx, day, selectedDay]);
 
   return (
     <div style={{
@@ -186,7 +260,7 @@ export default function FullMapDialog({ days, onClose }) {
         <Tab
           items={days.map((d, i) => ({ label: `D${i + 1}`, value: i }))}
           value={selectedDay}
-          onChange={(v) => { setSelectedDay(v); setSelectedItemIdx(null); setFlyTarget(null); }}
+          onChange={(v) => { setSelectedDay(v); setSelectedItemIdx(null); setDetailOpen(false); setFlyTarget(null); }}
           size="md"
         />
       </div>
@@ -266,12 +340,76 @@ export default function FullMapDialog({ days, onClose }) {
               </Marker>
             );
           })}
+          {/* Nearby (secondary) pins when a main pin is selected */}
+          {nearbyPlaces.map((p) => {
+            if (p.lat == null || p.lon == null) return null;
+            return (
+              <Marker
+                key={p.id || `${p.name_ko}-${p.lat}-${p.lon}`}
+                position={[Number(p.lat), Number(p.lon)]}
+                icon={createNearbyIcon(p.type)}
+              >
+                <Popup>
+                  <div style={{
+                    fontSize: 'var(--typo-caption-1-regular-size)',
+                    fontFamily: 'var(--font-family-base)',
+                    minWidth: '140px',
+                    maxWidth: '200px',
+                  }}>
+                    {p.image_url && (
+                      <img
+                        src={p.image_url}
+                        alt=""
+                        style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: SPACING.sm, display: 'block' }}
+                      />
+                    )}
+                    <strong style={{ display: 'block', marginBottom: SPACING.xs, fontSize: 'var(--typo-label-2-bold-size)' }}>
+                      {p.name_ko || '장소'}
+                    </strong>
+                    {onAddItem && (
+                      <Button
+                        variant="ghost-primary"
+                        size="sm"
+                        iconLeft="plus"
+                        onClick={() => setAddNearbyPlace(p)}
+                        style={{ marginTop: SPACING.sm }}
+                      >
+                        일정추가
+                      </Button>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
         </MapContainer>
 
-        {/* DetailDialog for map */}
-        {mapDetail && (
+        {/* RAG 장소 일정추가 시트 (프리필 폼, 시간만 선택 후 저장) */}
+        {addNearbyPlace && (
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1200 }}>
+            <AddRAGPlaceSheet
+              place={addNearbyPlace}
+              onConfirm={(item) => {
+                onAddItem(selectedDay, item, -1);
+                setAddNearbyPlace(null);
+              }}
+              onClose={() => setAddNearbyPlace(null)}
+            />
+          </div>
+        )}
+
+        {/* DetailDialog for map (swipe between same-day items) */}
+        {detailOpen && selectedItemIdx != null && allDetailPayloads[selectedItemIdx] && (
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1100 }}>
-            <DetailDialog detail={mapDetail} onClose={() => setMapDetail(null)} dayColor="var(--color-primary)" />
+            <DetailDialog
+              detail={allDetailPayloads[selectedItemIdx]}
+              onClose={() => setDetailOpen(false)}
+              dayColor="var(--color-primary)"
+              allDetailPayloads={allDetailPayloads}
+              currentDetailIndex={selectedItemIdx}
+              onNavigateToIndex={allDetailPayloads.length > 1 ? handleDetailNavigateToIndex : undefined}
+              onAddToSchedule={onAddItem ? (place) => setAddNearbyPlace(place) : undefined}
+            />
           </div>
         )}
       </div>

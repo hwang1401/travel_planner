@@ -6,6 +6,8 @@
 import { supabase } from '../lib/supabase.js';
 
 const MAX_PLACES = 80;
+/** hint(사용자 메시지) 지역에서 먼저 가져올 장소 수. 채팅에서 "도쿄" 말해도 트립이 북큐슈면 80개가 큐슈로 채워지는 문제 방지. */
+const HINT_PLACES_LIMIT = 30;
 
 /** Region center coordinates — synced with scripts/rag-seed.js REGION_CONFIG */
 const REGION_CENTERS = {
@@ -272,56 +274,82 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
 
     const selectCols = 'id, region, name_ko, type, description, tags, price_range, opening_hours, image_url, google_place_id, address, lat, lon';
     const tags = extractTagsFromPreferences(preferences || '');
+    const confidenceOr = 'confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null';
+
+    // hint 지역(사용자 메시지에서만 추출, 권역 확장 안 함) → 먼저 확보. 나머지는 트립/비-hint 지역으로 채움.
+    const hintRegions = hintText ? destinationsToRegions(extractDestinationHintsFromText(hintText)) : [];
+    const otherRegions = hintRegions.length > 0 ? regions.filter((r) => !hintRegions.includes(r)) : regions;
 
     let places = [];
 
     if (tags.length > 0) {
-      // 1차: 태그 매칭 장소 우선 가져오기
-      const { data: tagMatched, error: err1 } = await supabase
-        .from('rag_places')
-        .select(selectCols)
-        .in('region', regions)
-        .or('confidence.eq.verified,confidence.is.null')
-        .overlaps('tags', tags)
-        .limit(MAX_PLACES);
-
-      if (err1) {
-        console.warn('[RAG] tag query error:', err1);
-      } else if (tagMatched?.length) {
-        places = tagMatched;
-      }
-
-      // 2차: 남은 슬롯을 태그 무관 장소로 채우기
-      const remaining = MAX_PLACES - places.length;
-      if (remaining > 0) {
-        const excludeIds = places.map((p) => p.name_ko); // 중복 방지
-        const { data: others, error: err2 } = await supabase
+      // 1단계: hint 지역에서 태그 매칭 우선 (최대 HINT_PLACES_LIMIT)
+      if (hintRegions.length > 0) {
+        const { data: hintTag, error: eh } = await supabase
           .from('rag_places')
           .select(selectCols)
-          .in('region', regions)
-          .or('confidence.eq.verified,confidence.is.null')
-          .limit(remaining);
-
-        if (!err2 && others?.length) {
-          // 이미 가져온 장소 제외
-          const additional = others.filter((p) => !excludeIds.includes(p.name_ko));
-          places = [...places, ...additional].slice(0, MAX_PLACES);
+          .in('region', hintRegions)
+          .or(confidenceOr)
+          .overlaps('tags', tags)
+          .limit(HINT_PLACES_LIMIT);
+        if (!eh && hintTag?.length) places = hintTag;
+      }
+      // 2단계: 비-hint 지역에서 태그 매칭으로 남은 슬롯 채우기
+      let remaining = MAX_PLACES - places.length;
+      const seenIds = new Set(places.map((p) => p.id));
+      if (remaining > 0 && otherRegions.length > 0) {
+        const { data: restTag, error: er } = await supabase
+          .from('rag_places')
+          .select(selectCols)
+          .in('region', otherRegions)
+          .or(confidenceOr)
+          .overlaps('tags', tags)
+          .limit(remaining * 2);
+        if (!er && restTag?.length) {
+          const add = restTag.filter((p) => !seenIds.has(p.id)).slice(0, remaining);
+          add.forEach((p) => seenIds.add(p.id));
+          places = [...places, ...add];
+        }
+        remaining = MAX_PLACES - places.length;
+      }
+      // 3단계: 태그 무관으로 더 채우기
+      if (remaining > 0 && otherRegions.length > 0) {
+        const { data: rest, error: e2 } = await supabase
+          .from('rag_places')
+          .select(selectCols)
+          .in('region', otherRegions)
+          .or(confidenceOr)
+          .limit(remaining * 2);
+        if (!e2 && rest?.length) {
+          const add = rest.filter((p) => !seenIds.has(p.id)).slice(0, remaining);
+          places = [...places, ...add].slice(0, MAX_PLACES);
         }
       }
     } else {
-      // 태그 없으면 전체 조회
-      const { data, error } = await supabase
-        .from('rag_places')
-        .select(selectCols)
-        .in('region', regions)
-        .or('confidence.eq.verified,confidence.is.null')
-        .limit(MAX_PLACES);
-
-      if (error) {
-        console.warn('[RAG] getRAGContext query error:', error);
-        return result;
+      // 태그 없음: 1단계 hint 지역, 2단계 비-hint 지역
+      if (hintRegions.length > 0) {
+        const { data: hintPlaces, error: eh } = await supabase
+          .from('rag_places')
+          .select(selectCols)
+          .in('region', hintRegions)
+          .or(confidenceOr)
+          .limit(HINT_PLACES_LIMIT);
+        if (!eh && hintPlaces?.length) places = hintPlaces;
       }
-      places = data || [];
+      const remaining = MAX_PLACES - places.length;
+      const seenIds = new Set(places.map((p) => p.id));
+      if (remaining > 0 && otherRegions.length > 0) {
+        const { data: rest, error: er } = await supabase
+          .from('rag_places')
+          .select(selectCols)
+          .in('region', otherRegions)
+          .or(confidenceOr)
+          .limit(remaining * 2);
+        if (!er && rest?.length) {
+          const add = rest.filter((p) => !seenIds.has(p.id)).slice(0, remaining);
+          places = [...places, ...add].slice(0, MAX_PLACES);
+        }
+      }
     }
 
     if (places.length === 0) return result;
@@ -340,6 +368,65 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
   } catch (err) {
     console.warn('[RAG] getRAGContext error:', err);
     return result;
+  }
+}
+
+const NEARBY_SELECT = 'id, region, name_ko, type, description, image_url, address, lat, lon, rating, google_place_id, price_range, opening_hours, tags';
+const NEARBY_TYPES = ['food', 'spot', 'shop', 'stay'];
+const MAX_NEARBY_PER_TYPE = 5;
+const NEARBY_FETCH_LIMIT = 80;
+
+/**
+ * 주변 장소 조회 (lat/lon 기준, region으로 Supabase 조회 후 클라이언트에서 거리 필터).
+ * @param {{ lat: number, lon: number, excludeName?: string, radius?: number, limit?: number }} params
+ * @returns {Promise<{ food: Array, spot: Array, shop: Array }>}
+ */
+export async function getNearbyPlaces({ lat, lon, excludeName, radius = 1.5, limit = 20 }) {
+  const out = { food: [], spot: [], shop: [] };
+  if (lat == null || lon == null || Number.isNaN(lat) || Number.isNaN(lon)) return out;
+  const region = findRegionByCoords(lat, lon);
+  if (!region) return out;
+
+  try {
+    const { data, error } = await supabase
+      .from('rag_places')
+      .select(NEARBY_SELECT)
+      .eq('region', region)
+      .in('type', NEARBY_TYPES)
+      .or('confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null')
+      .limit(NEARBY_FETCH_LIMIT);
+
+    if (error) {
+      console.warn('[RAG] getNearbyPlaces query error:', error);
+      return out;
+    }
+    const rows = data || [];
+    const exclude = (excludeName && String(excludeName).trim()) || '';
+    const isSamePlace = (a, b) => {
+      const x = String(a || '').trim();
+      const y = String(b || '').trim();
+      if (!x || !y) return false;
+      if (x === y) return true;
+      return x.includes(y) || y.includes(x);
+    };
+    const withDist = rows
+      .filter((p) => p.lat != null && p.lon != null)
+      .filter((p) => !exclude || !isSamePlace(p.name_ko, exclude))
+      .map((p) => ({ ...p, _distKm: geoDistance(lat, lon, Number(p.lat), Number(p.lon)) }))
+      .filter((p) => p._distKm <= radius)
+      .sort((a, b) => a._distKm - b._distKm)
+      .slice(0, limit);
+
+    for (const p of withDist) {
+      if (p.type === 'food' && out.food.length < MAX_NEARBY_PER_TYPE) out.food.push(p);
+      else if (p.type === 'spot' && out.spot.length < MAX_NEARBY_PER_TYPE) out.spot.push(p);
+      else if (p.type === 'shop' && out.shop.length < MAX_NEARBY_PER_TYPE) out.shop.push(p);
+      // stay: 카드 섹션에서 제외 (스펙)
+    }
+    return out;
+  } catch (err) {
+    console.warn('[RAG] getNearbyPlaces error:', err);
+    return out;
   }
 }
 

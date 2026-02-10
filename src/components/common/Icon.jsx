@@ -40,6 +40,7 @@ const ICON_MAP = {
   externalLink: "/icons/External Link.svg",
   swap: "/icons/Swap.svg",
   list: "/icons/List.svg",
+  moreHorizontal: "/icons/More/Horizontal.svg",
   search: "/icons/Search.svg",
   person: "/icons/Person/Person.svg",
   persons: "/icons/Person/Persones.svg",

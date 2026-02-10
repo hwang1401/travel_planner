@@ -89,22 +89,26 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
         </div>
       </div>
 
-      {/* More button (top-right) */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onMore(); }}
+      {/* More button (top-right) — Button 컴포넌트, 터치 영역 확대(size lg) */}
+      <div
         style={{
-          position: 'absolute', top: coverImage ? '10px' : '12px', right: '10px',
-          width: '28px', height: '28px', borderRadius: '50%',
-          background: coverImage ? 'rgba(0,0,0,0.25)' : 'var(--color-surface-container-lowest)',
-          backdropFilter: coverImage ? 'blur(8px)' : 'none',
-          border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: coverImage ? 'white' : 'var(--color-on-surface-variant2)',
-          fontSize: '14px', fontWeight: 700, letterSpacing: '1px',
+          position: 'absolute', top: coverImage ? '8px' : '10px', right: '8px',
         }}
+        {...(coverImage && { 'data-cover': 'true' })}
       >
-        ···
-      </button>
+        <Button
+          variant="ghost-neutral"
+          size="lg"
+          iconOnly="moreHorizontal"
+          title="더보기"
+          onClick={(e) => { e.stopPropagation(); onMore(); }}
+          style={
+            coverImage
+              ? { background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)' }
+              : undefined
+          }
+        />
+      </div>
     </div>
   );
 }

@@ -97,6 +97,11 @@ body {
   opacity: 0.85;
 }
 
+/* 홈 일정 카드 더보기 버튼: 커버 이미지 위일 때 아이콘 흰색 */
+[data-cover="true"] button img {
+  filter: brightness(0) invert(1);
+}
+
 /* ── Skeleton (로딩 스켈레톤) ── */
 @keyframes skeletonShimmer {
   0% { background-position: -200% 0; }
