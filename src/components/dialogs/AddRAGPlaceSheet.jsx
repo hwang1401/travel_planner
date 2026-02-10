@@ -50,7 +50,7 @@ export default function AddRAGPlaceSheet({ place, onConfirm, onClose }) {
 
   return (
     <BottomSheet onClose={onClose} maxHeight="85vh" zIndex="var(--z-confirm)" title="일정에 추가">
-      <div style={{ padding: `0 ${SPACING.xxl} ${SPACING.xxxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
+      <div style={{ padding: SPACING.xxxl, display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
         {/* 일정명 (프리필, 읽기 전용) */}
         <Field
           label="일정명"

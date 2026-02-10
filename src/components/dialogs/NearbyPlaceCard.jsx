@@ -1,7 +1,6 @@
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import { SPACING, RADIUS } from '../../styles/tokens';
-import { TYPE_CONFIG } from '../../styles/tokens';
 
 /**
  * 주변 추천 가로 스크롤용 카드. 이미지/이름/거리/별점/일정추가.
@@ -24,7 +23,6 @@ function formatWalkMinutes(distKm) {
 export default function NearbyPlaceCard({ place, onSelect, onAddToSchedule }) {
   if (!place) return null;
   const { name_ko, image_url, type, _distKm, rating, address } = place;
-  const cfg = TYPE_CONFIG[type] || TYPE_CONFIG.info;
 
   const distanceText = _distKm != null ? (formatWalkMinutes(_distKm) || formatDistance(_distKm)) : '';
 
@@ -44,16 +42,19 @@ export default function NearbyPlaceCard({ place, onSelect, onAddToSchedule }) {
         scrollSnapAlign: 'start',
       }}
     >
-      {/* Image */}
+      {/* Image / 플레이스홀더 (이미지 없을 때 통일된 placeholder) */}
       <div style={{
         width: '100%',
         aspectRatio: '4/3',
-        background: cfg?.bg || 'var(--color-surface-container)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        background: image_url ? undefined : 'var(--color-surface-container-lowest)',
+        display: image_url ? 'block' : 'flex',
+        flexDirection: image_url ? undefined : 'column',
+        alignItems: image_url ? undefined : 'center',
+        justifyContent: image_url ? undefined : 'center',
+        gap: image_url ? undefined : SPACING.xs,
         overflow: 'hidden',
         borderRadius: RADIUS.sm,
+        border: image_url ? undefined : '1px dashed var(--color-outline-variant)',
       }}>
         {image_url ? (
           <img
@@ -62,7 +63,16 @@ export default function NearbyPlaceCard({ place, onSelect, onAddToSchedule }) {
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
         ) : (
-          <Icon name={cfg?.icon || 'pin'} size={28} style={{ opacity: 0.6, color: cfg?.text }} />
+          <>
+            <Icon name="pin" size={24} style={{ opacity: 0.35, color: 'var(--color-on-surface-variant2)' }} />
+            <span style={{
+              fontSize: 'var(--typo-caption-2-regular-size)',
+              color: 'var(--color-on-surface-variant2)',
+              opacity: 0.8,
+            }}>
+              이미지 없음
+            </span>
+          </>
         )}
       </div>
 

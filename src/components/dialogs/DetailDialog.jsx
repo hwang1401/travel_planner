@@ -88,9 +88,11 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
   const [nearbyByType, setNearbyByType] = useState({ food: [], spot: [], shop: [] });
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const nearbyCacheRef = useRef({});
+  const nearbyScrollRef = useRef(null);
+  const contentScrollRef = useRef(null);
   const effectiveDetail = overlayDetail || detail;
   const accentColor = dayColor || COLOR.primary;
-  const swipeStart = useRef({ x: 0, y: 0, pointerId: null });
+  const swipeStart = useRef({ x: 0, y: 0, pointerId: null, fromNearbyScroll: false });
   const curIdx = typeof currentDetailIndex === "number" ? currentDetailIndex : 0;
   const total = allDetailPayloads?.length ?? 0;
 
@@ -149,10 +151,18 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
     }).catch(() => setNearbyLoading(false));
   }, [showNearby, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.name]);
 
+  /* 주변 장소 overlay 열릴 때 스크롤 맨 위로 초기화 */
+  useEffect(() => {
+    if (overlayDetail && contentScrollRef.current) {
+      contentScrollRef.current.scrollTop = 0;
+    }
+  }, [overlayDetail]);
+
   /* 스와이프: 왼쪽(끝<시작) → 다음 인덱스, 오른쪽(끝>시작) → 이전 인덱스. 이동할 인덱스만 부모에 전달 */
   const MIN_SWIPE_PX = 60;
   const handleSwipeEnd = useCallback((endX, endY) => {
     if (overlayDetail) return;
+    if (swipeStart.current.fromNearbyScroll) return;
     const { x: startX, y: startY } = swipeStart.current;
     const dx = endX - startX;
     const dy = endY - startY;
@@ -175,6 +185,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
   const onTouchStart = useCallback((e) => {
     const t = e.touches[0];
     handleStart(t.clientX, t.clientY, null);
+    swipeStart.current.fromNearbyScroll = nearbyScrollRef.current?.contains(e.target) ?? false;
   }, [handleStart]);
   const onTouchEnd = useCallback((e) => {
     if (!e.changedTouches?.[0]) return;
@@ -185,6 +196,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
   const onPointerDown = useCallback((e) => {
     if (e.pointerType !== "mouse") return;
     handleStart(e.clientX, e.clientY, e.pointerId);
+    swipeStart.current.fromNearbyScroll = nearbyScrollRef.current?.contains(e.target) ?? false;
   }, [handleStart]);
   const onPointerUp = useCallback((e) => {
     if (e.pointerType !== "mouse") return;
@@ -235,6 +247,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
 
         {/* ── 스크롤 콘텐츠 (스와이프로 이전/다음) ── */}
         <div
+          ref={contentScrollRef}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           onPointerDown={onPointerDown}
@@ -374,9 +387,9 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           </SectionWrap>
         )}
 
-        {/* ── 주변 추천 (가로 스크롤 카드) ── */}
+        {/* ── 주변 추천 (가로 스크롤 카드). 이 영역 내 좌우 스와이프는 상세 이동이 아닌 스크롤만. ── */}
         {showNearby && (
-          <>
+          <div ref={nearbyScrollRef}>
             {nearbyLoading && (
               <SectionWrap label="주변 추천" px={px}>
                 <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>불러오는 중...</p>
@@ -440,7 +453,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
                 )}
               </>
             )}
-          </>
+          </div>
         )}
 
         {/* ── 교통 타임테이블 (공통 컴포넌트) ── */}
