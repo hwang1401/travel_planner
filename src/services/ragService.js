@@ -260,6 +260,11 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
       }
     }
     let regions = destinationsToRegions(destList);
+    // 사용자 메시지에 언급된 지역(예: "유후인")이 RAG에 반드시 포함되도록 hint → region 병합
+    if (hintText) {
+      const hintRegions = destinationsToRegions(extractDestinationHintsFromText(hintText));
+      if (hintRegions.length) regions = [...new Set([...regions, ...hintRegions])];
+    }
     if (expandToArea && regions.length > 0) {
       regions = expandRegionsToAreas(regions);
     }

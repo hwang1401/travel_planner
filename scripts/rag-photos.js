@@ -57,7 +57,7 @@ function parseArgs() {
   return opts;
 }
 
-/* ── Google Places (New): get photo resource name ── */
+/* ── Google Places (New): get photo resource name (대표에 가까운 사진 우선: 해상도 가장 큰 것) ── */
 async function getPhotoName(placeId) {
   const url = `https://places.googleapis.com/v1/places/${placeId}`;
   const res = await fetch(url, {
@@ -68,7 +68,19 @@ async function getPhotoName(placeId) {
   });
   const data = await res.json();
   if (!data.photos?.length) return null;
-  return data.photos[0].name; // e.g. "places/xxx/photos/yyy"
+  // photos[0]이 구글맵 대표사진과 다를 수 있음 → 해상도(widthPx*heightPx) 가장 큰 사진 사용 (대표/히어로 이미지에 가깝게)
+  const photos = data.photos;
+  let best = photos[0];
+  let bestPixels = (best.widthPx || 0) * (best.heightPx || 0);
+  for (let i = 1; i < photos.length; i++) {
+    const p = photos[i];
+    const pixels = (p.widthPx || 0) * (p.heightPx || 0);
+    if (pixels > bestPixels) {
+      best = p;
+      bestPixels = pixels;
+    }
+  }
+  return best.name; // e.g. "places/xxx/photos/yyy"
 }
 
 /* ── Google Places (New): download photo as buffer ── */

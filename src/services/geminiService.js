@@ -375,13 +375,16 @@ rag_id: 사용자 메시지에 [참고 장소] 목록이 있으면, 식사·관�
 
 참고 장소 사용 (내부: 사용자 메시지에 붙는 장소 목록. 사용자에게 "참고 장소"라고 말하지 말 것):
 - 사용자 메시지에 [참고 장소] 목록이 포함되어 있으면, 식사·관광·쇼핑·숙소 항목은 반드시 그 목록에 있는 장소만 사용하고, 각 item에 해당 장소의 rag_id를 넣으세요. 목록에 없는 장소는 절대 넣지 마세요 (예: 목록에 돈까스 맛집이 없으면 "돈까스 맛집" 같은 항목을 임의로 만들지 말고, 목록에 있는 라멘/우동 등으로만 구성).
+- 사용자가 특정 지역을 말하면 (예: "유후인에서 구경할거리 찾아줘") [참고 장소]에서 해당 지역(region)이 붙은 장소([yufuin] 등)를 골라 사용하세요. 목록에 그 지역 장소가 있으면 "OO엔 추천 목록이 없어요"라고 말하지 마세요.
 - 사용자가 "하카타에서 뭐 추천해줘"처럼만 말해도, [참고 장소] 목록이 주어졌으면 그 목록 안의 장소만 사용하세요. 목록에 없는 메뉴/장소 타입(예: 돈까스)을 꾸며 넣지 마세요.
 - 사용자가 요청한 메뉴/장소가 그 목록에 없을 때, message에서는 "추천 목록에 OO이 없어서요", "저희가 가진 맛집 정보에는 OO이 없어서요"처럼만 쓰고, "[참고 장소]"라는 말은 쓰지 마세요.
 
 대화·추가 질문 vs 일정 만들기 (맥락에 따라 판단):
+- 여행·일정·장소 추천과 무관한 말(인사, 농담, "바보", "ㅋㅋ", 짧은 반말 등)에는 일정을 만들지 마세요. message에 짧게 대화체로만 답하고 items: [], choices: []로 반환하세요. 예: "바보" → "ㅋㅋ 뭐 도와줄 거 있어?"
+- 여행과 관련된 일상 대화(예: "후쿠오카 좋지?", "라멘 먹고 싶다", "날씨 좋으면 좋겠다", "다음에 뭐 할까")처럼 추천/일정을 요청한 게 아닐 때도 일정을 만들지 마세요. 말에 맞춰 짧게 공감·대화하고 items: [], choices: [] 또는 choices: ["일정 짜줄까?", "맛집 추천해줄까?"]처럼 제안만 할 수 있습니다. 사용자가 "추천해줘", "일정 짜줘", "뭐 먹을지 정해줘" 등으로 구체적으로 요청할 때만 items를 채우세요.
 - 질문이 필요한 경우에만 질문하세요: 사용자 말만으로는 시간대·점심/저녁 등이 불명확할 때만 message에 질문을 쓰고, items: [], choices: ["선택지1", "선택지2"]로 반환하세요.
 - 일정을 만들 조건이 갖춰지면: 사용자가 "점심으로 해줘", "저녁" 등 답했거나, 처음부터 "하카타 맛집 점심 추천해줘"처럼 충분한 정보를 줬으면 items를 채우고 choices: []로 두세요. "타임라인 만들어줘", "일정 짜줘"라고 하면 바로 items를 채우세요.
-- 요약: 맥락상 추가 정보가 필요할 때만 질문(choices 사용). 일정을 만들 수 있을 때는 items를 채우고 choices는 비우세요.`;
+- 요약: 추천/일정을 명시적으로 요청했을 때만 items를 채우세요. 무관한 말·여행 관련 일상 대화에는 짧게만 답하고, 필요하면 "일정 짜줄까?" 같은 선택지만 주세요.`;
 
 /**
  * Get AI schedule recommendations based on natural language input.
@@ -752,6 +755,56 @@ function injectRAGData(days, ragPlaces) {
   return days;
 }
 
+const PLACE_TYPES_FOR_VERIFICATION = ['food', 'spot', 'shop', 'stay'];
+const MAX_UNMATCHED_PLACES_TO_ENQUEUE = 10;
+
+/**
+ * Collect RAG-unmatched items (food/spot/shop/stay) from days and POST to Edge Function
+ * for background verification + registration. Fire-and-forget; does not block UI.
+ */
+function enqueueUnmatchedPlacesForVerification(days, ragPlaces) {
+  if (!Array.isArray(days) || days.length === 0) return;
+  const collected = [];
+  const seenDesc = new Set();
+  let regionHint = '';
+  for (const day of days) {
+    if (!regionHint && day.label) regionHint = String(day.label).trim();
+    const sections = day.sections || [];
+    for (const sec of sections) {
+      for (const item of sec.items || []) {
+        const type = item.type;
+        if (!PLACE_TYPES_FOR_VERIFICATION.includes(type)) continue;
+        const desc = (item.desc || '').trim();
+        if (!desc) continue;
+        if (findRAGMatch(item, ragPlaces || [])) continue;
+        if (seenDesc.has(desc)) continue;
+        seenDesc.add(desc);
+        collected.push({ desc, type });
+        if (collected.length >= MAX_UNMATCHED_PLACES_TO_ENQUEUE) break;
+      }
+      if (collected.length >= MAX_UNMATCHED_PLACES_TO_ENQUEUE) break;
+    }
+    if (collected.length >= MAX_UNMATCHED_PLACES_TO_ENQUEUE) break;
+  }
+  if (collected.length === 0) return;
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!baseUrl || !anonKey) return;
+  const url = `${baseUrl.replace(/\/$/, '')}/functions/v1/verify-and-register-places`;
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${anonKey}`,
+  };
+  fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ places: collected, regionHint: regionHint || undefined }),
+    keepalive: true,
+  }).catch((err) => {
+    console.warn('[GeminiService] RAG verify-and-register fire-and-forget failed:', err);
+  });
+}
+
 /** 장기 일정은 7일 단위로 나눠 요청 (MAX_TOKENS·무료플랜 한도 방지) */
 const CHUNK_DAYS = 7;
 const MAX_SINGLE_REQUEST_DAYS = 7;
@@ -937,6 +990,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
       }
       const days = normalizeDays(parsed.days, 0);
       injectRAGData(days, ragPlaces);
+      enqueueUnmatchedPlacesForVerification(days, ragPlaces);
       return { days, error: null };
     }
 
@@ -952,6 +1006,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
       previousSummary = chunkDays.map((d) => `${d.day}일: ${d.label}`).join(" / ");
     }
     injectRAGData(allDays, ragPlaces);
+    enqueueUnmatchedPlacesForVerification(allDays, ragPlaces);
     return { days: allDays, error: null };
   } catch (err) {
     console.error("[GeminiService] Trip generation error:", err);
