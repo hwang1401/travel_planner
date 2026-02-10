@@ -6,6 +6,7 @@ import LoginPage from './components/LoginPage';
 import HomePage from './components/HomePage';
 import TravelPlanner from './components/TravelPlanner';
 import InvitePage from './components/InvitePage';
+import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 
 const MIN_SPLASH_MS = 1500;
 
@@ -31,14 +32,17 @@ function AppRoutes() {
   // Not authenticated → login
   if (!user) return <LoginPage />;
 
-  // Authenticated → app routes
+  // Authenticated → app routes + PWA 설치 툴팁 (웹 진입 시만)
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/trip/legacy" element={<TravelPlanner />} />
-      <Route path="/trip/:tripId" element={<TravelPlanner />} />
-      <Route path="/invite/:shareCode" element={<InvitePage />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/trip/legacy" element={<TravelPlanner />} />
+        <Route path="/trip/:tripId" element={<TravelPlanner />} />
+        <Route path="/invite/:shareCode" element={<InvitePage />} />
+      </Routes>
+      <PwaInstallPrompt />
+    </>
   );
 }
 
