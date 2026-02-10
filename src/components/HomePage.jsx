@@ -116,7 +116,7 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
 /* ── Home Page ── */
 export default function HomePage() {
   const navigate = useNavigate();
-  const { profile, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -127,8 +127,9 @@ export default function HomePage() {
   const [legacyHidden, setLegacyHidden] = useState(() => localStorage.getItem('legacy_trip_hidden') === 'true');
   const splashStartRef = useRef(null);
 
-  /* ── Total trip count ── */
-  const totalTrips = trips.length + (legacyHidden ? 0 : 1);
+  /* ── Total trip count (로그인 사용자에게는 로컬 레거시 미노출) ── */
+  const showLegacy = !user && !legacyHidden;
+  const totalTrips = trips.length + (showLegacy ? 1 : 0);
 
   /* ── Load trips from Supabase (최소 스플래시 시간 적용으로 깜빡임 방지) ── */
   const fetchTrips = useCallback(async () => {
@@ -392,8 +393,8 @@ export default function HomePage() {
 
         {!loading && (
           <div style={{ animation: 'fadeIn 0.35s ease' }}>
-            {/* Legacy trip card */}
-            {!legacyHidden && (
+            {/* Legacy trip card (비로그인 시에만 노출; 로그인/가입 후에는 숨김) */}
+            {showLegacy && (
               <TripCard
                 title="후쿠오카 · 유후인 여행"
                 subtitle="2/19 (목) — 2/24 (화) · 5박6일"
