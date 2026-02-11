@@ -14,6 +14,7 @@ import { TYPE_CONFIG, TYPE_LABELS, COLOR, SPACING, RADIUS } from '../../styles/t
 import { TIMETABLE_DB, findBestTrain, matchTimetableRoute, findRoutesByStations } from '../../data/timetable';
 import TimetablePreview from '../common/TimetablePreview';
 import StationPickerModal from '../dialogs/StationPickerModal';
+import TimePickerDialog from '../common/TimePickerDialog';
 
 /* ── AddPlacePage ──
  * Full-page for adding a single place / schedule item.
@@ -101,33 +102,13 @@ function FitResults({ positions }) {
   return null;
 }
 
-/* ── 시간 선택 UI: 앱용 팝업 다이얼로그 (잘림 없이 전체 스크롤) ── */
-const TIME_OPTIONS = (() => {
-  const list = [];
-  for (let h = 0; h < 24; h++) {
-    for (const m of [0, 15, 30, 45]) {
-      list.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-    }
-  }
-  return list;
-})();
-
+/* ── 시간 선택 UI: iOS 스타일 휠 다이얼로그 ── */
 const FIELD_LG_HEIGHT = 'var(--height-lg, 36px)';
 const FIELD_LG_PX = 'var(--spacing-sp140, 14px)';
 const FIELD_RADIUS = 'var(--radius-md, 8px)';
 
 function TimePicker({ value, onChange, label, error }) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [viewportRect, setViewportRect] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
 
   const displayText = value && value.match(/^\d{1,2}:\d{2}$/) ? value : '';
   const borderColor = error
@@ -146,10 +127,6 @@ function TimePicker({ value, onChange, label, error }) {
     lineHeight: 'var(--typo-caption-2-bold-line-height)',
     color: 'var(--color-on-surface-variant)',
   };
-
-  const dialogStyle = viewportRect
-    ? { position: 'fixed', top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height, zIndex: 2000 }
-    : { position: 'fixed', inset: 0, zIndex: 2000 };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: '60px' }}>
@@ -203,89 +180,13 @@ function TimePicker({ value, onChange, label, error }) {
         </div>
       )}
 
-      {dialogOpen && (
-        <div
-          style={{
-            ...dialogStyle,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(0,0,0,0.4)',
-            padding: SPACING.xxl,
-            boxSizing: 'border-box',
-          }}
-          onClick={() => setDialogOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-label="시간 선택"
-            style={{
-              width: '100%',
-              maxWidth: 320,
-              maxHeight: viewportRect ? viewportRect.height - 80 : '80vh',
-              display: 'flex',
-              flexDirection: 'column',
-              background: 'var(--color-surface-container-lowest)',
-              borderRadius: RADIUS.lg,
-              boxShadow: '0 16px 48px rgba(0,0,0,0.2)',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{
-              flexShrink: 0,
-              padding: `${SPACING.md} ${SPACING.xl}`,
-              borderBottom: '1px solid var(--color-outline-variant)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}>
-              <span style={{
-                fontSize: 'var(--typo-body-2-n---bold-size)',
-                fontWeight: 'var(--typo-body-2-n---bold-weight)',
-                color: 'var(--color-on-surface)',
-              }}>
-                시간 선택
-              </span>
-              <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={() => setDialogOpen(false)} aria-label="닫기" />
-            </div>
-            <div style={{
-              flex: 1,
-              minHeight: 0,
-              overflowY: 'auto',
-              paddingBottom: SPACING.xl,
-              WebkitOverflowScrolling: 'touch',
-            }}>
-              {TIME_OPTIONS.map((t) => {
-                const isActive = value === t;
-                return (
-                  <div
-                    key={t}
-                    role="option"
-                    aria-selected={isActive}
-                    onClick={() => {
-                      onChange(t);
-                      setDialogOpen(false);
-                    }}
-                    style={{
-                      padding: `${SPACING.lg} ${SPACING.xl}`,
-                      cursor: 'pointer',
-                      background: isActive ? 'var(--color-primary-container)' : 'transparent',
-                      color: isActive ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)',
-                      fontSize: 'var(--typo-label-1-n---regular-size)',
-                      fontWeight: isActive ? 600 : 400,
-                      transition: 'background 0.1s',
-                      borderBottom: '1px solid var(--color-surface-dim)',
-                    }}
-                  >
-                    {t}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      <TimePickerDialog
+        open={dialogOpen}
+        value={value || '12:00'}
+        minuteStep={5}
+        onConfirm={(v) => { onChange(v); setDialogOpen(false); }}
+        onClose={() => setDialogOpen(false)}
+      />
     </div>
   );
 }

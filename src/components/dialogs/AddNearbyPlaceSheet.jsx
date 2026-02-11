@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import BottomSheet from '../common/BottomSheet';
 import Button from '../common/Button';
-import Field from '../common/Field';
+import Icon from '../common/Icon';
+import TimePickerDialog from '../common/TimePickerDialog';
 import { SPACING, RADIUS } from '../../styles/tokens';
 
 /**
@@ -11,6 +12,7 @@ import { SPACING, RADIUS } from '../../styles/tokens';
  */
 export default function AddNearbyPlaceSheet({ place, onConfirm, onClose }) {
   const [time, setTime] = useState('12:00');
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   if (!place) return null;
 
@@ -73,17 +75,56 @@ export default function AddNearbyPlaceSheet({ place, onConfirm, onClose }) {
           )}
         </div>
 
-        {/* 시간 */}
+        {/* 시간 — iOS 스타일 휠 다이얼로그 */}
         <div style={{ marginBottom: SPACING.xxl }}>
-          <Field
-            as="input"
-            label="시간"
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value || '12:00')}
-            size="lg"
-          />
+          <div style={{
+            paddingBottom: 'var(--spacing-sp40, 4px)',
+            minHeight: 'var(--field-label-row-height, 20px)',
+            display: 'flex',
+            alignItems: 'center',
+          }}>
+            <span style={{
+              fontSize: 'var(--typo-caption-2-bold-size)',
+              fontWeight: 'var(--typo-caption-2-bold-weight)',
+              color: 'var(--color-on-surface-variant)',
+            }}>
+              시간
+            </span>
+          </div>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setShowTimePicker(true)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowTimePicker(true); } }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: SPACING.md,
+              minHeight: 'var(--height-lg, 48px)',
+              padding: `0 ${SPACING.lx}`,
+              border: '1px solid var(--color-outline-variant)',
+              borderRadius: RADIUS.md,
+              background: 'var(--color-surface-container-lowest)',
+              cursor: 'pointer',
+            }}
+            aria-label="시간 선택"
+          >
+            <span style={{
+              flex: 1,
+              fontSize: 'var(--typo-label-1-n---regular-size)',
+              color: 'var(--color-on-surface)',
+            }}>
+              {/^\d{1,2}:\d{2}$/.test(time) ? time : '12:00'}
+            </span>
+            <Icon name="chevronDown" size={18} style={{ opacity: 0.6 }} />
+          </div>
         </div>
+        <TimePickerDialog
+          open={showTimePicker}
+          value={time}
+          onConfirm={(v) => setTime(v)}
+          onClose={() => setShowTimePicker(false)}
+        />
 
         <Button variant="primary" size="lg" fullWidth onClick={handleSave}>
           저장

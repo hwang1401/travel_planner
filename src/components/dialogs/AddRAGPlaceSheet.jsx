@@ -2,6 +2,8 @@ import { useState } from 'react';
 import BottomSheet from '../common/BottomSheet';
 import Button from '../common/Button';
 import Field from '../common/Field';
+import Icon from '../common/Icon';
+import TimePickerDialog from '../common/TimePickerDialog';
 import { TYPE_LABELS } from '../../styles/tokens';
 import { SPACING, RADIUS } from '../../styles/tokens';
 
@@ -13,15 +15,9 @@ import { SPACING, RADIUS } from '../../styles/tokens';
  * 매핑: desc ← name_ko, type ← type, detail.image ← image_url,
  *       detail.placeId ← google_place_id, detail.address ← address, detail.lat/lon ← lat/lon
  */
-const timeOptions = [];
-for (let h = 0; h < 24; h++) {
-  for (let m = 0; m < 60; m += 30) {
-    timeOptions.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-  }
-}
-
 export default function AddRAGPlaceSheet({ place, onConfirm, onClose }) {
   const [time, setTime] = useState('12:00');
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   if (!place) return null;
 
@@ -71,20 +67,57 @@ export default function AddRAGPlaceSheet({ place, onConfirm, onClose }) {
           style={{ background: 'var(--color-surface-container-lowest)' }}
         />
 
-        {/* 시간 (편집 가능) */}
-        <Field
-          as="select"
-          label="시간"
-          required
-          size="lg"
-          variant="outlined"
+        {/* 시간 (편집 가능) — iOS 스타일 휠 다이얼로그 */}
+        <div>
+          <div style={{
+            paddingBottom: 'var(--spacing-sp40, 4px)',
+            minHeight: 'var(--field-label-row-height, 20px)',
+            display: 'flex',
+            alignItems: 'center',
+          }}>
+            <span style={{
+              fontSize: 'var(--typo-caption-2-bold-size)',
+              fontWeight: 'var(--typo-caption-2-bold-weight)',
+              color: 'var(--color-on-surface-variant)',
+            }}>
+              시간
+            </span>
+          </div>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setShowTimePicker(true)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowTimePicker(true); } }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: SPACING.md,
+              minHeight: 'var(--height-lg, 48px)',
+              padding: `0 ${SPACING.lx}`,
+              border: '1px solid var(--color-outline-variant)',
+              borderRadius: RADIUS.md,
+              background: 'var(--color-surface-container-lowest)',
+              cursor: 'pointer',
+            }}
+            aria-label="시간 선택"
+          >
+            <span style={{
+              flex: 1,
+              fontSize: 'var(--typo-label-1-n---regular-size)',
+              color: 'var(--color-on-surface)',
+            }}>
+              {/^\d{1,2}:\d{2}$/.test(time) ? time : '12:00'}
+            </span>
+            <Icon name="chevronDown" size={18} style={{ opacity: 0.6 }} />
+          </div>
+        </div>
+        <TimePickerDialog
+          open={showTimePicker}
           value={time}
-          onChange={(e) => setTime(e.target.value || '12:00')}
-        >
-          {timeOptions.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </Field>
+          minuteStep={5}
+          onConfirm={(v) => setTime(v)}
+          onClose={() => setShowTimePicker(false)}
+        />
 
         {/* 주소 (프리필, 읽기 전용) */}
         {place.address && (

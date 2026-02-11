@@ -16,6 +16,7 @@ import { analyzeScheduleWithAI, getAIRecommendation } from '../../services/gemin
 import ImportPreviewDialog from './ImportPreviewDialog';
 import { SPACING, RADIUS, COLOR } from '../../styles/tokens';
 import TimetableSearchDialog from './TimetableSearchDialog';
+import TimePickerDialog from '../common/TimePickerDialog';
 
 /* ── Edit Item Dialog (일정 추가/수정) ── */
 const PLACE_TYPES = ['food', 'spot', 'shop', 'stay'];
@@ -50,6 +51,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const [detailLat, setDetailLat] = useState(item?.detail?.lat || null);
   const [detailLon, setDetailLon] = useState(item?.detail?.lon || null);
   const [detailPlaceId] = useState(item?.detail?.placeId || null);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [detailTip, setDetailTip] = useState(item?.detail?.tip || "");
   const [detailPrice, setDetailPrice] = useState(item?.detail?.price || "");
   const [detailHours, setDetailHours] = useState(item?.detail?.hours || "");
@@ -387,14 +389,6 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   ];
 
   const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
-
-  // Generate time options (00:00 to 23:30 in 30-min intervals)
-  const timeOptions = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      timeOptions.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-    }
-  }
 
   const handleLoadTimetable = (routeId) => {
     if (!routeId) { setLoadedTimetable(null); return; }
@@ -891,13 +885,56 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
               value={type} onChange={(e) => setType(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
               {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </Field>
-            <Field as="select" label="시간" required size="lg" variant="outlined"
-              value={time} onChange={(e) => setTime(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
-              <option value="">시간 선택</option>
-              {timeOptions.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </Field>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                paddingBottom: "var(--spacing-sp40, 4px)",
+                minHeight: "var(--field-label-row-height, 20px)",
+                display: "flex",
+                alignItems: "center",
+              }}>
+                <span style={{
+                  fontSize: "var(--typo-caption-2-bold-size)",
+                  fontWeight: "var(--typo-caption-2-bold-weight)",
+                  color: "var(--color-on-surface-variant)",
+                }}>
+                  시간
+                </span>
+              </div>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setShowTimePicker(true)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowTimePicker(true); } }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: SPACING.ml,
+                  minHeight: "var(--height-lg, 48px)",
+                  padding: `0 ${SPACING.lx}`,
+                  border: "1px solid var(--color-outline-variant)",
+                  borderRadius: RADIUS.md,
+                  background: "var(--color-surface-container-lowest)",
+                  cursor: "pointer",
+                }}
+                aria-label="시간 선택"
+              >
+                <span style={{
+                  flex: 1,
+                  fontSize: "var(--typo-label-1-n---regular-size)",
+                  color: time ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
+                }}>
+                  {/^\d{1,2}:\d{2}$/.test(time) ? time : "시간 선택"}
+                </span>
+                <Icon name="chevronDown" size={18} style={{ opacity: 0.6 }} />
+              </div>
+            </div>
+            <TimePickerDialog
+              open={showTimePicker}
+              value={time || "12:00"}
+              minuteStep={5}
+              onConfirm={(v) => setTime(v)}
+              onClose={() => setShowTimePicker(false)}
+            />
           </div>
 
           {/* 주소 — 선택 시 장소 사진이 있으면 이미지 목록에 추가(수정·삭제 가능) */}
