@@ -49,6 +49,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const [address, setAddress] = useState(item?.detail?.address || "");
   const [detailLat, setDetailLat] = useState(item?.detail?.lat || null);
   const [detailLon, setDetailLon] = useState(item?.detail?.lon || null);
+  const [detailPlaceId] = useState(item?.detail?.placeId || null);
   const [detailTip, setDetailTip] = useState(item?.detail?.tip || "");
   const [detailPrice, setDetailPrice] = useState(item?.detail?.price || "");
   const [detailHours, setDetailHours] = useState(item?.detail?.hours || "");
@@ -448,6 +449,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         ...(address.trim() ? { address: address.trim() } : {}),
         ...(detailLat != null ? { lat: detailLat } : {}),
         ...(detailLon != null ? { lon: detailLon } : {}),
+        ...(detailPlaceId ? { placeId: detailPlaceId } : {}),
         ...(detailTip.trim() ? { tip: detailTip.trim() } : {}),
         ...(detailPrice.trim() ? { price: detailPrice.trim() } : {}),
         ...(detailHours.trim() ? { hours: detailHours.trim() } : {}),

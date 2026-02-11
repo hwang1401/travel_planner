@@ -6,6 +6,7 @@ import ImageViewer from '../common/ImageViewer';
 import CategoryBadge from '../common/CategoryBadge';
 import TimetablePreview from '../common/TimetablePreview';
 import NearbyPlaceCard from './NearbyPlaceCard';
+import Skeleton from '../common/Skeleton';
 import { getNearbyPlaces } from '../../services/ragService';
 import { COLOR, SPACING, RADIUS } from '../../styles/tokens';
 import { TYPE_LABELS } from '../../styles/tokens';
@@ -125,9 +126,10 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
   const itemSub = effectiveDetail._item?.sub;
   const hasExtraText = !!(itemDesc || itemSub);
 
-  /* 주변 추천: effectiveDetail에 lat/lon 있으면 조회 (캐시 by coords) */
+  /* 주변 추천: 좌표 있고, 항공/이동이 아닐 때만 (주변 맛집·장소는 장소 타입에서만) */
   const hasCoords = effectiveDetail.lat != null && effectiveDetail.lon != null;
-  const showNearby = hasCoords;
+  const itemType = effectiveDetail._item?.type;
+  const showNearby = hasCoords && itemType !== "flight" && itemType !== "move";
   useEffect(() => {
     setOverlayDetail(null);
     setOverlayPlace(null);
@@ -393,7 +395,18 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           <div ref={nearbyScrollRef}>
             {nearbyLoading && (
               <SectionWrap label="주변 추천" px={px}>
-                <p style={{ margin: 0, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)" }}>불러오는 중...</p>
+                <div style={{
+                  display: "flex", gap: SPACING.lg, overflowX: "hidden",
+                  paddingBottom: SPACING.sm,
+                }}>
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} style={{ flexShrink: 0, width: 140, scrollSnapAlign: "start" }}>
+                      <Skeleton style={{ width: "100%", aspectRatio: "4/3", borderRadius: RADIUS.sm, marginBottom: SPACING.sm }} />
+                      <Skeleton style={{ width: "80%", height: 14, borderRadius: RADIUS.xs, marginBottom: SPACING.xs }} />
+                      <Skeleton style={{ width: "50%", height: 12, borderRadius: RADIUS.xs }} />
+                    </div>
+                  ))}
+                </div>
               </SectionWrap>
             )}
             {!nearbyLoading && (nearbyByType.food?.length > 0 || nearbyByType.spot?.length > 0 || nearbyByType.shop?.length > 0) && (

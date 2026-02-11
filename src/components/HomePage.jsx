@@ -14,6 +14,7 @@ import { getShareLink } from '../services/memberService';
 import { loadCustomData, mergeData } from '../data/storage';
 import { BASE_DAYS } from '../data/days';
 import BottomSheet from './common/BottomSheet';
+import PullToRefresh from './common/PullToRefresh';
 import { COLOR, SPACING, RADIUS } from '../styles/tokens';
 
 const MIN_SPLASH_MS = 400;
@@ -384,57 +385,55 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: loading ? 0 : '0 20px 100px', overflowY: loading ? 'hidden' : 'auto' }}>
-        {/* 로딩 시 스켈레톤 */}
-        {loading && (
-          <TripListSkeleton />
-        )}
+      {/* Content (당겨서 새로고침: iOS 등) */}
+      <PullToRefresh onRefresh={fetchTrips} disabled={loading}>
+        <div style={{ padding: loading ? 0 : '0 20px 100px', minHeight: '100%' }}>
+          {loading && (
+            <TripListSkeleton />
+          )}
 
-        {!loading && (
-          <div style={{ animation: 'fadeIn 0.35s ease' }}>
-            {/* Legacy trip card (비로그인 시에만 노출; 로그인/가입 후에는 숨김) */}
-            {showLegacy && (
-              <TripCard
-                title="후쿠오카 · 유후인 여행"
-                subtitle="2/19 (목) — 2/24 (화) · 5박6일"
-                destinations={['후쿠오카', '구마모토', '유후인']}
-                coverColor="linear-gradient(135deg, #D94F3B, #F07040)"
-                badge="로컬"
-                onClick={handleOpenLegacy}
-                onMore={() => setMoreMenu({ legacy: true })}
-              />
-            )}
-
-            {/* Supabase trips */}
-            {trips.map((trip) => (
-              <TripCard
-                key={trip.id}
-                title={trip.name}
-                subtitle={formatDateRange(trip)}
-                destinations={trip.destinations}
-                coverColor={trip.coverColor}
-                coverImage={trip.coverImage}
-                memberCount={trip.members?.length || 0}
-                onClick={() => handleOpenTrip(trip)}
-                onMore={() => setMoreMenu({ trip })}
-              />
-            ))}
-
-            {/* Empty state — only when truly no trips at all */}
-            {totalTrips === 0 && (
-              <div style={{ marginTop: SPACING.xxxl }}>
-                <EmptyState
-                  icon="navigation"
-                  title="새로운 여행을 계획해보세요"
-                  description={"버튼을 눌러 여행을 만들고\n함께할 사람들을 초대할 수 있습니다"}
-                  actions={{ label: "첫 여행 만들기", variant: "primary", iconLeft: "plus", onClick: () => setShowCreate(true) }}
+          {!loading && (
+            <div style={{ animation: 'fadeIn 0.35s ease' }}>
+              {showLegacy && (
+                <TripCard
+                  title="후쿠오카 · 유후인 여행"
+                  subtitle="2/19 (목) — 2/24 (화) · 5박6일"
+                  destinations={['후쿠오카', '구마모토', '유후인']}
+                  coverColor="linear-gradient(135deg, #D94F3B, #F07040)"
+                  badge="로컬"
+                  onClick={handleOpenLegacy}
+                  onMore={() => setMoreMenu({ legacy: true })}
                 />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              )}
+
+              {trips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  title={trip.name}
+                  subtitle={formatDateRange(trip)}
+                  destinations={trip.destinations}
+                  coverColor={trip.coverColor}
+                  coverImage={trip.coverImage}
+                  memberCount={trip.members?.length || 0}
+                  onClick={() => handleOpenTrip(trip)}
+                  onMore={() => setMoreMenu({ trip })}
+                />
+              ))}
+
+              {totalTrips === 0 && (
+                <div style={{ marginTop: SPACING.xxxl }}>
+                  <EmptyState
+                    icon="navigation"
+                    title="새로운 여행을 계획해보세요"
+                    description={"버튼을 눌러 여행을 만들고\n함께할 사람들을 초대할 수 있습니다"}
+                    actions={{ label: "첫 여행 만들기", variant: "primary", iconLeft: "plus", onClick: () => setShowCreate(true) }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </PullToRefresh>
 
       {/* FAB: Create Trip (hide if empty state already has button) */}
       {totalTrips > 0 && (
