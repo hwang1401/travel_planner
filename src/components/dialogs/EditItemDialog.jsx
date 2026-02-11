@@ -419,6 +419,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
     const hasDetailContent = address.trim() || detailTip.trim() || hasImages || detailPrice.trim() || detailHours.trim() || detailHighlights.trim();
 
     const newItem = {
+      _id: isNew ? crypto.randomUUID() : (item?._id || crypto.randomUUID()),
       time: time.trim(),
       desc: desc.trim(),
       type,

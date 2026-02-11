@@ -96,9 +96,17 @@ export default function InvitePage() {
           <p style={{
             fontSize: 'var(--typo-caption-1-regular-size)',
             color: 'var(--color-on-surface-variant2)',
-            marginBottom: SPACING.xxl,
+            marginBottom: SPACING.sm,
           }}>
             잠시 후 일정 화면으로 이동합니다...
+          </p>
+          <p style={{
+            fontSize: 'var(--typo-caption-2-regular-size)',
+            color: 'var(--color-on-surface-variant2)',
+            opacity: 0.7,
+            marginBottom: SPACING.xxl,
+          }}>
+            홈 화면에 앱이 설치되어 있다면, 앱에서도 확인할 수 있어요
           </p>
           <Button variant="primary" size="lg" onClick={() => navigate(`/trip/${tripId}`, { replace: true })}>
             바로 이동

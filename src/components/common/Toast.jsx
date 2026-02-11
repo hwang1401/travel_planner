@@ -3,7 +3,7 @@ import Icon from './Icon';
 import { SPACING } from '../../styles/tokens';
 
 /* ── Toast Notification Component ── */
-export default function Toast({ message, icon, duration = 2500, onDone }) {
+export default function Toast({ message, icon, duration = 2500, onDone, actionLabel, onAction }) {
   const [visible, setVisible] = useState(true);
   const [exiting, setExiting] = useState(false);
 
@@ -17,6 +17,10 @@ export default function Toast({ message, icon, duration = 2500, onDone }) {
   }, [duration, onDone]);
 
   if (!visible) return null;
+
+  const handleAction = () => {
+    onAction?.();
+  };
 
   return (
     <div style={{
@@ -37,11 +41,30 @@ export default function Toast({ message, icon, duration = 2500, onDone }) {
       fontWeight: "var(--typo-label-2-medium-weight)",
       opacity: exiting ? 0 : 1,
       transition: "opacity var(--transition-slow), transform var(--transition-slow)",
-      pointerEvents: "none",
+      pointerEvents: onAction ? "auto" : "none",
       whiteSpace: "nowrap",
     }}>
       {icon && <Icon name={icon} size={16} style={{ filter: "brightness(0) invert(1)" }} />}
-      {message}
+      <span style={{ flex: 1 }}>{message}</span>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          onClick={handleAction}
+          style={{
+            background: "rgba(255,255,255,0.2)",
+            color: "inherit",
+            border: "none",
+            borderRadius: "var(--radius-sm, 6px)",
+            padding: `${SPACING.xs} ${SPACING.ml}`,
+            fontSize: "inherit",
+            fontWeight: "var(--typo-label-2-bold-weight)",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }

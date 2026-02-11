@@ -35,6 +35,7 @@ import ShoppingGuideDialog from "./dialogs/ShoppingGuideDialog";
 import DayInfoDialog from "./dialogs/DayInfoDialog";
 import EditItemDialog from "./dialogs/EditItemDialog";
 import AddDayDialog from "./dialogs/AddDayDialog";
+import DuplicateReviewDialog from "./dialogs/DuplicateReviewDialog";
 
 /* Map imports */
 import FullMapDialog from "./map/FullMapDialog";
@@ -48,6 +49,74 @@ import AddPlacePage from "./schedule/AddPlacePage";
 import PasteInfoPage from "./schedule/PasteInfoPage";
 import { getDistance, getTravelInfo } from "../utils/distance";
 import { getTodayDayIndex, getCurrentItemIndex, isTodayInTrip } from "../utils/today";
+
+/**
+ * 아이템 배열에서 target과 같은 아이템의 인덱스를 찾음.
+ * _id가 있으면 _id 우선, 없으면 time+desc fallback.
+ */
+function findItemIndex(items, target) {
+  if (!target || !items) return -1;
+  if (target._id) {
+    const idx = items.findIndex((it) => it && it._id === target._id);
+    if (idx >= 0) return idx;
+  }
+  return items.findIndex((it) =>
+    it && it.time === target.time && it.desc === target.desc
+  );
+}
+
+/**
+ * 기존 데이터에 _id가 없는 아이템에 UUID 부여 (로드 시 마이그레이션).
+ */
+function ensureItemIds(data) {
+  if (!data) return data;
+  const next = { ...data };
+
+  if (next._extraDays) {
+    next._extraDays = next._extraDays.map((day) => {
+      if (!day?.sections) return day;
+      return {
+        ...day,
+        sections: day.sections.map((sec) => ({
+          ...sec,
+          items: (sec.items || []).map((it) =>
+            it && !it._id ? { ...it, _id: crypto.randomUUID() } : it
+          ),
+        })),
+      };
+    });
+  }
+
+  const dayKeys = Object.keys(next).filter((k) => !k.startsWith("_") && !isNaN(Number(k)));
+  for (const dk of dayKeys) {
+    const dayData = next[dk];
+    if (!dayData) continue;
+
+    if (dayData.extraItems) {
+      next[dk] = next[dk] === dayData ? { ...dayData } : next[dk];
+      next[dk].extraItems = dayData.extraItems.map((it) =>
+        it && !it._id ? { ...it, _id: crypto.randomUUID() } : it
+      );
+    }
+
+    if (dayData.sections) {
+      next[dk] = next[dk] === dayData ? { ...dayData } : next[dk];
+      next[dk].sections = { ...dayData.sections };
+      for (const sk of Object.keys(dayData.sections || {})) {
+        const sec = dayData.sections[sk];
+        if (!sec?.items) continue;
+        next[dk].sections[sk] = {
+          ...sec,
+          items: sec.items.map((it) =>
+            it && !it._id ? { ...it, _id: crypto.randomUUID() } : it
+          ),
+        };
+      }
+    }
+  }
+
+  return next;
+}
 
 /**
  * sanitizeScheduleData: overlay와 extraItems 간 중복 아이템 제거.
@@ -67,14 +136,14 @@ function sanitizeScheduleData(data) {
     const extras = dayData.extraItems;
     if (!extras || extras.length === 0 || !dayData.sections) continue;
 
-    const extraSet = new Set(extras.map((it) => `${it.time}|${it.desc}`));
+    const extraSet = new Set(extras.map((it) => it._id || `${it.time}|${it.desc}`));
     const secKeys = Object.keys(dayData.sections);
     for (const sk of secKeys) {
       const sec = dayData.sections[sk];
       if (!sec?.items) continue;
       const cleaned = sec.items.filter((it) => {
         if (!it) return false;
-        const key = `${it.time}|${it.desc}`;
+        const key = it._id || `${it.time}|${it.desc}`;
         return !it._extra && !extraSet.has(key);
       });
       if (cleaned.length !== sec.items.length) {
@@ -94,13 +163,13 @@ function sanitizeScheduleData(data) {
       const extras = dayData?.extraItems;
       if (!extras || extras.length === 0) return day;
 
-      const extraSet = new Set(extras.map((it) => `${it.time}|${it.desc}`));
+      const extraSet = new Set(extras.map((it) => it._id || `${it.time}|${it.desc}`));
       let dayChanged = false;
       const newSections = day.sections.map((sec) => {
         if (!sec?.items) return sec;
         const cleaned = sec.items.filter((it) => {
           if (!it) return false;
-          const key = `${it.time}|${it.desc}`;
+          const key = it._id || `${it.time}|${it.desc}`;
           return !it._extra && !extraSet.has(key);
         });
         if (cleaned.length !== sec.items.length) {
@@ -164,6 +233,7 @@ export default function TravelPlanner() {
   /** 일정 추가 직후 새 지역이 있으면 "여행지에 추가할까요?" 시트. 여러 개일 때 선택 가능 */
   const [addDestinationSheet, setAddDestinationSheet] = useState(null);
   const [addDestinationSelected, setAddDestinationSelected] = useState(() => new Set());
+  const [duplicateReview, setDuplicateReview] = useState(null);
   const todayInitDone = useRef(false);
 
   /* ── Debounced save ref ── */
@@ -173,6 +243,8 @@ export default function TravelPlanner() {
   const bulkDeletePayloadRef = useRef(null);
   /* 일괄 삭제 직후 즉시 저장할 데이터 (디바운서/리얼타임 덮어쓰기 방지) */
   const bulkDeleteNextRef = useRef(null);
+  /* 삭제 복구용: 삭제 직전 스냅샷 (복구 시 이 상태로 재저장) */
+  const deleteUndoRef = useRef(null);
 
   /* ── Presence: who is online ── */
   const presenceUser = useMemo(() => {
@@ -218,7 +290,7 @@ export default function TravelPlanner() {
           );
           if (!hasLegacySections) schedData._standalone = true;
         }
-        setCustomData(sanitizeScheduleData(schedData));
+        setCustomData(sanitizeScheduleData(ensureItemIds(schedData)));
         setTripLoading(false);
         setScheduleLoading(false);
       } catch (err) {
@@ -258,7 +330,7 @@ export default function TravelPlanner() {
           );
           if (!hasLegacySections) rtData._standalone = true;
         }
-        setCustomData(sanitizeScheduleData(rtData));
+        setCustomData(sanitizeScheduleData(ensureItemIds(rtData)));
       }
     });
 
@@ -283,6 +355,25 @@ export default function TravelPlanner() {
       return next;
     });
   }, [persistSchedule]);
+
+  /* ── 삭제 복구: 직전 스냅샷으로 state 복원 후 재저장 ── */
+  const handleDeleteUndo = useCallback(() => {
+    const payload = deleteUndoRef.current;
+    if (!payload) return;
+    const { snapshot, tripId: payloadTripId } = payload;
+    deleteUndoRef.current = null;
+
+    updateCustomData(() => snapshot);
+    if (payloadTripId) {
+      lastSaveTimestampRef.current = Date.now();
+      debouncedSaveRef.current?.cancel?.();
+      saveSchedule(payloadTripId, snapshot).catch((err) => {
+        console.error("[TravelPlanner] Undo save failed:", err);
+        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+      });
+    }
+    setToast({ message: "복구했어요", icon: "check" });
+  }, [updateCustomData]);
 
   /* ── Legacy: persist on change (backward compat) ── */
   useEffect(() => {
@@ -419,6 +510,7 @@ export default function TravelPlanner() {
 
   /** RAG place → schedule item for 일정추가 */
   const ragPlaceToItem = useCallback((place) => ({
+    _id: crypto.randomUUID(),
     desc: place.name_ko || "",
     type: place.type || "info",
     time: "12:00",
@@ -548,9 +640,10 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, nextSnapshot).catch((err) =>
-        console.error("[TravelPlanner] AddDay save failed:", err)
-      );
+      saveSchedule(tripId, nextSnapshot).catch((err) => {
+        console.error("[TravelPlanner] AddDay save failed:", err);
+        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+      });
     }
 
     setShowAddDay(false);
@@ -591,6 +684,8 @@ export default function TravelPlanner() {
       onConfirm: () => {
         let nextSnapshot = null;
         updateCustomData((prev) => {
+          deleteUndoRef.current = { snapshot: prev, tripId: tripId || null };
+
           const next = { ...prev };
           const extraIdx = dayIdx - baseLen;
           const totalDaysBefore = baseLen + (prev._extraDays?.length || 0);
@@ -637,17 +732,24 @@ export default function TravelPlanner() {
         if (tripId && !isLegacy && nextSnapshot) {
           lastSaveTimestampRef.current = Date.now();
           debouncedSaveRef.current?.cancel?.();
-          saveSchedule(tripId, nextSnapshot).catch((err) =>
-            console.error("[TravelPlanner] DeleteDay save failed:", err)
-          );
+          saveSchedule(tripId, nextSnapshot).catch((err) => {
+            console.error("[TravelPlanner] DeleteDay save failed:", err);
+            setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+          });
         }
 
         setSelectedDay((prev) => Math.max(0, prev - 1));
         setConfirmDialog(null);
-        setToast({ message: "날짜가 삭제되었습니다", icon: "trash" });
+        setToast({
+          message: "날짜가 삭제되었습니다",
+          icon: "trash",
+          actionLabel: "복구",
+          onAction: handleDeleteUndo,
+          onDone: () => { deleteUndoRef.current = null; },
+        });
       },
     });
-  }, [updateCustomData, baseLen, DAYS.length, setToast, tripId, isLegacy]);
+  }, [updateCustomData, baseLen, DAYS.length, setToast, tripId, isLegacy, handleDeleteUndo]);
 
   /* ── Day Reorder ── */
   const handleOpenReorder = useCallback(() => {
@@ -684,9 +786,10 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, nextSnapshot).catch((err) =>
-        console.error("[TravelPlanner] Reorder save failed:", err)
-      );
+      saveSchedule(tripId, nextSnapshot).catch((err) => {
+        console.error("[TravelPlanner] Reorder save failed:", err);
+        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+      });
     }
 
     setShowReorder(false);
@@ -728,9 +831,7 @@ export default function TravelPlanner() {
           // Editing existing extra item — find by old item reference
           const oldItem = editTarget?.item;
           if (oldItem) {
-            const idx = next[dayIdx].extraItems.findIndex((it) =>
-              it.time === oldItem.time && it.desc === oldItem.desc
-            );
+            const idx = findItemIndex(next[dayIdx].extraItems, oldItem);
             if (idx >= 0) {
               next[dayIdx].extraItems = [...next[dayIdx].extraItems];
               next[dayIdx].extraItems[idx] = newItem;
@@ -757,9 +858,7 @@ export default function TravelPlanner() {
           const newItems = [...(sec.items || [])];
           const oldItem = editTarget?.item;
           if (oldItem) {
-            const matchIdx = newItems.findIndex((it) =>
-              it && it.time === oldItem.time && it.desc === oldItem.desc
-            );
+            const matchIdx = findItemIndex(newItems, oldItem);
             if (matchIdx >= 0) newItems[matchIdx] = newItem;
             else if (itemIdx < newItems.length) newItems[itemIdx] = newItem;
           } else if (itemIdx < newItems.length) {
@@ -774,12 +873,7 @@ export default function TravelPlanner() {
             const edSec = edSections[sectionIdx];
             if (edSec && Array.isArray(edSec.items)) {
               const edNewItems = [...edSec.items];
-              let edMatchIdx = -1;
-              if (oldItem) {
-                edMatchIdx = edNewItems.findIndex((it) =>
-                  it && it.time === oldItem.time && it.desc === oldItem.desc
-                );
-              }
+              const edMatchIdx = oldItem ? findItemIndex(edNewItems, oldItem) : -1;
               if (edMatchIdx >= 0) {
                 edNewItems[edMatchIdx] = newItem;
               } else if (itemIdx < edNewItems.length) {
@@ -810,7 +904,7 @@ export default function TravelPlanner() {
         if (itemIdx !== undefined && itemIdx !== null) {
           const oldItem = editTarget?.item;
           if (oldItem) {
-            const idx = next[dayIdx].extraItems.findIndex((it) => it.time === oldItem.time && it.desc === oldItem.desc);
+            const idx = findItemIndex(next[dayIdx].extraItems, oldItem);
             if (idx >= 0) {
               next[dayIdx].extraItems = [...next[dayIdx].extraItems];
               next[dayIdx].extraItems[idx] = newItem;
@@ -829,9 +923,7 @@ export default function TravelPlanner() {
           const newItems = [...baseItems];
           const oldItemSave = editTarget?.item;
           if (oldItemSave) {
-            const matchIdx = newItems.findIndex((it) =>
-              it && it.time === oldItemSave.time && it.desc === oldItemSave.desc
-            );
+            const matchIdx = findItemIndex(newItems, oldItemSave);
             if (matchIdx >= 0) newItems[matchIdx] = newItem;
             else if (itemIdx < newItems.length) newItems[itemIdx] = newItem;
           } else if (itemIdx < newItems.length) {
@@ -848,12 +940,7 @@ export default function TravelPlanner() {
           const edItems = Array.isArray(edSec?.items) ? [...edSec.items] : [];
           if (itemIdx !== undefined && itemIdx !== null) {
             const oldItemEd = editTarget?.item;
-            let edMatchIdx = -1;
-            if (oldItemEd) {
-              edMatchIdx = edItems.findIndex((it) =>
-                it && it.time === oldItemEd.time && it.desc === oldItemEd.desc
-              );
-            }
+            const edMatchIdx = oldItemEd ? findItemIndex(edItems, oldItemEd) : -1;
             if (edMatchIdx >= 0) {
               edItems[edMatchIdx] = newItem;
             } else if (itemIdx < edItems.length) {
@@ -870,7 +957,10 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && debouncedSaveRef.current) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current.cancel?.();
-      saveSchedule(tripId, nextForSave).catch((err) => console.error('[TravelPlanner] Immediate save after edit failed:', err));
+      saveSchedule(tripId, nextForSave).catch((err) => {
+        console.error('[TravelPlanner] Immediate save after edit failed:', err);
+        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+      });
     } else if (isLegacy) {
       debouncedSaveRef.current?.flush?.();
     }
@@ -902,14 +992,14 @@ export default function TravelPlanner() {
     let nextSnapshot = null;
 
     updateCustomData((prev) => {
+      deleteUndoRef.current = { snapshot: prev, tripId: tripId || null };
+
       const next = { ...prev };
 
-      // 1) extraItems에서 삭제 (time+desc 매칭)
+      // 1) extraItems에서 삭제 (_id 우선, time+desc fallback)
       if (next[dayIdx]?.extraItems && target) {
         next[dayIdx] = { ...next[dayIdx] };
-        const idx = next[dayIdx].extraItems.findIndex((it) =>
-          it.time === target.time && it.desc === target.desc
-        );
+        const idx = findItemIndex(next[dayIdx].extraItems, target);
         if (idx >= 0) {
           next[dayIdx].extraItems = [...next[dayIdx].extraItems];
           next[dayIdx].extraItems.splice(idx, 1);
@@ -924,9 +1014,7 @@ export default function TravelPlanner() {
         for (const sk of secKeys) {
           const sec = next[dayIdx].sections[sk];
           if (!sec?.items) continue;
-          const idx = target
-            ? sec.items.findIndex((it) => it && it.time === target.time && it.desc === target.desc)
-            : -1;
+          const idx = target ? findItemIndex(sec.items, target) : -1;
           if (idx >= 0) {
             next[dayIdx].sections = next[dayIdx].sections === prev[dayIdx]?.sections ? { ...next[dayIdx].sections } : next[dayIdx].sections;
             next[dayIdx].sections[sk] = { ...sec, items: [...sec.items] };
@@ -942,9 +1030,7 @@ export default function TravelPlanner() {
         let edChanged = false;
         const newEdSections = edSections.map((sec) => {
           if (!sec?.items) return sec;
-          const idx = target
-            ? sec.items.findIndex((it) => it && it.time === target.time && it.desc === target.desc)
-            : -1;
+          const idx = target ? findItemIndex(sec.items, target) : -1;
           if (idx >= 0) {
             edChanged = true;
             const newItems = [...sec.items];
@@ -968,14 +1054,21 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, nextSnapshot).catch((err) =>
-        console.error("[TravelPlanner] Delete save failed:", err)
-      );
+      saveSchedule(tripId, nextSnapshot).catch((err) => {
+        console.error("[TravelPlanner] Delete save failed:", err);
+        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+      });
     }
 
     setEditTarget(null);
-    setToast({ message: "일정이 삭제되었습니다", icon: "trash" });
-  }, [updateCustomData, editTarget, baseLen, tripId, isLegacy]);
+    setToast({
+      message: "일정이 삭제되었습니다",
+      icon: "trash",
+      actionLabel: "복구",
+      onAction: handleDeleteUndo,
+      onDone: () => { deleteUndoRef.current = null; },
+    });
+  }, [updateCustomData, editTarget, baseLen, tripId, isLegacy, handleDeleteUndo]);
 
   const handleDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
     setConfirmDialog({
@@ -1024,7 +1117,7 @@ export default function TravelPlanner() {
       // 1) extraItems에서 삭제
       if (next[sourceDayIdx]?.extraItems) {
         next[sourceDayIdx] = { ...next[sourceDayIdx] };
-        const idx = next[sourceDayIdx].extraItems.findIndex((it) => it.time === item.time && it.desc === item.desc);
+        const idx = findItemIndex(next[sourceDayIdx].extraItems, item);
         if (idx >= 0) {
           next[sourceDayIdx].extraItems = [...next[sourceDayIdx].extraItems];
           next[sourceDayIdx].extraItems.splice(idx, 1);
@@ -1037,7 +1130,7 @@ export default function TravelPlanner() {
         for (const sk of secKeys) {
           const sec = next[sourceDayIdx].sections[sk];
           if (!sec?.items) continue;
-          const idx = sec.items.findIndex((it) => it && it.time === item.time && it.desc === item.desc);
+          const idx = findItemIndex(sec.items, item);
           if (idx >= 0) {
             next[sourceDayIdx] = next[sourceDayIdx] === prev[sourceDayIdx] ? { ...next[sourceDayIdx] } : next[sourceDayIdx];
             next[sourceDayIdx].sections = { ...next[sourceDayIdx].sections };
@@ -1053,7 +1146,7 @@ export default function TravelPlanner() {
         let edChanged = false;
         const newEdSections = edSections.map((sec) => {
           if (!sec?.items) return sec;
-          const idx = sec.items.findIndex((it) => it && it.time === item.time && it.desc === item.desc);
+          const idx = findItemIndex(sec.items, item);
           if (idx >= 0) {
             edChanged = true;
             const newItems = [...sec.items];
@@ -1071,6 +1164,7 @@ export default function TravelPlanner() {
       // ── Target: 항상 extraItems에 추가 (통일) ──
       const itemToAdd = { ...item, _custom: true };
       delete itemToAdd._extra; // merge 시 자동으로 붙여줌
+      if (!itemToAdd._id) itemToAdd._id = crypto.randomUUID();
       if (!next[targetDayIdx]) next[targetDayIdx] = {};
       if (!next[targetDayIdx].extraItems) next[targetDayIdx].extraItems = [];
       next[targetDayIdx].extraItems = [...next[targetDayIdx].extraItems, itemToAdd];
@@ -1093,15 +1187,15 @@ export default function TravelPlanner() {
     const mergedDay = DAYS.find((_, i) => toOrigIdx(i) === dayIdx);
 
     updateCustomData((prev) => {
+      deleteUndoRef.current = { snapshot: prev, tripId: tripId || null };
+
       const next = { ...prev };
       if (!next[dayIdx]) next[dayIdx] = {};
 
       if (extraEntries.length > 0 && next[dayIdx].extraItems) {
         const extraIndices = [];
         for (const entry of extraEntries) {
-          const idx = next[dayIdx].extraItems.findIndex((it) =>
-            it.time === entry.item.time && it.desc === entry.item.desc
-          );
+          const idx = findItemIndex(next[dayIdx].extraItems, entry.item);
           if (idx >= 0) extraIndices.push(idx);
         }
         extraIndices.sort((a, b) => b - a);
@@ -1150,18 +1244,25 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && bulkDeleteNextRef.current) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, bulkDeleteNextRef.current).catch((err) =>
-        console.error("[TravelPlanner] 일괄 삭제 직후 저장 실패:", err)
-      );
+      saveSchedule(tripId, bulkDeleteNextRef.current).catch((err) => {
+        console.error("[TravelPlanner] 일괄 삭제 직후 저장 실패:", err);
+        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+      });
       bulkDeleteNextRef.current = null;
     }
 
     setBulkDeleteMode(false);
     setSelectedBulkKeys(new Set());
     setConfirmDialog(null);
-    setToast({ message: `${keys.length}개 일정이 삭제되었습니다`, icon: "trash" });
+    setToast({
+      message: `${keys.length}개 일정이 삭제되었습니다`,
+      icon: "trash",
+      actionLabel: "복구",
+      onAction: handleDeleteUndo,
+      onDone: () => { deleteUndoRef.current = null; },
+    });
     bulkDeletePayloadRef.current = null;
-  }, [updateCustomData, DAYS, toOrigIdx, tripId, isLegacy]);
+  }, [updateCustomData, DAYS, toOrigIdx, tripId, isLegacy, handleDeleteUndo]);
 
   const handleBulkDeleteConfirm = useCallback(() => {
     const payload = bulkDeletePayloadRef.current;
@@ -1186,10 +1287,9 @@ export default function TravelPlanner() {
     });
   }, [selectedBulkKeys, selectedDay, toOrigIdx, currentDayItems, baseLen, handleBulkDeleteConfirm]);
 
-  /* ── Bulk Import: replace or append ── */
-  const handleBulkImport = useCallback((items, mode) => {
+  /* ── Bulk Import: 실제 추가/교체 실행 (즉시 저장 + 토스트 + 여행지 시트) ── */
+  const applyBulkImport = useCallback((items, mode, dayIdx) => {
     if (!items || items.length === 0) return;
-    const dayIdx = toOrigIdx(selectedDay);
     let nextSnapshot = null;
 
     if (mode === "replace") {
@@ -1225,16 +1325,15 @@ export default function TravelPlanner() {
       setToast({ message: `${items.length}개 일정이 추가되었습니다`, icon: "check" });
     }
 
-    // 즉시 저장
     if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, nextSnapshot).catch((err) =>
-        console.error("[TravelPlanner] BulkImport save failed:", err)
-      );
+      saveSchedule(tripId, nextSnapshot).catch((err) => {
+        console.error("[TravelPlanner] BulkImport save failed:", err);
+        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+      });
     }
 
-    // 일정 추가 직후에만: 새 지역이 있으면 "여행지에 추가할까요?" 시트 (여러 개일 때 선택 가능)
     if (!isLegacy && tripId && Array.isArray(tripMeta?.destinations)) {
       const itemRegions = getRegionsFromItems(items);
       const currentRegions = getRegionCodesFromDestinations(tripMeta.destinations);
@@ -1245,7 +1344,37 @@ export default function TravelPlanner() {
         setAddDestinationSheet({ regionNames: newRegionNames, regionCodes: newRegionCodes });
       }
     }
-  }, [updateCustomData, toOrigIdx, selectedDay, baseLen, isLegacy, tripId, tripMeta]);
+  }, [updateCustomData, baseLen, isLegacy, tripId, tripMeta]);
+
+  /* ── Bulk Import: replace는 바로 적용, append는 중복 체크 후 적용 또는 DuplicateReviewDialog ── */
+  const handleBulkImport = useCallback((items, mode) => {
+    if (!items || items.length === 0) return;
+    const dayIdx = toOrigIdx(selectedDay);
+    const itemsWithIds = items.map((it) => (it._id ? it : { ...it, _id: crypto.randomUUID() }));
+
+    if (mode === "replace") {
+      applyBulkImport(itemsWithIds, "replace", dayIdx);
+      return;
+    }
+
+    const currentDay = DAYS[selectedDay];
+    const existingItems = currentDay?.sections?.flatMap((sec) => sec.items || []) || [];
+    const duplicates = [];
+    const clean = [];
+    for (const item of itemsWithIds) {
+      if (existingItems.some((ex) => ex.time === item.time && ex.desc === item.desc)) {
+        duplicates.push(item);
+      } else {
+        clean.push(item);
+      }
+    }
+
+    if (duplicates.length === 0) {
+      applyBulkImport(itemsWithIds, "append", dayIdx);
+    } else {
+      setDuplicateReview({ cleanItems: clean, duplicateItems: duplicates, dayIdx });
+    }
+  }, [toOrigIdx, selectedDay, DAYS, applyBulkImport]);
 
   /* ── Share link copy ── */
   const handleCopyShareLink = useCallback(async () => {
@@ -1857,7 +1986,7 @@ export default function TravelPlanner() {
       <PasteInfoPage
         open={showPasteInfo}
         onClose={() => setShowPasteInfo(false)}
-        onImport={(items) => handleBulkImport(items, toOrigIdx(selectedDay))}
+        onImport={(items) => handleBulkImport(items, "append")}
         context={current ? `Day ${current.day} ${current.label || ''}` : ''}
       />
 
@@ -1891,6 +2020,21 @@ export default function TravelPlanner() {
           confirmLabel={confirmDialog.confirmLabel}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {/* 중복 일정 리뷰: AI 파싱/일괄 추가 append 시 중복이 있으면 표시 */}
+      {duplicateReview && (
+        <DuplicateReviewDialog
+          cleanItems={duplicateReview.cleanItems}
+          duplicateItems={duplicateReview.duplicateItems}
+          onConfirm={(selectedItems) => {
+            if (selectedItems.length > 0) {
+              applyBulkImport(selectedItems, "append", duplicateReview.dayIdx);
+            }
+            setDuplicateReview(null);
+          }}
+          onClose={() => setDuplicateReview(null)}
         />
       )}
 
@@ -2274,10 +2418,12 @@ export default function TravelPlanner() {
       {/* Toast */}
       {toast && (
         <Toast
-          key={Date.now()}
+          key={toast.actionLabel ? `undo-${Date.now()}` : Date.now()}
           message={toast.message}
           icon={toast.icon}
-          onDone={() => setToast(null)}
+          onDone={() => { toast.onDone?.(); setToast(null); }}
+          actionLabel={toast.actionLabel}
+          onAction={toast.onAction}
         />
       )}
     </div>

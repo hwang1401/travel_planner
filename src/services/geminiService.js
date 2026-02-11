@@ -268,6 +268,7 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus, a
           }
         }
         return {
+          _id: crypto.randomUUID(),
           time: timeStr,
           type: itemType,
           desc: item.desc,
@@ -577,6 +578,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
         const itemType = ["food", "spot", "shop", "move", "flight", "stay", "info"].includes(item.type) ? item.type : "info";
         const ragId = item.rag_id ?? item._ragId;
         return {
+          _id: crypto.randomUUID(),
           time: (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0"),
           type: itemType,
           desc: item.desc,
