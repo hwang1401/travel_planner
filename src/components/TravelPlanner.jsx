@@ -26,6 +26,7 @@ import Checkbox from "./common/Checkbox";
 import EmptyState from "./common/EmptyState";
 import ScheduleSkeleton from "./common/ScheduleSkeleton";
 import IconContainer from "./common/IconContainer";
+import PullToRefresh from "./common/PullToRefresh";
 
 /* Dialog imports */
 import DetailDialog from "./dialogs/DetailDialog";
@@ -304,6 +305,24 @@ export default function TravelPlanner() {
 
     load();
     return () => { cancelled = true; };
+  }, [tripId, isLegacy]);
+
+  /* ── Pull-to-refresh: 일정 다시 불러오기 ── */
+  const refreshSchedule = useCallback(async () => {
+    if (isLegacy) return;
+    try {
+      const schedule = await loadSchedule(tripId);
+      const schedData = schedule?.data || {};
+      if (!schedData._standalone) {
+        const hasLegacySections = Object.keys(schedData).some(
+          (k) => !k.startsWith("_") && !isNaN(Number(k)) && schedData[k]?.sections
+        );
+        if (!hasLegacySections) schedData._standalone = true;
+      }
+      setCustomData(sanitizeScheduleData(ensureItemIds(schedData)));
+    } catch (err) {
+      console.error("[TravelPlanner] Refresh error:", err);
+    }
   }, [tripId, isLegacy]);
 
   /* ── Setup debounced save for Supabase trips ── */
@@ -1179,12 +1198,7 @@ export default function TravelPlanner() {
 
   const runBulkDeleteWithPayload = useCallback((payload) => {
     if (!payload) return;
-    const { keys, entries, dayIdx, baseLen: payloadBaseLen } = payload;
-    const extraEntries = entries.filter((e) => e.item._extra);
-    const sectionEntries = entries.filter((e) => !e.item._extra);
-    const sectionDesc = [...sectionEntries].sort((a, b) => (b.si !== a.si ? b.si - a.si : b.ii - a.ii));
-
-    const mergedDay = DAYS.find((_, i) => toOrigIdx(i) === dayIdx);
+    const { keys, entries, dayIdx } = payload;
 
     updateCustomData((prev) => {
       deleteUndoRef.current = { snapshot: prev, tripId: tripId || null };
@@ -1192,48 +1206,64 @@ export default function TravelPlanner() {
       const next = { ...prev };
       if (!next[dayIdx]) next[dayIdx] = {};
 
-      if (extraEntries.length > 0 && next[dayIdx].extraItems) {
-        const extraIndices = [];
-        for (const entry of extraEntries) {
-          const idx = findItemIndex(next[dayIdx].extraItems, entry.item);
-          if (idx >= 0) extraIndices.push(idx);
+      // ── 모든 대상 아이템에 대해 3곳에서 identity 기반 삭제 ──
+      for (const entry of entries) {
+        const target = entry.item;
+        if (!target) continue;
+
+        // 1) extraItems에서 삭제
+        if (next[dayIdx]?.extraItems) {
+          next[dayIdx] = next[dayIdx] === prev[dayIdx] ? { ...next[dayIdx] } : next[dayIdx];
+          const idx = findItemIndex(next[dayIdx].extraItems, target);
+          if (idx >= 0) {
+            next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+            next[dayIdx].extraItems.splice(idx, 1);
+          }
         }
-        extraIndices.sort((a, b) => b - a);
-        next[dayIdx] = { ...next[dayIdx] };
-        next[dayIdx].extraItems = [...next[dayIdx].extraItems];
-        for (const idx of extraIndices) next[dayIdx].extraItems.splice(idx, 1);
-        if (next[dayIdx].extraItems.length === 0) delete next[dayIdx].extraItems;
+
+        // 2) overlay sections에서 삭제
+        if (next[dayIdx]?.sections) {
+          next[dayIdx] = next[dayIdx] === prev[dayIdx] ? { ...next[dayIdx] } : next[dayIdx];
+          const secKeys = Object.keys(next[dayIdx].sections || {});
+          for (const sk of secKeys) {
+            const sec = next[dayIdx].sections[sk];
+            if (!sec?.items) continue;
+            const idx = findItemIndex(sec.items, target);
+            if (idx >= 0) {
+              next[dayIdx].sections = { ...next[dayIdx].sections };
+              next[dayIdx].sections[sk] = { ...sec, items: [...sec.items] };
+              next[dayIdx].sections[sk].items.splice(idx, 1);
+            }
+          }
+        }
+
+        // 3) _extraDays에서 삭제
+        if (next._extraDays?.[dayIdx]) {
+          const ed = next._extraDays[dayIdx];
+          const edSections = ed.sections || [];
+          let edChanged = false;
+          const newEdSections = edSections.map((sec) => {
+            if (!sec?.items) return sec;
+            const idx = findItemIndex(sec.items, target);
+            if (idx >= 0) {
+              edChanged = true;
+              const newItems = [...sec.items];
+              newItems.splice(idx, 1);
+              return { ...sec, items: newItems };
+            }
+            return sec;
+          });
+          if (edChanged) {
+            next._extraDays = [...next._extraDays];
+            next._extraDays[dayIdx] = { ...ed, sections: newEdSections };
+          }
+        }
       }
 
-      if (sectionDesc.length > 0 && mergedDay?.sections) {
-        const indicesBySection = {};
-        for (const entry of sectionDesc) {
-          const { si, ii } = entry;
-          if (!indicesBySection[si]) indicesBySection[si] = [];
-          indicesBySection[si].push(ii);
-        }
-        const newSectionsFromMerged = mergedDay.sections.map((sec, si) => {
-          const toRemove = (indicesBySection[si] || []).sort((a, b) => b - a);
-          const displayedItems = (mergedDay.sections[si]?.items ?? []).filter(Boolean);
-          const baseItems = [...displayedItems];
-          toRemove.forEach((ii) => { if (ii >= 0 && ii < baseItems.length) baseItems.splice(ii, 1); });
-          return { ...sec, items: baseItems };
-        });
-
-        if (payloadBaseLen === 0 && next._extraDays) {
-          // standalone: 해당 날짜를 _extraDays에서만 통째로 교체. custom[dayIdx] 오버라이드 제거해 merge 시 덮어쓰기 방지.
-          const ed = next._extraDays[dayIdx];
-          const newDay = { ...(ed || {}), sections: newSectionsFromMerged };
-          next._extraDays = [...next._extraDays];
-          next._extraDays[dayIdx] = newDay;
-          delete next[dayIdx];
-        } else {
-          next[dayIdx] = { ...next[dayIdx] };
-          next[dayIdx].sections = { ...(next[dayIdx].sections || {}) };
-          newSectionsFromMerged.forEach((sec, si) => {
-            next[dayIdx].sections[si] = { items: sec.items || [] };
-          });
-        }
+      // extraItems가 비었으면 정리
+      if (next[dayIdx]?.extraItems?.length === 0) {
+        next[dayIdx] = { ...next[dayIdx] };
+        delete next[dayIdx].extraItems;
       }
 
       const result = { ...next };
@@ -1241,6 +1271,7 @@ export default function TravelPlanner() {
       return result;
     });
 
+    // 즉시 저장
     if (tripId && !isLegacy && bulkDeleteNextRef.current) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
@@ -1262,7 +1293,7 @@ export default function TravelPlanner() {
       onDone: () => { deleteUndoRef.current = null; },
     });
     bulkDeletePayloadRef.current = null;
-  }, [updateCustomData, DAYS, toOrigIdx, tripId, isLegacy, handleDeleteUndo]);
+  }, [updateCustomData, tripId, isLegacy, handleDeleteUndo]);
 
   const handleBulkDeleteConfirm = useCallback(() => {
     const payload = bulkDeletePayloadRef.current;
@@ -1654,34 +1685,35 @@ export default function TravelPlanner() {
         )}
       </div>
 
-      {/* ── Main content: scrollable timeline ── */}
-      <div
-        onTouchStart={(e) => {
-          const t = e.touches[0];
-          e.currentTarget._swipeStartX = t.clientX;
-          e.currentTarget._swipeStartY = t.clientY;
-          e.currentTarget._swipeDecided = false;
-        }}
-        onTouchMove={(e) => {
-          if (e.currentTarget._swipeDecided) return;
-          const dx = Math.abs(e.touches[0].clientX - (e.currentTarget._swipeStartX || 0));
-          const dy = Math.abs(e.touches[0].clientY - (e.currentTarget._swipeStartY || 0));
-          if (dx > 15 || dy > 15) {
-            e.currentTarget._swipeDecided = true;
-            e.currentTarget._swipeIsHorizontal = dx > dy * 1.5;
-          }
-        }}
-        onTouchEnd={(e) => {
-          if (!e.currentTarget._swipeIsHorizontal) return;
-          const dx = e.changedTouches[0].clientX - (e.currentTarget._swipeStartX || 0);
-          if (Math.abs(dx) < 50) return;
-          if (dx > 0 && selectedDay > 0) {
-            setSelectedDay(selectedDay - 1);
-          } else if (dx < 0 && selectedDay < DAYS.length - 1) {
-            setSelectedDay(selectedDay + 1);
-          }
-        }}
-        style={{ flex: 1, overflowY: "auto", padding: `${SPACING.lg} ${SPACING.xl} var(--spacing-sp320)`, touchAction: "pan-y" }}>
+      {/* ── Main content: scrollable timeline + pull-to-refresh ── */}
+      <PullToRefresh onRefresh={refreshSchedule} disabled={scheduleLoading}>
+        <div
+          onTouchStart={(e) => {
+            const t = e.touches[0];
+            e.currentTarget._swipeStartX = t.clientX;
+            e.currentTarget._swipeStartY = t.clientY;
+            e.currentTarget._swipeDecided = false;
+          }}
+          onTouchMove={(e) => {
+            if (e.currentTarget._swipeDecided) return;
+            const dx = Math.abs(e.touches[0].clientX - (e.currentTarget._swipeStartX || 0));
+            const dy = Math.abs(e.touches[0].clientY - (e.currentTarget._swipeStartY || 0));
+            if (dx > 15 || dy > 15) {
+              e.currentTarget._swipeDecided = true;
+              e.currentTarget._swipeIsHorizontal = dx > dy * 1.5;
+            }
+          }}
+          onTouchEnd={(e) => {
+            if (!e.currentTarget._swipeIsHorizontal) return;
+            const dx = e.changedTouches[0].clientX - (e.currentTarget._swipeStartX || 0);
+            if (Math.abs(dx) < 50) return;
+            if (dx > 0 && selectedDay > 0) {
+              setSelectedDay(selectedDay - 1);
+            } else if (dx < 0 && selectedDay < DAYS.length - 1) {
+              setSelectedDay(selectedDay + 1);
+            }
+          }}
+          style={{ padding: `${SPACING.lg} ${SPACING.xl} var(--spacing-sp320)`, touchAction: "pan-y" }}>
 
         {/* Empty trip state */}
         {!current && (
@@ -1856,7 +1888,8 @@ export default function TravelPlanner() {
             </div>
           ) : null;
         })()}
-      </div>
+        </div>
+      </PullToRefresh>
 
       {/* RAG 장소 일정추가 시트 (프리필 폼, 시간만 선택 후 저장) */}
       {addNearbyPlace && (

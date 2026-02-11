@@ -22,6 +22,7 @@ export default function Toast({ message, icon, duration = 2500, onDone, actionLa
     onAction?.();
   };
 
+  const hasAction = actionLabel && onAction;
   return (
     <div style={{
       position: "fixed",
@@ -31,7 +32,7 @@ export default function Toast({ message, icon, duration = 2500, onDone, actionLa
       zIndex: "var(--z-toast)",
       background: "var(--color-inverse-surface)",
       color: "var(--color-on-inverse-surface)",
-      padding: `${SPACING.ml} ${SPACING.xxl}`,
+      padding: `${SPACING.ml} ${SPACING.xxl} ${SPACING.ml} ${hasAction ? SPACING.xxxxl : SPACING.xxl}`,
       borderRadius: "var(--radius-md, 8px)",
       boxShadow: "var(--shadow-heavy)",
       display: "flex",
@@ -46,7 +47,7 @@ export default function Toast({ message, icon, duration = 2500, onDone, actionLa
     }}>
       {icon && <Icon name={icon} size={16} style={{ filter: "brightness(0) invert(1)" }} />}
       <span style={{ flex: 1 }}>{message}</span>
-      {actionLabel && onAction && (
+      {hasAction && (
         <button
           type="button"
           onClick={handleAction}

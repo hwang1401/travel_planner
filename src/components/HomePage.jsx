@@ -329,65 +329,66 @@ export default function HomePage() {
       background: 'var(--color-surface)',
       paddingTop: 'env(safe-area-inset-top, 0px)',
     }}>
-      {/* Header */}
-      <div style={{ padding: `${SPACING.xxl} ${SPACING.xxl} 0`, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm }}>
-          <h1 style={{
-            margin: 0, fontSize: 'var(--typo-heading-2-bold-size, 22px)',
-            fontWeight: 'var(--typo-heading-2-bold-weight, 700)',
-            color: 'var(--color-on-surface)',
-            letterSpacing: 'var(--typo-heading-2-bold-letter-spacing)',
-          }}>
-            내 여행
-          </h1>
-          {/* Profile */}
-          {profile && (
-            <div
-              onClick={handleSignOut}
-              style={{
-                display: 'flex', alignItems: 'center', gap: SPACING.ms,
-                padding: `${SPACING.sm} ${SPACING.ml} ${SPACING.sm} ${SPACING.sm}`, borderRadius: '20px',
-                background: 'var(--color-surface-container-lowest)',
-                cursor: 'pointer', transition: 'background 0.15s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-container)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-surface-container-lowest)'; }}
-            >
-              {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt=""
-                  style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{
-                  width: '24px', height: '24px', borderRadius: '50%',
-                  background: 'var(--color-primary)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '11px', fontWeight: 700, color: 'var(--color-on-primary)',
-                }}>
-                  {(profile.name || '?').charAt(0).toUpperCase()}
+      {/* 전체 스크롤 + 당겨서 새로고침 (헤더 포함 한 영역) */}
+      <PullToRefresh onRefresh={fetchTrips} disabled={loading}>
+        <>
+          {/* Header */}
+          <div style={{ padding: `${SPACING.xxl} ${SPACING.xxl} 0`, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm }}>
+              <h1 style={{
+                margin: 0, fontSize: 'var(--typo-heading-2-bold-size, 22px)',
+                fontWeight: 'var(--typo-heading-2-bold-weight, 700)',
+                color: 'var(--color-on-surface)',
+                letterSpacing: 'var(--typo-heading-2-bold-letter-spacing)',
+              }}>
+                내 여행
+              </h1>
+              {profile && (
+                <div
+                  onClick={handleSignOut}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: SPACING.ms,
+                    padding: `${SPACING.sm} ${SPACING.ml} ${SPACING.sm} ${SPACING.sm}`, borderRadius: '20px',
+                    background: 'var(--color-surface-container-lowest)',
+                    cursor: 'pointer', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-container)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-surface-container-lowest)'; }}
+                >
+                  {profile.avatar_url ? (
+                    <img src={profile.avatar_url} alt=""
+                      style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{
+                      width: '24px', height: '24px', borderRadius: '50%',
+                      background: 'var(--color-primary)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '11px', fontWeight: 700, color: 'var(--color-on-primary)',
+                    }}>
+                      {(profile.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span style={{
+                    fontSize: 'var(--typo-caption-1-bold-size)',
+                    fontWeight: 'var(--typo-caption-1-bold-weight)',
+                    color: 'var(--color-on-surface)',
+                  }}>
+                    {profile.name || '사용자'}
+                  </span>
                 </div>
               )}
-              <span style={{
-                fontSize: 'var(--typo-caption-1-bold-size)',
-                fontWeight: 'var(--typo-caption-1-bold-weight)',
-                color: 'var(--color-on-surface)',
-              }}>
-                {profile.name || '사용자'}
-              </span>
             </div>
-          )}
-        </div>
-        <p style={{
-          margin: `0 0 ${SPACING.xxl}`, fontSize: 'var(--typo-caption-1-regular-size)',
-          fontWeight: 'var(--typo-caption-1-regular-weight)',
-          color: 'var(--color-on-surface-variant2)',
-        }}>
-          여행을 계획하고 함께하는 사람들과 공유하세요
-        </p>
-      </div>
+            <p style={{
+              margin: `0 0 ${SPACING.xxl}`, fontSize: 'var(--typo-caption-1-regular-size)',
+              fontWeight: 'var(--typo-caption-1-regular-weight)',
+              color: 'var(--color-on-surface-variant2)',
+            }}>
+              여행을 계획하고 함께하는 사람들과 공유하세요
+            </p>
+          </div>
 
-      {/* Content (당겨서 새로고침: iOS 등) */}
-      <PullToRefresh onRefresh={fetchTrips} disabled={loading}>
-        <div style={{ padding: loading ? 0 : '0 20px 100px', minHeight: '100%' }}>
+          {/* Content */}
+          <div style={{ padding: loading ? 0 : '0 20px 100px', minHeight: '100%' }}>
           {loading && (
             <TripListSkeleton />
           )}
@@ -432,7 +433,8 @@ export default function HomePage() {
               )}
             </div>
           )}
-        </div>
+          </div>
+        </>
       </PullToRefresh>
 
       {/* FAB: Create Trip (hide if empty state already has button) */}

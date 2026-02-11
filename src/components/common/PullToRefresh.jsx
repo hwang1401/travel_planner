@@ -6,20 +6,18 @@ const PULL_THRESHOLD = 56;
 const RESISTANCE = 0.45;
 
 /**
- * 당겨서 새로고침 (iOS 등에서 새로고침 버튼이 없을 때).
- * 스크롤이 맨 위일 때 아래로 당기면 onRefresh 호출.
+ * 당겨서 새로고침 (앱/PWA·터치 환경용).
+ * 터치만 지원 — 웹 데스크톱 마우스 스크롤 시 오동작 방지.
  */
 export default function PullToRefresh({ children, onRefresh, disabled }) {
   const [pullY, setPullY] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef(null);
   const startY = useRef(0);
-  const startScrollTop = useRef(0);
 
   const handleTouchStart = useCallback((e) => {
     if (disabled) return;
     startY.current = e.touches[0].clientY;
-    startScrollTop.current = scrollRef.current?.scrollTop ?? 0;
   }, [disabled]);
 
   const handleTouchMove = useCallback((e) => {
@@ -36,7 +34,6 @@ export default function PullToRefresh({ children, onRefresh, disabled }) {
     }
   }, [disabled]);
 
-  /* iOS: preventDefault는 passive: false일 때만 동작 */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -45,39 +42,6 @@ export default function PullToRefresh({ children, onRefresh, disabled }) {
   }, [handleTouchMove]);
 
   const handleTouchEnd = useCallback(async () => {
-    if (disabled) return;
-    const pull = pullY;
-    setPullY(0);
-    if (pull >= PULL_THRESHOLD && typeof onRefresh === 'function' && !refreshing) {
-      setRefreshing(true);
-      try {
-        await Promise.resolve(onRefresh());
-      } finally {
-        setRefreshing(false);
-      }
-    }
-  }, [disabled, pullY, onRefresh, refreshing]);
-
-  const handlePointerDown = useCallback((e) => {
-    if (e.pointerType !== 'mouse' || disabled) return;
-    startY.current = e.clientY;
-    startScrollTop.current = scrollRef.current?.scrollTop ?? 0;
-  }, [disabled]);
-
-  const handlePointerMove = useCallback((e) => {
-    if (e.pointerType !== 'mouse' || disabled) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const scrollTop = el.scrollTop;
-    const currentY = e.clientY;
-    const deltaY = currentY - startY.current;
-    if (scrollTop <= 0 && deltaY > 0) {
-      const pull = Math.min(deltaY * RESISTANCE, PULL_THRESHOLD * 1.5);
-      setPullY(pull);
-    }
-  }, [disabled]);
-
-  const handlePointerUp = useCallback(async () => {
     if (disabled) return;
     const pull = pullY;
     setPullY(0);
@@ -126,10 +90,6 @@ export default function PullToRefresh({ children, onRefresh, disabled }) {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
       >
         {children}
