@@ -14,7 +14,6 @@ import { TYPE_CONFIG, TYPE_LABELS, COLOR, SPACING, RADIUS } from '../../styles/t
 import { TIMETABLE_DB, findBestTrain, findRoutesByStations } from '../../data/timetable';
 import TimetablePreview from '../common/TimetablePreview';
 import { FromToStationField } from '../common/FromToStationField';
-import FromToTimetablePicker from '../dialogs/FromToTimetablePicker';
 import AddressToStationPicker from '../dialogs/AddressToStationPicker';
 import TimePickerDialog from '../common/TimePickerDialog';
 
@@ -220,7 +219,6 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
   const [loadedTimetable, setLoadedTimetable] = useState(null);
   const [moveFrom, setMoveFrom] = useState('');
   const [moveTo, setMoveTo] = useState('');
-  const [showStationPicker, setShowStationPicker] = useState(false);
   const [singleStationPicker, setSingleStationPicker] = useState(null);
 
   // Validation: field errors and toast
@@ -449,24 +447,6 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
     onClose();
   };
 
-  const handleFromToTimetableSelect = ({ from, to, routeId, route }) => {
-    setMoveFrom(from);
-    setMoveTo(to);
-    if (!desc.trim()) setDesc(`${from} → ${to}`);
-    if (route) {
-      const bestIdx = findBestTrain(route.trains, time);
-      setLoadedTimetable({
-        _routeId: routeId,
-        station: route.station,
-        direction: route.direction,
-        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
-      });
-    } else {
-      setLoadedTimetable(null);
-    }
-    setShowStationPicker(false);
-  };
-
   const handleSingleStationSelect = (station) => {
     const from = singleStationPicker.mode === 'from' ? station : moveFrom;
     const to = singleStationPicker.mode === 'to' ? station : moveTo;
@@ -498,7 +478,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
       setSelectedResultIdx(null);
       setTime('09:00'); setDesc(''); setType('spot'); setSub('');
       setAddress(''); setLat(null); setLon(null); setTip('');
-      setHighlights(''); setLoadedTimetable(null); setMoveFrom(''); setMoveTo(''); setShowStationPicker(false); setSingleStationPicker(null);
+      setHighlights(''); setLoadedTimetable(null); setMoveFrom(''); setMoveTo(''); setSingleStationPicker(null);
       setStorageImageUrl(null); setSelectedPlaceId(null);
       setErrors({});
       setToast(null);
@@ -851,13 +831,13 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
                         label="출발지"
                         value={moveFrom}
                         placeholder="출발지 선택"
-                        onClick={() => { if (moveTo) setSingleStationPicker({ mode: 'from' }); else setShowStationPicker(true); }}
+                        onClick={() => setSingleStationPicker({ mode: 'from' })}
                       />
                       <FromToStationField
                         label="도착지"
                         value={moveTo}
                         placeholder="도착지 선택"
-                        onClick={() => { if (moveFrom) setSingleStationPicker({ mode: 'to' }); else setShowStationPicker(true); }}
+                        onClick={() => setSingleStationPicker({ mode: 'to' })}
                       />
                     </div>
 
@@ -873,19 +853,10 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
                       </div>
                     )}
 
-                    {showStationPicker && (
-                      <FromToTimetablePicker
-                        initialFrom={moveFrom}
-                        initialTo={moveTo}
-                        initialRouteId={loadedTimetable?._routeId || ''}
-                        onClose={() => setShowStationPicker(false)}
-                        onSelect={handleFromToTimetableSelect}
-                      />
-                    )}
                     {singleStationPicker && (
                       <AddressToStationPicker
                         mode={singleStationPicker.mode}
-                        fixedStation={singleStationPicker.mode === 'from' ? moveTo : moveFrom}
+                        fixedStation={singleStationPicker.mode === 'from' ? (moveTo || '') : (moveFrom || '')}
                         onClose={() => setSingleStationPicker(null)}
                         onSelect={handleSingleStationSelect}
                       />

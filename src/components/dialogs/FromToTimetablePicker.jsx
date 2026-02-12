@@ -12,8 +12,13 @@ import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
+import AddressSearch from '../common/AddressSearch';
 import { getStationsByRegion, getStationList, findRoutesByStations } from '../../data/timetable';
+import { findNearestStation } from '../../data/stationCoords';
 import { SPACING } from '../../styles/tokens';
+
+const VIEW_ADDRESS = 'address';
+const VIEW_STATION = 'station';
 
 const STEP_FROM = 1;
 const STEP_TO = 2;
@@ -24,6 +29,9 @@ export default function FromToTimetablePicker({ onClose, onSelect, initialFrom =
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
   const [query, setQuery] = useState('');
+  const [view, setView] = useState(VIEW_ADDRESS);
+  const [addressError, setAddressError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const regionGroups = useMemo(() => getStationsByRegion(), []);
   const allStations = useMemo(() => getStationList(), []);
@@ -54,12 +62,45 @@ export default function FromToTimetablePicker({ onClose, onSelect, initialFrom =
   const handlePickFrom = (station) => {
     setFrom(station);
     setQuery('');
+    setView(VIEW_ADDRESS);
+    setAddressError(null);
     setStep(STEP_TO);
+  };
+
+  const handleAddressSelect = (address, lat, lon) => {
+    setAddressError(null);
+    if (lat == null || lon == null) {
+      setAddressError('위치를 확인할 수 없습니다. 역에서 직접 선택해 주세요.');
+      return;
+    }
+    setLoading(true);
+    const nearest = findNearestStation(lat, lon, 50);
+    setLoading(false);
+    if (!nearest) {
+      setAddressError('50km 이내 가까운 역이 없습니다. 역에서 직접 선택해 주세요.');
+      return;
+    }
+    if (step === STEP_FROM) {
+      if (!allStations.includes(nearest.station)) {
+        setAddressError(`${nearest.station} (약 ${Math.round(nearest.km)}km) — 등록된 역이 아닙니다. 역에서 직접 선택해 주세요.`);
+        return;
+      }
+      handlePickFrom(nearest.station);
+    } else {
+      const dests = new Set(availableDests);
+      if (!dests.has(nearest.station)) {
+        setAddressError(`${nearest.station} (약 ${Math.round(nearest.km)}km) — 해당 구간 시간표가 없습니다. 역에서 직접 선택해 주세요.`);
+        return;
+      }
+      handlePickTo(nearest.station);
+    }
   };
 
   const handlePickTo = (station) => {
     setTo(station);
     setQuery('');
+    setView(VIEW_ADDRESS);
+    setAddressError(null);
     const r = findRoutesByStations(from, station);
     if (r.length === 0) {
       setStep(STEP_ROUTE);
@@ -81,9 +122,13 @@ export default function FromToTimetablePicker({ onClose, onSelect, initialFrom =
       setStep(STEP_FROM);
       setTo('');
       setQuery('');
+      setView(VIEW_ADDRESS);
+      setAddressError(null);
     } else if (step === STEP_ROUTE) {
       setStep(STEP_TO);
       setQuery('');
+      setView(VIEW_ADDRESS);
+      setAddressError(null);
     }
   };
 
@@ -147,36 +192,81 @@ export default function FromToTimetablePicker({ onClose, onSelect, initialFrom =
           </div>
         )}
 
-        {/* 검색 (step 1, 2만) */}
+        {/* 검색 (step 1, 2만) — 주소 검색 + 역 선택 통합 */}
         {step !== STEP_ROUTE && (
-          <div style={{ padding: `${SPACING.lg} ${SPACING.xxl}` }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: SPACING.md,
-              height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
-              border: '1px solid var(--color-outline-variant)',
-              borderRadius: 'var(--radius-md, 8px)',
-              background: 'var(--color-surface-container-lowest)',
-            }}>
-              <Icon name="search" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={step === STEP_FROM ? '역명 검색 (예: 하카타)' : '도착지 검색'}
-                autoComplete="off"
-                style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', color: 'var(--color-on-surface)', fontFamily: 'inherit' }}
-              />
-              {query && (
-                <button type="button" onClick={() => setQuery('')} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
-                  <Icon name="close" size={14} style={{ opacity: 0.4 }} />
+          <div style={{ padding: `0 ${SPACING.xxl} ${SPACING.lg}` }}>
+            {view === VIEW_ADDRESS ? (
+              <>
+                <AddressSearch
+                  placeholder="주소나 장소 검색 (예: 호텔, 카페)"
+                  onChange={handleAddressSelect}
+                  inlineResults
+                  size="lg"
+                />
+                {loading && (
+                  <p style={{ margin: `${SPACING.md} 0 0`, fontSize: 'var(--typo-caption-2-size)', color: 'var(--color-on-surface-variant2)' }}>가까운 역 검색 중…</p>
+                )}
+                {addressError && (
+                  <p style={{ margin: `${SPACING.md} 0 0`, fontSize: 'var(--typo-caption-2-size)', color: 'var(--color-error)' }}>{addressError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setView(VIEW_STATION); setAddressError(null); }}
+                  style={{
+                    marginTop: SPACING.lg,
+                    display: 'flex', alignItems: 'center', gap: SPACING.sm,
+                    border: 'none', background: 'none', cursor: 'pointer',
+                    fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-primary)', fontFamily: 'inherit',
+                  }}
+                >
+                  <Icon name="navigation" size={18} style={{ color: 'var(--color-primary)' }} />
+                  역에서 직접 선택
                 </button>
-              )}
-            </div>
+              </>
+            ) : (
+              <>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: SPACING.md,
+                  height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
+                  border: '1px solid var(--color-outline-variant)',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  background: 'var(--color-surface-container-lowest)',
+                }}>
+                  <Icon name="search" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={step === STEP_FROM ? '역명 검색 (예: 하카타)' : '도착지 검색'}
+                    autoComplete="off"
+                    style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', color: 'var(--color-on-surface)', fontFamily: 'inherit' }}
+                  />
+                  {query && (
+                    <button type="button" onClick={() => setQuery('')} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                      <Icon name="close" size={14} style={{ opacity: 0.4 }} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setView(VIEW_ADDRESS)}
+                  style={{
+                    marginTop: SPACING.lg,
+                    display: 'flex', alignItems: 'center', gap: SPACING.sm,
+                    border: 'none', background: 'none', cursor: 'pointer',
+                    fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-primary)', fontFamily: 'inherit',
+                  }}
+                >
+                  <Icon name="pin" size={18} style={{ color: 'var(--color-primary)' }} />
+                  주소로 검색
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
 
-      {/* 콘텐츠 */}
+      {/* 콘텐츠 — 노선 선택 시 또는 역 직접 선택 시에만 */}
       <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: `calc(${SPACING.xxl} + var(--safe-area-bottom, 0px))` }}>
         {step === STEP_ROUTE ? (
           routes.length === 0 ? (
@@ -217,7 +307,7 @@ export default function FromToTimetablePicker({ onClose, onSelect, initialFrom =
               ))}
             </ul>
           )
-        ) : (
+        ) : view === VIEW_STATION ? (
           filteredGroups.length === 0 ? (
             <div style={{ padding: `60px ${SPACING.xxl}`, textAlign: 'center' }}>
               <Icon name="navigation" size={36} style={{ color: 'var(--color-on-surface-variant2)', opacity: 0.2, marginBottom: SPACING.xl }} />
@@ -251,7 +341,7 @@ export default function FromToTimetablePicker({ onClose, onSelect, initialFrom =
               </div>
             ))
           )
-        )}
+        ) : null}
       </div>
     </div>
   );

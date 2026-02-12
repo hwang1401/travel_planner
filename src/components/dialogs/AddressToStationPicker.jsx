@@ -1,8 +1,9 @@
 /**
- * 주소/장소 검색 → 가까운 역 매핑 or 역에서 직접 선택
+ * 주소/장소 검색 + 역에서 직접 선택 — 통합 피커
  *
- * mode='from': 고정 도착지로 갈 수 있는 출발지
- * mode='to': 고정 출발지에서 갈 수 있는 도착지
+ * mode='from': 출발지 (fixedStation 있으면 해당 도착지로 갈 수 있는 역만)
+ * mode='to': 도착지 (fixedStation 있으면 해당 출발지에서 갈 수 있는 역만)
+ * fixedStation 없으면 전체 역 노출
  *
  * onSelect(station) — 선택된 역명
  */
@@ -18,7 +19,7 @@ import { SPACING } from '../../styles/tokens';
 const VIEW_ADDRESS = 'address';
 const VIEW_STATION = 'station';
 
-export default function AddressToStationPicker({ onClose, onSelect, mode, fixedStation }) {
+export default function AddressToStationPicker({ onClose, onSelect, mode, fixedStation = '' }) {
   const [view, setView] = useState(VIEW_ADDRESS);
   const [addressError, setAddressError] = useState(null);
   const [stationQuery, setStationQuery] = useState('');
@@ -30,8 +31,13 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
     [regionGroups]
   );
   const stationList = useMemo(() => {
-    return [...allStations].filter((s) => s !== fixedStation);
-  }, [fixedStation, allStations]);
+    const list = [...allStations].filter((s) => s !== fixedStation);
+    if (!fixedStation) return list;
+    return list.filter((s) => {
+      if (mode === 'from') return findRoutesByStations(s, fixedStation).length > 0;
+      return findRoutesByStations(fixedStation, s).length > 0;
+    });
+  }, [fixedStation, allStations, mode]);
 
   const searchLower = (stationQuery || '').trim().toLowerCase();
   const filteredGroups = useMemo(() => {
@@ -54,19 +60,25 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
     setLoading(true);
     const nearest = findNearestStation(lat, lon, 50);
     setLoading(false);
-    if (nearest) {
+    if (!nearest) {
+      setAddressError('50km 이내 가까운 역이 없습니다. 역에서 직접 선택해 주세요.');
+      return;
+    }
+    if (!allStations.has(nearest.station)) {
+      setAddressError(`${nearest.station} (약 ${Math.round(nearest.km)}km) — 등록된 역이 아닙니다. 역에서 직접 선택해 주세요.`);
+      return;
+    }
+    if (fixedStation) {
       const hasRoute = mode === 'from'
         ? findRoutesByStations(nearest.station, fixedStation).length > 0
         : findRoutesByStations(fixedStation, nearest.station).length > 0;
-      if (hasRoute) {
-        onSelect(nearest.station);
-        onClose();
-      } else {
+      if (!hasRoute) {
         setAddressError(`${nearest.station} (약 ${Math.round(nearest.km)}km) — 해당 구간 시간표가 없습니다. 역에서 직접 선택해 주세요.`);
+        return;
       }
-    } else {
-      setAddressError('50km 이내 가까운 역이 없습니다. 역에서 직접 선택해 주세요.');
     }
+    onSelect(nearest.station);
+    onClose();
   };
 
   const handleStationPick = (station) => {
@@ -74,7 +86,9 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
     onClose();
   };
 
-  const title = mode === 'from' ? `출발지 (→ ${fixedStation})` : `도착지 (${fixedStation} →)`;
+  const title = fixedStation
+    ? (mode === 'from' ? `출발지 (→ ${fixedStation})` : `도착지 (${fixedStation} →)`)
+    : (mode === 'from' ? '출발지 선택' : '도착지 선택');
 
   const [viewportRect, setViewportRect] = useState(null);
   useEffect(() => {
@@ -179,7 +193,7 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
           {filteredGroups.length === 0 ? (
             <div style={{ padding: `60px ${SPACING.xxl}`, textAlign: 'center' }}>
               <p style={{ margin: 0, fontSize: 'var(--typo-body-2-size)', color: 'var(--color-on-surface-variant2)' }}>
-                {searchLower ? '검색 결과가 없습니다' : `${fixedStation}으로 갈 수 있는 역이 없습니다`}
+                {searchLower ? '검색 결과가 없습니다' : (fixedStation ? `${fixedStation}으로 갈 수 있는 역이 없습니다` : '등록된 역이 없습니다')}
               </p>
             </div>
           ) : (

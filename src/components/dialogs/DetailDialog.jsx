@@ -17,7 +17,6 @@ import TimePickerDialog from '../common/TimePickerDialog';
 import ChipSelector from '../common/ChipSelector';
 import ImagePicker from '../common/ImagePicker';
 import AddressSearch from '../common/AddressSearch';
-import FromToTimetablePicker from './FromToTimetablePicker';
 import AddressToStationPicker from './AddressToStationPicker';
 import { FromToStationField } from '../common/FromToStationField';
 import { getNearbyPlaces } from '../../services/ragService';
@@ -155,7 +154,6 @@ export default function DetailDialog({
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [timePickerInitialTime, setTimePickerInitialTime] = useState(null); // 시간표 행 탭 시 해당 시각으로 초기값
   const [timePickerPickedIndex, setTimePickerPickedIndex] = useState(null); // 시간표 행 탭 시 저장 시 해당 행을 picked로
-  const [showFromToTimetablePicker, setShowFromToTimetablePicker] = useState(false);
   const [singleStationPicker, setSingleStationPicker] = useState(null); // { mode: 'from'|'to' }
   const [showAddressSearchDialog, setShowAddressSearchDialog] = useState(false);
   const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined });
@@ -387,21 +385,6 @@ export default function DetailDialog({
     setTimePickerPickedIndex(null);
   };
 
-  const handleFromToTimetableSelect = ({ from, to, routeId, route }) => {
-    const updates = { moveFrom: from, moveTo: to, desc: `${from} → ${to}` };
-    if (route) {
-      const bestIdx = findBestTrain(route.trains, item?.time || '');
-      updates.timetable = {
-        _routeId: routeId, station: route.station, direction: route.direction,
-        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
-      };
-    } else {
-      updates.timetable = null;
-    }
-    saveField(updates);
-    setShowFromToTimetablePicker(false);
-  };
-
   const handleSingleStationSelect = (station) => {
     const from = singleStationPicker.mode === 'from' ? station : (item?.moveFrom || '');
     const to = singleStationPicker.mode === 'to' ? station : (item?.moveTo || '');
@@ -598,19 +581,13 @@ export default function DetailDialog({
               label="출발지"
               value={item?.moveFrom || ''}
               placeholder="출발지 선택"
-              onClick={() => {
-                if (item?.moveTo) setSingleStationPicker({ mode: 'from' });
-                else setShowFromToTimetablePicker(true);
-              }}
+              onClick={() => setSingleStationPicker({ mode: 'from' })}
             />
             <FromToStationField
               label="도착지"
               value={item?.moveTo || ''}
               placeholder="도착지 선택"
-              onClick={() => {
-                if (item?.moveFrom) setSingleStationPicker({ mode: 'to' });
-                else setShowFromToTimetablePicker(true);
-              }}
+              onClick={() => setSingleStationPicker({ mode: 'to' })}
             />
           </div>
         </div>
@@ -1182,15 +1159,6 @@ export default function DetailDialog({
         </CenterPopup>
       )}
 
-      {showFromToTimetablePicker && (
-        <FromToTimetablePicker
-          onClose={() => setShowFromToTimetablePicker(false)}
-          onSelect={handleFromToTimetableSelect}
-          initialFrom={item?.moveFrom || ''}
-          initialTo={item?.moveTo || ''}
-          initialRouteId={effectiveTimetable?._routeId || ''}
-        />
-      )}
       {singleStationPicker && (
         <AddressToStationPicker
           mode={singleStationPicker.mode}

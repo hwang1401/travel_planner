@@ -15,7 +15,6 @@ import { readFileAsText, detectConflicts } from '../../utils/scheduleParser';
 import { analyzeScheduleWithAI, getAIRecommendation } from '../../services/geminiService';
 import ImportPreviewDialog from './ImportPreviewDialog';
 import { SPACING, RADIUS, COLOR } from '../../styles/tokens';
-import FromToTimetablePicker from './FromToTimetablePicker';
 import { FromToStationField } from '../common/FromToStationField';
 import AddressToStationPicker from './AddressToStationPicker';
 import TimePickerDialog from '../common/TimePickerDialog';
@@ -76,7 +75,6 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const [loadedTimetable, setLoadedTimetable] = useState(
     () => (item?.detail?.timetable?.trains?.length ? item.detail.timetable : null)
   );
-  const [showFromToTimetablePicker, setShowFromToTimetablePicker] = useState(false);
   const [singleStationPicker, setSingleStationPicker] = useState(null);
   const [moveFrom, setMoveFrom] = useState('');
   const [moveTo, setMoveTo] = useState('');
@@ -404,26 +402,6 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   ];
 
   const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
-
-  const handleFromToTimetableSelect = ({ from, to, routeId, route }) => {
-    setMoveFrom(from);
-    setMoveTo(to);
-    if (!desc.trim()) setDesc(`${from} → ${to}`);
-    if (route) {
-      const bestIdx = findBestTrain(route.trains, time);
-      setLoadedTimetable({
-        _routeId: routeId,
-        station: route.station,
-        direction: route.direction,
-        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
-      });
-      setSelectedRoute(routeId);
-    } else {
-      setLoadedTimetable(null);
-      setSelectedRoute('');
-    }
-    setShowFromToTimetablePicker(false);
-  };
 
   const handleSingleStationSelect = (station) => {
     const fromVal = moveFrom || item?.moveFrom || '';
@@ -1063,13 +1041,13 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                   label="출발지"
                   value={moveFrom || item?.moveFrom || ''}
                   placeholder="출발지 선택"
-                  onClick={() => { if (moveTo || item?.moveTo) setSingleStationPicker({ mode: "from" }); else setShowFromToTimetablePicker(true); }}
+                  onClick={() => setSingleStationPicker({ mode: "from" })}
                 />
                 <FromToStationField
                   label="도착지"
                   value={moveTo || item?.moveTo || ''}
                   placeholder="도착지 선택"
-                  onClick={() => { if (moveFrom || item?.moveFrom) setSingleStationPicker({ mode: "to" }); else setShowFromToTimetablePicker(true); }}
+                  onClick={() => setSingleStationPicker({ mode: "to" })}
                 />
               </div>
               {loadedTimetable?.trains?.length > 0 && (
@@ -1078,15 +1056,6 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 </div>
               )}
 
-              {showFromToTimetablePicker && (
-                <FromToTimetablePicker
-                  initialFrom={moveFrom || item?.moveFrom || ''}
-                  initialTo={moveTo || item?.moveTo || ''}
-                  initialRouteId={loadedTimetable?._routeId || ''}
-                  onClose={() => setShowFromToTimetablePicker(false)}
-                  onSelect={handleFromToTimetableSelect}
-                />
-              )}
               {singleStationPicker && (
                 <AddressToStationPicker
                   mode={singleStationPicker.mode}
