@@ -138,6 +138,30 @@ export default function DetailDialog({
     return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
   }, []);
 
+  // 다이얼로그 노출 시 배경 스크롤·터치 차단
+  useEffect(() => {
+    if (!detail) return;
+    const scrollY = window.scrollY ?? window.pageYOffset;
+    const prevOverflow = document.body.style.overflow;
+    const prevPosition = document.body.style.position;
+    const prevTop = document.body.style.top;
+    const prevLeft = document.body.style.left;
+    const prevRight = document.body.style.right;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.top = `-${scrollY}px`;
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.position = prevPosition;
+      document.body.style.top = prevTop;
+      document.body.style.left = prevLeft;
+      document.body.style.right = prevRight;
+      window.scrollTo(0, scrollY);
+    };
+  }, [detail]);
+
   /* ── 데이터 추출 ── */
   const item = effectiveDetail._item;
   const itemType = item?.type;
@@ -885,6 +909,18 @@ export default function DetailDialog({
 
   return createPortal(
     <>
+      {/* 배경 터치·스크롤 차단용 백드롭 */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1999,
+          background: 'transparent',
+          pointerEvents: 'auto',
+          touchAction: 'none',
+        }}
+        aria-hidden
+      />
       {fullscreenModal}
 
       {/* 이미지 뷰어 */}
