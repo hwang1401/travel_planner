@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import BottomSheet from '../common/BottomSheet';
@@ -8,31 +9,27 @@ import CategoryBadge from '../common/CategoryBadge';
 import TimetablePreview from '../common/TimetablePreview';
 import NearbyPlaceCard from './NearbyPlaceCard';
 import Skeleton from '../common/Skeleton';
+import CenterPopup from '../common/CenterPopup';
+import TimePickerDialog from '../common/TimePickerDialog';
+import ChipSelector from '../common/ChipSelector';
+import ImagePicker from '../common/ImagePicker';
+import AddressSearch from '../common/AddressSearch';
+import StationPickerModal from './StationPickerModal';
+import TimetableSearchDialog from './TimetableSearchDialog';
 import { getNearbyPlaces } from '../../services/ragService';
-import { COLOR, SPACING, RADIUS } from '../../styles/tokens';
-import { TYPE_LABELS } from '../../styles/tokens';
+import { COLOR, SPACING, RADIUS, TYPE_CONFIG, TYPE_LABELS } from '../../styles/tokens';
+import { TIMETABLE_DB, findBestTrain, matchByFromTo, findRoutesByStations } from '../../data/timetable';
 
 /**
- * ── DetailDialog ──
- * "바로 꺼내기" — 여행 중 일정 정보를 즉시 확인.
+ * ── DetailDialog (풀스크린) ──
+ * 여행 일정 아이템 상세 — 풀스크린 모달.
  *
  * 구조:
- *   헤더 (고정) → 이미지 → 주소+길찾기 → 정보 → 메모 → 포인트(카드) → 교통 → 맵 → 수정
- *
- * 원칙:
- *   - 있는 것만 렌더, 빈 섹션은 그리지 않음
- *   - 섹션 구분: 소형 라벨 + 여백 (구분선 없음, 라벨+본문 흐름)
- *   - 주소·메모: 라벨 + 본문 (카드 없음)
- *   - 포인트: 카드형 (rounded + 배경 + border)으로 강조
- *   - 미니맵: 정적 이미지, 로드 실패 시 텍스트 링크로 대체
- *   - 높이: 콘텐츠에 맞춰 자동
- *
- * 다이얼로그 아웃라인 규칙: 시트 배경과 같은 블록·버튼은 구분을 위해 아웃라인 필수.
- * 아웃라인은 기본으로 variant 사용 (연한 톤, --color-outline-variant).
+ *   고정 헤더 → 칩 네비게이션 → 콘텐츠 (인라인 수정 가능) → 하단 고정 액션
+ *   스와이프로 이전/다음 아이템 이동 유지.
  */
 
 /* ── 내부 헬퍼 ── */
-
 const SectionLabel = ({ children }) => (
   <p style={{
     margin: "0 0 var(--spacing-sp80)",
@@ -53,40 +50,64 @@ const SectionWrap = ({ label, children, px }) => (
   </div>
 );
 
-/* ── 컴포넌트 ── */
+/** 탭 가능 필드 행 */
+const TappableRow = ({ label, value, placeholder, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      width: '100%', padding: `${SPACING.lg} 0`,
+      border: 'none', background: 'transparent', cursor: 'pointer',
+      textAlign: 'left', fontFamily: 'inherit',
+    }}
+  >
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-surface-variant2)', marginBottom: SPACING.xs }}>{label}</div>
+      <div style={{
+        fontSize: 'var(--typo-label-1-n---regular-size)',
+        color: value ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
+        whiteSpace: 'pre-line', wordBreak: 'break-word',
+      }}>
+        {value || placeholder || '탭하여 입력'}
+      </div>
+    </div>
+    <Icon name="chevronRight" size={14} style={{ opacity: 0.3, flexShrink: 0, marginLeft: SPACING.md }} />
+  </button>
+);
 
-/** RAG place → detail shape for overlay view (일정 상세와 동일한 UI: 부가정보, 메모, 주소, 정보, 포인트) */
+/* RAG place → detail shape */
 function ragPlaceToDetail(place) {
   if (!place) return null;
   const cat = TYPE_LABELS[place.type];
   const tags = place.tags;
-  const highlights = Array.isArray(tags) && tags.length > 0
-    ? tags
+  const highlights = Array.isArray(tags) && tags.length > 0 ? tags
     : typeof tags === "string" && tags.trim() ? [tags.trim()] : [];
   return {
-    name: place.name_ko,
-    address: place.address,
-    lat: place.lat,
-    lon: place.lon,
-    image: place.image_url,
-    placeId: place.google_place_id,
-    categories: cat ? [cat] : [],
-    tip: null,
+    name: place.name_ko, address: place.address, lat: place.lat, lon: place.lon,
+    image: place.image_url, placeId: place.google_place_id,
+    categories: cat ? [cat] : [], tip: null,
     highlights: highlights.length > 0 ? highlights : null,
-    _item: {
-      desc: place.name_ko,
-      sub: place.description || "",
-    },
+    _item: { desc: place.name_ko, sub: place.description || "" },
   };
 }
 
-export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDelete, onMoveToDay, moveDayOptions = [], currentDayDisplayIdx, allDetailPayloads, currentDetailIndex, onNavigateToIndex, onAddToSchedule }) {
+const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
+
+export default function DetailDialog({
+  detail, onClose, dayColor,
+  onEdit, onDelete, onMoveToDay, onSaveField,
+  moveDayOptions = [], currentDayDisplayIdx,
+  allDetailPayloads, currentDetailIndex,
+  onNavigateToIndex, onAddToSchedule,
+}) {
   if (!detail) return null;
+
   const [viewImage, setViewImage] = useState(null);
   const [overlayDetail, setOverlayDetail] = useState(null);
   const [overlayPlace, setOverlayPlace] = useState(null);
-  const [showMoveSheet, setShowMoveSheet] = useState(false);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
+  const [showMoveSheet, setShowMoveSheet] = useState(false);
   const [showDirectionsConfirm, setShowDirectionsConfirm] = useState(false);
   const [nearbyByType, setNearbyByType] = useState({ food: [], spot: [], shop: [] });
   const [nearbyLoading, setNearbyLoading] = useState(false);
@@ -99,43 +120,82 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
   const curIdx = typeof currentDetailIndex === "number" ? currentDetailIndex : 0;
   const total = allDetailPayloads?.length ?? 0;
 
-  /* Images: stored only (no auto-fetch) */
-  const images = effectiveDetail.images && Array.isArray(effectiveDetail.images) && effectiveDetail.images.length > 0
-    ? effectiveDetail.images
-    : effectiveDetail.image ? [effectiveDetail.image] : [];
-  const displayImages = effectiveDetail.image && images.length > 1
-    ? [effectiveDetail.image, ...images.filter((img) => img !== effectiveDetail.image)]
-    : images;
+  // ── 인라인 수정 state ──
+  const [editField, setEditField] = useState(null); // { field, value }
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showStationPicker, setShowStationPicker] = useState(false);
+  const [showTimetableSearch, setShowTimetableSearch] = useState(false);
 
-  /* URLs */
+  // visualViewport
+  const [viewportRect, setViewportRect] = useState(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
+
+  /* ── 데이터 추출 ── */
+  const item = effectiveDetail._item;
+  const itemType = item?.type;
+  const isMove = itemType === 'move';
+  const isCustom = !!item?._custom;
+
+  const mainImage = effectiveDetail.image ?? item?.detail?.image;
+  const imagesArray = effectiveDetail.images ?? item?.detail?.images;
+  const images = imagesArray && Array.isArray(imagesArray) && imagesArray.length > 0
+    ? imagesArray : mainImage ? [mainImage] : [];
+  const displayImages = mainImage && images.length > 1
+    ? [mainImage, ...images.filter((img) => img !== mainImage)] : images;
+
   const directionsUrl = effectiveDetail.placeId
     ? `https://www.google.com/maps/dir/?api=1&destination=place_id:${effectiveDetail.placeId}&destination_place_id=${effectiveDetail.placeId}`
     : effectiveDetail.address
       ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(effectiveDetail.address)}`
       : null;
 
-  const px = "var(--spacing-sp200)";
-
-  /* Data checks — 시간표는 detail 또는 _item.detail에서 가져옴 (리스트/merge 경로와 무관하게 노출) */
   const effectiveTimetable = (effectiveDetail.timetable?.trains?.length ? effectiveDetail.timetable : null)
-    ?? (effectiveDetail._item?.detail?.timetable?.trains?.length ? effectiveDetail._item.detail.timetable : null);
+    ?? (item?.detail?.timetable?.trains?.length ? item.detail.timetable : null);
   const hasTimetable = !!effectiveTimetable?.trains?.length;
-
   const hasTip = !!effectiveDetail.tip;
   const hasHighlights = effectiveDetail.highlights && effectiveDetail.highlights.length > 0;
-
-  const itemDesc = effectiveDetail._item?.desc;
-  const itemSub = effectiveDetail._item?.sub;
-  const hasExtraText = !!(itemDesc || itemSub);
-
-  /* 주변 추천: 좌표 있고, 항공/이동이 아닐 때만 (주변 맛집·장소는 장소 타입에서만) */
+  const hasExtraText = !!(item?.desc || item?.sub);
+  const hasPrice = !!effectiveDetail.price;
+  const hasHours = !!effectiveDetail.hours;
   const hasCoords = effectiveDetail.lat != null && effectiveDetail.lon != null;
-  const itemType = effectiveDetail._item?.type;
-  const showNearby = hasCoords && itemType !== "flight" && itemType !== "move";
+  const showNearby = hasCoords && itemType !== "flight" && !isMove;
+
+  /* ── 칩 네비게이션 ── */
+  const chipItems = useMemo(() => {
+    const chips = [];
+    // 정보 (부가정보, 주소, 가격, 영업시간, 메모 통합)
+    chips.push({ value: 'info', label: '정보' });
+    // 포인트
+    if (hasHighlights || isCustom) chips.push({ value: 'points', label: '포인트' });
+    // 시간표 (교통만)
+    if (isMove || hasTimetable) chips.push({ value: 'timetable', label: '시간표' });
+    // 주변
+    if (showNearby) chips.push({ value: 'nearby', label: '주변' });
+    return chips;
+  }, [hasHighlights, isMove, hasTimetable, showNearby, isCustom]);
+
+  const [activeChip, setActiveChip] = useState(() => {
+    if (isMove && (hasTimetable || true)) return 'timetable';
+    return 'info';
+  });
+
+  // chip이 없으면 기본값으로 돌림
   useEffect(() => {
-    setOverlayDetail(null);
-    setOverlayPlace(null);
-  }, [detail]);
+    if (chipItems.length > 0 && !chipItems.find(c => c.value === activeChip)) {
+      setActiveChip(chipItems[0].value);
+    }
+  }, [chipItems, activeChip]);
+
+  /* ── 주변 추천 로딩 ── */
+  useEffect(() => { setOverlayDetail(null); setOverlayPlace(null); }, [detail]);
 
   useEffect(() => {
     if (!showNearby) return;
@@ -144,10 +204,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
     if (Number.isNaN(lat) || Number.isNaN(lon)) return;
     const excludeId = overlayPlace?.id ?? null;
     const key = `${lat},${lon},${excludeId ?? ''}`;
-    if (nearbyCacheRef.current[key]) {
-      setNearbyByType(nearbyCacheRef.current[key]);
-      return;
-    }
+    if (nearbyCacheRef.current[key]) { setNearbyByType(nearbyCacheRef.current[key]); return; }
     setNearbyLoading(true);
     getNearbyPlaces({ lat, lon, excludeName: effectiveDetail.name, excludeId }).then((byType) => {
       nearbyCacheRef.current[key] = byType;
@@ -156,14 +213,11 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
     }).catch(() => setNearbyLoading(false));
   }, [showNearby, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.name, overlayPlace?.id]);
 
-  /* 주변 장소 overlay 열릴 때 스크롤 맨 위로 초기화 */
   useEffect(() => {
-    if (overlayDetail && contentScrollRef.current) {
-      contentScrollRef.current.scrollTop = 0;
-    }
+    if (overlayDetail && contentScrollRef.current) contentScrollRef.current.scrollTop = 0;
   }, [overlayDetail]);
 
-  /* 스와이프: 왼쪽(끝<시작) → 다음 인덱스, 오른쪽(끝>시작) → 이전 인덱스. 이동할 인덱스만 부모에 전달 */
+  /* ── 스와이프 ── */
   const MIN_SWIPE_PX = 60;
   const handleSwipeEnd = useCallback((endX, endY) => {
     if (overlayDetail) return;
@@ -197,7 +251,6 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
     const t = e.changedTouches[0];
     handleEnd(t.clientX, t.clientY, null);
   }, [handleEnd]);
-
   const onPointerDown = useCallback((e) => {
     if (e.pointerType !== "mouse") return;
     handleStart(e.clientX, e.clientY, e.pointerId);
@@ -207,42 +260,391 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
     if (e.pointerType !== "mouse") return;
     handleEnd(e.clientX, e.clientY, e.pointerId);
   }, [handleEnd]);
-  const onPointerCancel = useCallback(() => {
-    swipeStart.current.pointerId = null;
-  }, []);
+  const onPointerCancel = useCallback(() => { swipeStart.current.pointerId = null; }, []);
 
-  return (
+  /* ── 필드 저장 헬퍼 ── */
+  const canEditInline = !!onSaveField && isCustom && !overlayDetail;
+
+  const saveField = useCallback((fieldUpdates) => {
+    if (!onSaveField || !item) return;
+    const displayIdx = effectiveDetail._di ?? detail._di;
+    const si = effectiveDetail._si ?? detail._si;
+    const ii = effectiveDetail._ii ?? detail._ii;
+    // Build updated item
+    const updated = { ...item };
+    if (fieldUpdates.time !== undefined) updated.time = fieldUpdates.time;
+    if (fieldUpdates.desc !== undefined) updated.desc = fieldUpdates.desc;
+    if (fieldUpdates.sub !== undefined) updated.sub = fieldUpdates.sub;
+    if (fieldUpdates.type !== undefined) updated.type = fieldUpdates.type;
+    if (fieldUpdates.moveFrom !== undefined) updated.moveFrom = fieldUpdates.moveFrom;
+    if (fieldUpdates.moveTo !== undefined) updated.moveTo = fieldUpdates.moveTo;
+    if (!updated.detail) updated.detail = { name: updated.desc, category: catMap[updated.type] || '관광' };
+    if (fieldUpdates.address !== undefined) updated.detail = { ...updated.detail, address: fieldUpdates.address };
+    if (fieldUpdates.tip !== undefined) updated.detail = { ...updated.detail, tip: fieldUpdates.tip };
+    if (fieldUpdates.price !== undefined) updated.detail = { ...updated.detail, price: fieldUpdates.price };
+    if (fieldUpdates.hours !== undefined) updated.detail = { ...updated.detail, hours: fieldUpdates.hours };
+    if (fieldUpdates.highlights !== undefined) updated.detail = { ...updated.detail, highlights: fieldUpdates.highlights };
+    if (fieldUpdates.image !== undefined) updated.detail = { ...updated.detail, image: fieldUpdates.image };
+    if (fieldUpdates.images !== undefined) updated.detail = { ...updated.detail, images: fieldUpdates.images };
+    if (fieldUpdates.timetable !== undefined) updated.detail = { ...updated.detail, timetable: fieldUpdates.timetable };
+    updated.detail.name = updated.desc;
+    onSaveField(displayIdx, si, ii, updated);
+  }, [onSaveField, item, effectiveDetail, detail]);
+
+  /* ── 인라인 수정 핸들러 ── */
+  const openTextEdit = (field, label, currentValue, multiline = false) => {
+    setEditField({ field, label, value: currentValue || '', multiline });
+  };
+  const handleTextSave = () => {
+    if (!editField) return;
+    const { field, value } = editField;
+    if (field === 'highlights') {
+      // 줄바꿈으로 분리
+      const arr = value.split('\n').map(l => l.trim()).filter(Boolean);
+      saveField({ highlights: arr.length > 0 ? arr : [] });
+    } else {
+      saveField({ [field]: value });
+    }
+    setEditField(null);
+  };
+
+  const handleTimeSave = (timeVal) => {
+    saveField({ time: timeVal });
+    setShowTimePicker(false);
+  };
+
+  const handleStationSelect = (from, to) => {
+    const updates = { moveFrom: from, moveTo: to, desc: `${from} → ${to}` };
+    // 자동 재매칭
+    const routes = findRoutesByStations(from, to);
+    if (routes.length > 0) {
+      const route = routes[0];
+      const bestIdx = findBestTrain(route.trains, item?.time || '');
+      updates.timetable = {
+        _routeId: route.id, station: route.station, direction: route.direction,
+        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+      };
+    }
+    saveField(updates);
+    setShowStationPicker(false);
+  };
+
+  const handleTimetableSelect = (routeId) => {
+    const route = TIMETABLE_DB.find(r => r.id === routeId);
+    if (!route) return;
+    const bestIdx = findBestTrain(route.trains, item?.time || '');
+    saveField({
+      timetable: {
+        _routeId: routeId, station: route.station, direction: route.direction,
+        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+      },
+    });
+    setShowTimetableSearch(false);
+  };
+
+  const px = "var(--spacing-sp200)";
+
+  /* ── 콘텐츠 렌더 (칩별) ── */
+  const renderInfoTab = () => (
     <>
-    <BottomSheet onClose={onClose} maxHeight="85vh">
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-        {/* ── 헤더: 제목 + 뱃지(제목 옆) + 닫기(우측) ── */}
-        <div style={{
-          padding: `var(--spacing-sp120) ${px}`,
-          flexShrink: 0,
-          display: "flex", alignItems: "center", gap: "var(--spacing-sp80)",
-          borderBottom: "1px solid var(--color-outline-variant)",
-        }}>
-          {overlayDetail && (
-            <Button variant="ghost-neutral" size="sm" iconOnly="chevronLeft" onClick={() => setOverlayDetail(null)} style={{ flexShrink: 0 }} title="이전" />
+      {/* 부가정보 */}
+      {canEditInline ? (
+        <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
+          <TappableRow label="부가정보" value={item?.sub} placeholder="부가정보 입력" onClick={() => openTextEdit('sub', '부가정보', item?.sub)} />
+        </div>
+      ) : hasExtraText && (
+        <SectionWrap label="부가정보" px="0">
+          <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface-variant)', whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
+            {[item?.desc, item?.sub].filter(Boolean).join('\n')}
+          </p>
+        </SectionWrap>
+      )}
+
+      {/* 주소 */}
+      {canEditInline ? (
+        <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
+          <TappableRow label="주소" value={effectiveDetail.address} placeholder="주소 입력" onClick={() => openTextEdit('address', '주소', effectiveDetail.address)} />
+        </div>
+      ) : effectiveDetail.address && (
+        <SectionWrap label="주소" px="0">
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.lg, flexWrap: 'wrap' }}>
+            <p style={{ flex: 1, minWidth: 0, margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface-variant)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {effectiveDetail.address}
+            </p>
+            {directionsUrl && (
+              <Button variant="primary" size="sm" iconLeft="navigation" onClick={() => setShowDirectionsConfirm(true)} style={{ flexShrink: 0 }}>길찾기</Button>
+            )}
+          </div>
+        </SectionWrap>
+      )}
+
+      {/* 가격 */}
+      {(canEditInline || hasPrice) && (
+        canEditInline ? (
+          <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
+            <TappableRow label="가격" value={effectiveDetail.price} placeholder="가격 입력" onClick={() => openTextEdit('price', '가격', effectiveDetail.price)} />
+          </div>
+        ) : (
+          <SectionWrap label="가격" px="0">
+            <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant)' }}>{effectiveDetail.price}</p>
+          </SectionWrap>
+        )
+      )}
+
+      {/* 영업시간 */}
+      {(canEditInline || hasHours) && (
+        canEditInline ? (
+          <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
+            <TappableRow label="영업시간" value={effectiveDetail.hours} placeholder="영업시간 입력" onClick={() => openTextEdit('hours', '영업시간', effectiveDetail.hours)} />
+          </div>
+        ) : (
+          <SectionWrap label="영업시간" px="0">
+            <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant)' }}>{effectiveDetail.hours}</p>
+          </SectionWrap>
+        )
+      )}
+
+      {/* 길찾기 (주소가 있는 경우 뷰 모드에서 아래에도 표시) */}
+      {!canEditInline && !effectiveDetail.address && directionsUrl && (
+        <div style={{ paddingTop: SPACING.xl }}>
+          <Button variant="primary" size="sm" iconLeft="navigation" onClick={() => setShowDirectionsConfirm(true)}>길찾기</Button>
+        </div>
+      )}
+
+      {/* ── 메모 (정보 탭에 통합) ── */}
+      {canEditInline ? (
+        <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
+          <TappableRow label="메모" value={effectiveDetail.tip} placeholder="메모를 입력하세요" onClick={() => openTextEdit('tip', '메모', effectiveDetail.tip, true)} />
+        </div>
+      ) : hasTip && (
+        <SectionWrap label="메모" px="0">
+          <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface-variant)', whiteSpace: 'pre-line' }}>
+            {effectiveDetail.tip}
+          </p>
+        </SectionWrap>
+      )}
+    </>
+  );
+
+  const renderPointsTab = () => (
+    <>
+      {canEditInline ? (
+        <TappableRow
+          label="포인트"
+          value={hasHighlights ? effectiveDetail.highlights.join('\n') : ''}
+          placeholder="포인트를 입력하세요 (줄바꿈으로 구분)"
+          onClick={() => openTextEdit('highlights', '포인트', hasHighlights ? effectiveDetail.highlights.join('\n') : '', true)}
+        />
+      ) : hasHighlights ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.md }}>
+          {effectiveDetail.highlights.map((h, i) => {
+            const isNote = h.startsWith("[");
+            return (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: SPACING.lg,
+                  padding: `${SPACING.lg} ${SPACING.xl}`,
+                  borderRadius: RADIUS.lg,
+                  background: isNote ? 'var(--color-surface-container-lowest)' : 'var(--color-primary-container)',
+                  border: `1px solid ${isNote ? 'var(--color-outline-variant)' : 'var(--color-primary)'}`,
+                  borderLeftWidth: 4,
+                  borderLeftColor: isNote ? 'var(--color-outline-variant)' : accentColor,
+                }}
+              >
+                <span
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: RADIUS.full,
+                    background: isNote ? 'var(--color-outline-variant)' : accentColor,
+                    color: isNote ? 'var(--color-on-surface-variant2)' : 'var(--color-on-primary)',
+                    fontSize: 'var(--typo-caption-2-bold-size)',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {i + 1}
+                </span>
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 'var(--typo-label-2-regular-size)',
+                    lineHeight: 1.45,
+                    color: isNote ? 'var(--color-on-surface-variant)' : 'var(--color-on-surface)',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {h}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p style={{ padding: `${SPACING.xxxl} 0`, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>포인트 없음</p>
+      )}
+    </>
+  );
+
+  const renderTimetableTab = () => (
+    <>
+      {/* 출발지/도착지 (교통) */}
+      {isMove && canEditInline && (
+        <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
+          <TappableRow
+            label="출발지 → 도착지"
+            value={item?.moveFrom && item?.moveTo ? `${item.moveFrom} → ${item.moveTo}` : ''}
+            placeholder="출발지/도착지 선택"
+            onClick={() => setShowStationPicker(true)}
+          />
+        </div>
+      )}
+
+      {/* 노선 선택 */}
+      {isMove && canEditInline && (
+        <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
+          <TappableRow
+            label="시간표 노선"
+            value={effectiveTimetable?._routeId ? TIMETABLE_DB.find(r => r.id === effectiveTimetable._routeId)?.label : ''}
+            placeholder="노선 검색"
+            onClick={() => setShowTimetableSearch(true)}
+          />
+        </div>
+      )}
+
+      {hasTimetable ? (
+        <div style={{ paddingTop: SPACING.xl }}>
+          <SectionLabel>{effectiveTimetable.station} → {effectiveTimetable.direction}</SectionLabel>
+          <TimetablePreview timetable={effectiveTimetable} variant="full" accentColor={accentColor} />
+        </div>
+      ) : (
+        <p style={{ padding: `${SPACING.xxxl} 0`, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>시간표 없음</p>
+      )}
+    </>
+  );
+
+  const renderNearbyTab = () => (
+    <div ref={nearbyScrollRef}>
+      {nearbyLoading && (
+        <div style={{ display: 'flex', gap: SPACING.lg, overflowX: 'hidden', paddingBottom: SPACING.sm, paddingTop: SPACING.lg }}>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} style={{ flexShrink: 0, width: 140 }}>
+              <Skeleton style={{ width: '100%', aspectRatio: '4/3', borderRadius: RADIUS.sm, marginBottom: SPACING.sm }} />
+              <Skeleton style={{ width: '80%', height: 14, borderRadius: RADIUS.xs, marginBottom: SPACING.xs }} />
+              <Skeleton style={{ width: '50%', height: 12, borderRadius: RADIUS.xs }} />
+            </div>
+          ))}
+        </div>
+      )}
+      {!nearbyLoading && (
+        <>
+          {nearbyByType.food?.length > 0 && (
+            <SectionWrap label="주변 맛집" px="0">
+              <div style={{ display: 'flex', gap: SPACING.lg, overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', paddingBottom: SPACING.sm }}>
+                {nearbyByType.food.map((p) => (
+                  <NearbyPlaceCard key={p.id || p.name_ko} place={p} onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }} onAddToSchedule={onAddToSchedule} />
+                ))}
+              </div>
+            </SectionWrap>
           )}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: SPACING.md, overflow: "hidden" }}>
-            <h3 style={{
-              margin: 0,
-              minWidth: 0, flexShrink: 1,
-              fontSize: "var(--typo-body-1-n---bold-size)",
-              fontWeight: "var(--typo-body-1-n---bold-weight)",
-              color: "var(--color-on-surface)",
-              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-            }}>
-              {effectiveDetail.name}
+          {nearbyByType.spot?.length > 0 && (
+            <SectionWrap label="주변 볼거리" px="0">
+              <div style={{ display: 'flex', gap: SPACING.lg, overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', paddingBottom: SPACING.sm }}>
+                {nearbyByType.spot.map((p) => (
+                  <NearbyPlaceCard key={p.id || p.name_ko} place={p} onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }} onAddToSchedule={onAddToSchedule} />
+                ))}
+              </div>
+            </SectionWrap>
+          )}
+          {nearbyByType.shop?.length > 0 && (
+            <SectionWrap label="주변 쇼핑" px="0">
+              <div style={{ display: 'flex', gap: SPACING.lg, overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', paddingBottom: SPACING.sm }}>
+                {nearbyByType.shop.map((p) => (
+                  <NearbyPlaceCard key={p.id || p.name_ko} place={p} onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }} onAddToSchedule={onAddToSchedule} />
+                ))}
+              </div>
+            </SectionWrap>
+          )}
+          {!nearbyByType.food?.length && !nearbyByType.spot?.length && !nearbyByType.shop?.length && (
+            <p style={{ padding: `${SPACING.xxxl} 0`, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>주변 추천 없음</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  const renderActiveContent = () => {
+    switch (activeChip) {
+      case 'info': return renderInfoTab();
+      case 'points': return renderPointsTab();
+      case 'timetable': return renderTimetableTab();
+      case 'nearby': return renderNearbyTab();
+      default: return renderInfoTab();
+    }
+  };
+
+  const typeConfig = TYPE_CONFIG[itemType] || TYPE_CONFIG.info;
+
+  const fullscreenModal = (
+    <div style={{
+      position: 'fixed',
+      ...(viewportRect != null
+        ? { top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height }
+        : { inset: 0 }),
+      zIndex: 2000,
+      display: 'flex',
+      flexDirection: 'column',
+      background: 'var(--color-surface)',
+    }}>
+      {/* ══ 고정 헤더 ══ */}
+      <div style={{ flexShrink: 0 }}>
+        {/* 상단 바: 이름 + 유형·시간 뱃지 + 닫기 */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: SPACING.md,
+          padding: `${SPACING.md} ${px}`,
+          borderBottom: '1px solid var(--color-outline-variant)',
+        }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: SPACING.md, overflow: 'hidden' }}>
+            <h3 style={{ margin: 0, minWidth: 0, flexShrink: 1, fontSize: 'var(--typo-body-1-n---bold-size)', fontWeight: 'var(--typo-body-1-n---bold-weight)', color: 'var(--color-on-surface)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {canEditInline ? (
+                <span onClick={() => openTextEdit('desc', '이름', item?.desc)} style={{ cursor: 'pointer' }}>
+                  {effectiveDetail.name || '이름 입력'}
+                </span>
+              ) : effectiveDetail.name}
             </h3>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: SPACING.sm, flexWrap: "nowrap", flexShrink: 0 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'nowrap', flexShrink: 0, gap: SPACING.sm }}>
               {(effectiveDetail.categories && effectiveDetail.categories.length > 0
                 ? effectiveDetail.categories
                 : effectiveDetail.category ? [effectiveDetail.category] : []
-              ).map((cat) => (
-                <CategoryBadge key={cat} category={cat} />
-              ))}
+              ).map((cat) => (<CategoryBadge key={cat} category={cat} />))}
+              {item?.time && (
+                <button
+                  type="button"
+                  onClick={canEditInline ? () => setShowTimePicker(true) : undefined}
+                  style={{
+                    padding: '2px 8px',
+                    border: `1px solid ${typeConfig.border}`,
+                    background: typeConfig.bg,
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 'var(--typo-caption-3-bold-size)',
+                    fontWeight: 'var(--typo-caption-3-bold-weight)',
+                    lineHeight: 'var(--typo-caption-3-bold-line-height)',
+                    color: typeConfig.text,
+                    cursor: canEditInline ? 'pointer' : 'default',
+                    fontFamily: 'inherit',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {item.time}
+                </button>
+              )}
             </span>
           </div>
           {!overlayDetail && onMoveToDay && moveDayOptions.length > 1 && (
@@ -251,376 +653,315 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
           <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
         </div>
 
-        {/* ── 스크롤 콘텐츠 (스와이프로 이전/다음) ── */}
-        <div
-          ref={contentScrollRef}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-          onPointerDown={onPointerDown}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
-          style={{
-          flex: 1, minHeight: "min(40vh, 280px)", overflowY: "auto", overscrollBehavior: "contain",
-          WebkitOverflowScrolling: "touch", touchAction: "pan-y",
-          ...((onEdit || onDelete) ? { paddingBottom: SPACING.lg } : {}),
-        }}>
-
-        {/* ── 이미지: 헤더 바로 아래 (저장된 이미지만) ── */}
-        {displayImages.length === 1 && (
-          <div onClick={() => setViewImage(displayImages[0])}
+        {/* 교통이면: 출발지 → 도착지 */}
+        {isMove && (item?.moveFrom || item?.moveTo || item?.desc) && (
+          <div
+            onClick={canEditInline ? () => setShowStationPicker(true) : undefined}
             style={{
-              width: "100%",
-              aspectRatio: "16/9",
-              overflow: "hidden",
-              cursor: "zoom-in",
-              background: COLOR.surfaceLowest,
-            }}>
-            <img src={displayImages[0]} alt={effectiveDetail.name}
-              style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} />
+              display: 'flex', alignItems: 'center', gap: SPACING.md,
+              padding: `${SPACING.md} ${px}`,
+              background: 'var(--color-surface-container-lowest)',
+              borderBottom: '1px solid var(--color-outline-variant)',
+              cursor: canEditInline ? 'pointer' : 'default',
+            }}
+          >
+            <Icon name="navigation" size={14} style={{ color: typeConfig.text, flexShrink: 0 }} />
+            <span style={{ fontSize: 'var(--typo-label-2-medium-size)', color: 'var(--color-on-surface)' }}>
+              {item?.moveFrom && item?.moveTo ? `${item.moveFrom} → ${item.moveTo}` : item?.desc}
+            </span>
+            {canEditInline && <Icon name="chevronRight" size={12} style={{ opacity: 0.3, marginLeft: 'auto' }} />}
+          </div>
+        )}
+
+        {/* 이미지 */}
+        {displayImages.length === 1 && (
+          <div onClick={() => setViewImage(displayImages[0])} style={{ width: '100%', aspectRatio: '16/7', overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest }}>
+            <img src={displayImages[0]} alt={effectiveDetail.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
           </div>
         )}
         {displayImages.length > 1 && (
-          <div style={{
-            overflowX: "auto", overflowY: "hidden",
-            display: "flex", gap: "var(--spacing-sp60)", padding: `var(--spacing-sp120) ${px}`,
-            scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
-          }}>
+          <div style={{ overflowX: 'auto', overflowY: 'hidden', display: 'flex', gap: SPACING.ms, padding: `${SPACING.lg} ${px}`, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
             {displayImages.map((img, i) => (
-              <div key={i} onClick={() => setViewImage(img)} style={{
-                flexShrink: 0, width: "75%", aspectRatio: "16/9",
-                scrollSnapAlign: "start",
-                borderRadius: RADIUS.md, overflow: "hidden",
-                cursor: "zoom-in", background: COLOR.surfaceLowest,
-              }}>
-                <img src={img} alt={`${effectiveDetail.name} ${i + 1}`}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              <div key={i} onClick={() => setViewImage(img)} style={{ flexShrink: 0, width: '75%', aspectRatio: '16/9', scrollSnapAlign: 'start', borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest }}>
+                <img src={img} alt={`${effectiveDetail.name} ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
             ))}
           </div>
         )}
 
-        {/* ── 부가정보: 이미지/헤더 아래 텍스트 (빈 모달에서도 스와이프 영역 확보 + 내용 노출) ── */}
-        {hasExtraText && (
-          <SectionWrap label="부가정보" px={px}>
-            <p style={{
-              margin: 0,
-              fontSize: "var(--typo-label-1-n---regular-size)",
-              lineHeight: "var(--typo-label-1-n---regular-line-height)",
-              color: "var(--color-on-surface-variant)",
-              whiteSpace: "pre-line",
-              wordBreak: "break-word",
-            }}>
-              {[itemDesc, itemSub].filter(Boolean).join("\n")}
-            </p>
-          </SectionWrap>
+        {/* 칩 네비게이션 — 2개 이상일 때만 */}
+        {!overlayDetail && chipItems.length > 1 && (
+          <div style={{ padding: `${SPACING.md} ${px}`, borderBottom: '1px solid var(--color-outline-variant)', overflowX: 'auto' }}>
+            <ChipSelector
+              items={chipItems}
+              value={activeChip}
+              onChange={setActiveChip}
+              variant="pill"
+              size="sm"
+              style={{ gap: SPACING.md, flexWrap: 'nowrap' }}
+            />
+          </div>
         )}
+      </div>
 
-        {/* ── 주소: 라벨 + 본문 (카드·구분선 없음) ── */}
-        {effectiveDetail.address && (
-          <SectionWrap label="주소" px={px}>
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sp120)", flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{
-                  margin: 0,
-                  fontSize: "var(--typo-label-1-n---regular-size)",
-                  lineHeight: "var(--typo-label-1-n---regular-line-height)",
-                  color: "var(--color-on-surface-variant)",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}>
-                  {effectiveDetail.address}
+      {/* ══ 스크롤 콘텐츠 ══ */}
+      <div
+        ref={contentScrollRef}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        style={{
+          flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch', touchAction: 'pan-y',
+          padding: `0 ${px} ${SPACING.xl}`,
+        }}
+      >
+        {overlayDetail ? (
+          <>
+            {/* overlay view of nearby place — 기존 스타일 유지 */}
+            {hasExtraText && (
+              <SectionWrap label="부가정보" px="0">
+                <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface-variant)', whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
+                  {[effectiveDetail._item?.desc, effectiveDetail._item?.sub].filter(Boolean).join('\n')}
                 </p>
-              </div>
-              {directionsUrl && (
-                <Button variant="primary" size="sm" iconLeft="navigation"
-                  onClick={() => setShowDirectionsConfirm(true)}
-                  style={{ flexShrink: 0 }}>
-                  길찾기
-                </Button>
-              )}
-            </div>
-          </SectionWrap>
-        )}
-
-        <ImageViewer src={viewImage} alt={detail.name} onClose={() => setViewImage(null)} />
-
-        {/* ── 메모: 라벨 + 본문 (카드 없음) ── */}
-        {hasTip && (
-          <SectionWrap label="메모" px={px}>
-            <p style={{
-              margin: 0,
-              fontSize: "var(--typo-label-1-n---regular-size)",
-              lineHeight: "var(--typo-label-1-n---regular-line-height)",
-              color: "var(--color-on-surface-variant)",
-              whiteSpace: "pre-line",
-            }}>
-              {effectiveDetail.tip}
-            </p>
-          </SectionWrap>
-        )}
-
-        {/* ── 포인트: 카드로 감싼 불릿 리스트 ── */}
-        {hasHighlights && (
-          <SectionWrap label="포인트" px={px}>
-            <div style={{
-              padding: "var(--spacing-sp120) var(--spacing-sp160)",
-              borderRadius: "var(--radius-md)",
-              background: "var(--color-surface-container-lowest)",
-              border: "1px solid var(--color-outline-variant)",
-            }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: SPACING.md }}>
-                {effectiveDetail.highlights.map((h, i) => {
-                  const isNote = h.startsWith("[");
-                  return (
-                    <div key={i} style={{ display: "flex", gap: SPACING.lg, alignItems: "flex-start" }}>
-                      <div style={{
-                        width: "5px", height: "5px", borderRadius: RADIUS.full,
-                        background: isNote ? COLOR.onSurfaceVariant2 : accentColor,
-                        flexShrink: 0, marginTop: SPACING.ms,
-                      }} />
+              </SectionWrap>
+            )}
+            {effectiveDetail.address && (
+              <SectionWrap label="주소" px="0">
+                <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant)' }}>{effectiveDetail.address}</p>
+              </SectionWrap>
+            )}
+            {effectiveDetail.highlights?.length > 0 && (
+              <SectionWrap label="포인트" px="0">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.md }}>
+                  {effectiveDetail.highlights.map((h, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: SPACING.lg,
+                        padding: `${SPACING.lg} ${SPACING.xl}`,
+                        borderRadius: RADIUS.lg,
+                        background: 'var(--color-primary-container)',
+                        border: '1px solid var(--color-primary)',
+                        borderLeftWidth: 4,
+                        borderLeftColor: accentColor,
+                      }}
+                    >
                       <span style={{
-                        fontSize: "var(--typo-caption-1-regular-size)",
-                        lineHeight: "var(--typo-caption-1-regular-line-height)",
-                        color: isNote ? COLOR.onSurfaceVariant : COLOR.onSurface,
+                        width: 24, height: 24, borderRadius: RADIUS.full, background: accentColor,
+                        color: 'var(--color-on-primary)', fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       }}>
-                        {h}
+                        {i + 1}
                       </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </SectionWrap>
-        )}
-
-        {/* ── 주변 추천 (가로 스크롤 카드). 이 영역 내 좌우 스와이프는 상세 이동이 아닌 스크롤만. ── */}
-        {showNearby && (
-          <div ref={nearbyScrollRef}>
-            {nearbyLoading && (
-              <SectionWrap label="주변 추천" px={px}>
-                <div style={{
-                  display: "flex", gap: SPACING.lg, overflowX: "hidden",
-                  paddingBottom: SPACING.sm,
-                }}>
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} style={{ flexShrink: 0, width: 140, scrollSnapAlign: "start" }}>
-                      <Skeleton style={{ width: "100%", aspectRatio: "4/3", borderRadius: RADIUS.sm, marginBottom: SPACING.sm }} />
-                      <Skeleton style={{ width: "80%", height: 14, borderRadius: RADIUS.xs, marginBottom: SPACING.xs }} />
-                      <Skeleton style={{ width: "50%", height: 12, borderRadius: RADIUS.xs }} />
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--typo-label-2-regular-size)', lineHeight: 1.45, color: 'var(--color-on-surface)', wordBreak: 'break-word' }}>{h}</span>
                     </div>
                   ))}
                 </div>
               </SectionWrap>
             )}
-            {!nearbyLoading && (nearbyByType.food?.length > 0 || nearbyByType.spot?.length > 0 || nearbyByType.shop?.length > 0) && (
-              <>
-                {nearbyByType.food?.length > 0 && (
-                  <SectionWrap label="주변 맛집" px={px}>
-                    <div style={{
-                      display: "flex", gap: SPACING.lg, overflowX: "auto", overflowY: "hidden",
-                      scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
-                      paddingBottom: SPACING.sm,
-                    }}>
-                      {nearbyByType.food.map((p) => (
-                        <NearbyPlaceCard
-                          key={p.id || p.name_ko}
-                          place={p}
-                          onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }}
-                          onAddToSchedule={onAddToSchedule}
-                        />
-                      ))}
-                    </div>
-                  </SectionWrap>
-                )}
-                {nearbyByType.spot?.length > 0 && (
-                  <SectionWrap label="주변 볼거리" px={px}>
-                    <div style={{
-                      display: "flex", gap: SPACING.lg, overflowX: "auto", overflowY: "hidden",
-                      scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
-                      paddingBottom: SPACING.sm,
-                    }}>
-                      {nearbyByType.spot.map((p) => (
-                        <NearbyPlaceCard
-                          key={p.id || p.name_ko}
-                          place={p}
-                          onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }}
-                          onAddToSchedule={onAddToSchedule}
-                        />
-                      ))}
-                    </div>
-                  </SectionWrap>
-                )}
-                {nearbyByType.shop?.length > 0 && (
-                  <SectionWrap label="주변 쇼핑" px={px}>
-                    <div style={{
-                      display: "flex", gap: SPACING.lg, overflowX: "auto", overflowY: "hidden",
-                      scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
-                      paddingBottom: SPACING.sm,
-                    }}>
-                      {nearbyByType.shop.map((p) => (
-                        <NearbyPlaceCard
-                          key={p.id || p.name_ko}
-                          place={p}
-                          onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }}
-                          onAddToSchedule={onAddToSchedule}
-                        />
-                      ))}
-                    </div>
-                  </SectionWrap>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ── 교통 타임테이블 (공통 컴포넌트) ── */}
-        {hasTimetable && (
-          <SectionWrap label={`${effectiveTimetable.station} → ${effectiveTimetable.direction}`} px={px}>
-            <TimetablePreview timetable={effectiveTimetable} variant="full" accentColor={accentColor} />
-          </SectionWrap>
-        )}
-
-        {(!onEdit && !onDelete) && <div style={{ height: "var(--spacing-sp120)" }} />}
-        </div>
-
-        {/* ── 컨텐츠 하단: 일정 개수만큼 dot, 현재만 강조 (주변 장소 overlay 중에는 숨김) ── */}
-        {!overlayDetail && allDetailPayloads && allDetailPayloads.length > 1 && (
-          <div style={{
-            flexShrink: 0,
-            padding: "var(--spacing-sp80) var(--spacing-sp200)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: SPACING.ms,
-            background: "var(--color-surface-container-lowest)",
-          }}>
-            {allDetailPayloads.map((_, i) => {
-              const active = i === curIdx;
-              return (
-                <span
-                  key={i}
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: active ? "var(--color-primary)" : "var(--color-outline-variant)",
-                    opacity: active ? 1 : 0.6,
-                  }}
-                  aria-hidden
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── 하단 고정: 주변 장소 상세(overlay)일 때 일정추가 ── */}
-        {overlayDetail && onAddToSchedule && overlayPlace && (
-          <div style={{
-            flexShrink: 0,
-            padding: `${SPACING.xl} ${SPACING.xxl}`,
-            borderTop: "1px solid var(--color-outline-variant)",
-            background: "var(--color-surface)",
-          }}>
-            <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => onAddToSchedule(overlayPlace)}>
-              일정추가
-            </Button>
-          </div>
-        )}
-
-        {/* ── 하단 고정: 삭제 + 수정하기 (일정 아이템 상세일 때만) ── */}
-        {!overlayDetail && (onEdit || onDelete) && (
-          <div style={{
-            flexShrink: 0,
-            padding: `${SPACING.xl} ${SPACING.xxl}`,
-            display: "flex",
-            gap: SPACING.md,
-            borderTop: "1px solid var(--color-outline-variant)",
-            background: "var(--color-surface)",
-          }}>
-            {onDelete && (
-              <Button variant="ghost-danger" size="lg" iconLeft="trash" onClick={() => onDelete(effectiveDetail)}>
-                삭제
-              </Button>
-            )}
-            {onEdit && (
-              <Button variant="primary" size="lg" iconLeft="edit" onClick={() => onEdit(effectiveDetail)} fullWidth style={{ flex: 1 }}>
-                수정하기
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* 헤더 더보기 액션 시트: 다른 Day로 이동 */}
-        {showMoreSheet && (
-          <BottomSheet onClose={() => setShowMoreSheet(false)} maxHeight="auto" zIndex={3100} title="">
-            <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}` }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMoreSheet(false);
-                  setShowMoveSheet(true);
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: SPACING.md,
-                  width: "100%",
-                  padding: `${SPACING.lg} ${SPACING.xl}`,
-                  border: "none",
-                  borderRadius: "var(--radius-md)",
-                  background: "transparent",
-                  color: "var(--color-on-surface)",
-                  fontSize: "var(--typo-label-2-medium-size)",
-                  fontWeight: "var(--typo-label-2-medium-weight)",
-                  cursor: "pointer",
-                  textAlign: "left",
-                }}
-              >
-                <Icon name="pin" size={20} style={{ opacity: 0.7 }} />
-                다른 Day로 이동
-              </button>
-            </div>
-          </BottomSheet>
-        )}
-
-        {/* Day 선택 시트 (다른 Day로 이동) */}
-        {showMoveSheet && (
-          <BottomSheet onClose={() => setShowMoveSheet(false)} maxHeight="70vh" zIndex={3100} title="어느 날로 옮길까요?">
-            <div style={{ padding: SPACING.xxxl, display: "flex", flexDirection: "column", gap: SPACING.sm }}>
-              {moveDayOptions
-                .filter((opt) => opt.displayIdx !== currentDayDisplayIdx)
-                .map((opt) => (
-                  <Button
-                    key={opt.displayIdx}
-                    variant="ghost-neutral"
-                    size="lg"
-                    fullWidth
-                    onClick={() => {
-                      onMoveToDay(effectiveDetail, opt.displayIdx);
-                      setShowMoveSheet(false);
-                    }}
-                    style={{ justifyContent: "flex-start" }}
-                  >
-                    {opt.label}
-                  </Button>
-                ))}
-            </div>
-          </BottomSheet>
-        )}
+          </>
+        ) : renderActiveContent()}
       </div>
-    </BottomSheet>
-    {showDirectionsConfirm && directionsUrl && (
-      <ConfirmDialog
-        title="구글맵으로 이동"
-        message="구글맵으로 이동합니다"
-        confirmLabel="확인"
-        onConfirm={() => {
-          window.open(directionsUrl, "_blank");
-          setShowDirectionsConfirm(false);
-        }}
-        onCancel={() => setShowDirectionsConfirm(false)}
-      />
-    )}
-    </>
+
+      {/* ══ 하단 dot 인디케이터 ══ */}
+      {!overlayDetail && allDetailPayloads && allDetailPayloads.length > 1 && (
+        <div style={{
+          flexShrink: 0, padding: `${SPACING.md} ${px}`,
+          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: SPACING.ms,
+          background: 'var(--color-surface-container-lowest)',
+        }}>
+          {allDetailPayloads.map((_, i) => (
+            <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: i === curIdx ? 'var(--color-primary)' : 'var(--color-outline-variant)', opacity: i === curIdx ? 1 : 0.6 }} />
+          ))}
+        </div>
+      )}
+
+      {/* ══ 하단 고정 액션: overlay일 때 일정추가 ══ */}
+      {overlayDetail && onAddToSchedule && overlayPlace && (
+        <div style={{ flexShrink: 0, padding: `${SPACING.xl} ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
+          <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => onAddToSchedule(overlayPlace)}>일정추가</Button>
+        </div>
+      )}
+
+      {/* ══ 하단 고정 액션: 삭제 + 길찾기(primary) ══ */}
+      {!overlayDetail && (directionsUrl || (isCustom && onDelete)) && (
+        <div style={{
+          flexShrink: 0, padding: `${SPACING.lg} ${px}`,
+          display: 'flex', gap: SPACING.md,
+          borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)',
+        }}>
+          {isCustom && onDelete && (
+            <Button variant="ghost-danger" size="lg" iconLeft="trash" onClick={() => { onDelete(effectiveDetail); }}>삭제</Button>
+          )}
+          {directionsUrl && (
+            <Button variant="primary" size="lg" iconLeft="navigation" onClick={() => setShowDirectionsConfirm(true)} style={{ flex: 1 }}>길찾기</Button>
+          )}
+        </div>
+      )}
+
+      {/* ══ 헤더 더보기 메뉴 → Day 이동 ══ */}
+      {showMoreSheet && (
+        <BottomSheet onClose={() => setShowMoreSheet(false)} maxHeight="auto" zIndex={3100} title="">
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}` }}>
+            <button
+              type="button"
+              onClick={() => { setShowMoreSheet(false); setShowMoveSheet(true); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: SPACING.md,
+                width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+                border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
+                color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
+                fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
+              }}
+            >
+              <Icon name="pin" size={20} style={{ opacity: 0.7 }} />
+              다른 Day로 이동
+            </button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* ══ Day 이동 시트 ══ */}
+      {showMoveSheet && (
+        <BottomSheet onClose={() => setShowMoveSheet(false)} maxHeight="70vh" zIndex={3100} title="어느 날로 옮길까요?">
+          <div style={{ padding: `${SPACING.lg} ${SPACING.xxl} ${SPACING.xxxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.md }}>
+            {moveDayOptions
+              .filter((opt) => opt.displayIdx !== currentDayDisplayIdx)
+              .map((opt) => {
+                const dayNum = opt.displayIdx + 1;
+                return (
+                  <button
+                    key={opt.displayIdx}
+                    type="button"
+                    onClick={() => { onMoveToDay(effectiveDetail, opt.displayIdx); setShowMoveSheet(false); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: SPACING.lg,
+                      width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+                      border: '1px solid var(--color-outline-variant)',
+                      borderRadius: RADIUS.lg, background: 'var(--color-surface-container-lowest)',
+                      cursor: 'pointer', fontFamily: 'inherit',
+                      transition: 'background 0.15s, border-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary-container)'; e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-surface-container-lowest)'; e.currentTarget.style.borderColor = 'var(--color-outline-variant)'; }}
+                  >
+                    <div style={{
+                      width: 36, height: 36, borderRadius: RADIUS.md,
+                      background: 'var(--color-primary-container)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <span style={{ fontSize: 'var(--typo-label-2-bold-size)', fontWeight: 700, color: 'var(--color-primary)' }}>
+                        {dayNum}
+                      </span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <div style={{ fontSize: 'var(--typo-label-2-medium-size)', fontWeight: 600, color: 'var(--color-on-surface)' }}>
+                        Day {dayNum}
+                      </div>
+                      {opt.label && opt.label !== `Day ${dayNum}` && (
+                        <div style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', marginTop: '1px' }}>
+                          {opt.label}
+                        </div>
+                      )}
+                    </div>
+                    <Icon name="chevronRight" size={14} style={{ opacity: 0.3, flexShrink: 0 }} />
+                  </button>
+                );
+              })}
+          </div>
+        </BottomSheet>
+      )}
+    </div>
+  );
+
+  return createPortal(
+    <>
+      {fullscreenModal}
+
+      {/* 이미지 뷰어 */}
+      <ImageViewer src={viewImage} alt={detail.name} onClose={() => setViewImage(null)} />
+
+      {/* 구글맵 이동 확인 */}
+      {showDirectionsConfirm && directionsUrl && (
+        <ConfirmDialog
+          title="구글맵으로 이동"
+          message="구글맵으로 이동합니다"
+          confirmLabel="확인"
+          onConfirm={() => { window.open(directionsUrl, '_blank'); setShowDirectionsConfirm(false); }}
+          onCancel={() => setShowDirectionsConfirm(false)}
+        />
+      )}
+
+      {/* 시간 수정 */}
+      {showTimePicker && (
+        <TimePickerDialog
+          value={item?.time || ''}
+          onConfirm={handleTimeSave}
+          onClose={() => setShowTimePicker(false)}
+          minuteStep={5}
+        />
+      )}
+
+      {/* 텍스트 필드 수정 CenterPopup */}
+      {editField && (
+        <CenterPopup title={editField.label} onClose={() => setEditField(null)} maxWidth={360}>
+          {editField.multiline ? (
+            <textarea
+              autoFocus
+              value={editField.value}
+              onChange={(e) => setEditField(prev => ({ ...prev, value: e.target.value }))}
+              rows={5}
+              style={{
+                width: '100%', border: '1px solid var(--color-outline-variant)', borderRadius: RADIUS.md,
+                padding: SPACING.lg, fontSize: 'var(--typo-label-1-n---regular-size)', fontFamily: 'inherit',
+                color: 'var(--color-on-surface)', background: 'var(--color-surface-container-lowest)',
+                resize: 'vertical', outline: 'none',
+              }}
+            />
+          ) : (
+            <input
+              autoFocus
+              type="text"
+              value={editField.value}
+              onChange={(e) => setEditField(prev => ({ ...prev, value: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleTextSave(); }}
+              style={{
+                width: '100%', border: '1px solid var(--color-outline-variant)', borderRadius: RADIUS.md,
+                padding: `${SPACING.md} ${SPACING.lg}`, fontSize: 'var(--typo-label-1-n---regular-size)',
+                fontFamily: 'inherit', color: 'var(--color-on-surface)',
+                background: 'var(--color-surface-container-lowest)', outline: 'none',
+              }}
+            />
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: SPACING.md, marginTop: SPACING.lg }}>
+            <Button variant="ghost-neutral" size="sm" onClick={() => setEditField(null)}>취소</Button>
+            <Button variant="primary" size="sm" onClick={handleTextSave}>저장</Button>
+          </div>
+        </CenterPopup>
+      )}
+
+      {/* 출발지/도착지 선택 */}
+      {showStationPicker && (
+        <StationPickerModal
+          onClose={() => setShowStationPicker(false)}
+          onSelect={(from, to) => handleStationSelect(from, to)}
+          initialFrom={item?.moveFrom || ''}
+          initialTo={item?.moveTo || ''}
+        />
+      )}
+
+      {/* 시간표 검색 */}
+      {showTimetableSearch && (
+        <TimetableSearchDialog
+          onClose={() => setShowTimetableSearch(false)}
+          onSelect={handleTimetableSelect}
+        />
+      )}
+    </>,
+    document.body
   );
 }

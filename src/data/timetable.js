@@ -655,6 +655,48 @@ const REGION_MAP = {
   '삿포로': '홋카이도', '신치토세공항': '홋카이도', '오타루': '홋카이도',
 };
 
+/* ── 역/도시 별칭 사전: 다양한 표기를 DB 라벨 정식 이름으로 정규화 ── */
+const STATION_ALIASES = {
+  // 규슈
+  '후쿠오카': '하카타', '福岡': '하카타', '博多': '하카타', '하카타역': '하카타', '후쿠오카역': '하카타',
+  '구마모토역': '구마모토', '熊本': '구마모토',
+  '아소역': '아소', '아소산역': '아소산',
+  '유후인역': '유후인', '유후인온천': '유후인', '由布院': '유후인',
+  '쿠루메역': '쿠루메', '久留米': '쿠루메',
+  '후쿠오카공항역': '후쿠오카공항',
+  // 간사이
+  '오사카역': '오사카', '大阪': '오사카', '大阪駅': '오사카',
+  '교토역': '교토', '京都': '교토', '京都駅': '교토',
+  '난바역': '난바', '難波': '난바', 'なんば': '난바',
+  '우메다역': '우메다', '梅田': '우메다',
+  '신오사카역': '신오사카', '新大阪': '신오사카',
+  '아라시야마역': '아라시야마', '嵐山': '아라시야마',
+  // 간토
+  '도쿄역': '도쿄', '東京': '도쿄', '東京駅': '도쿄',
+  '시나가와역': '시나가와', '品川': '시나가와',
+  '시부야역': '시부야', '渋谷': '시부야',
+  '신주쿠역': '신주쿠', '新宿': '신주쿠',
+  // 홋카이도
+  '삿포로역': '삿포로', '札幌': '삿포로',
+  '치토세공항': '신치토세공항', '신치토세': '신치토세공항', '新千歳空港': '신치토세공항', '신치토세공항역': '신치토세공항',
+  '오타루역': '오타루', '小樽': '오타루',
+};
+
+/**
+ * 별칭 사전 + "역" 접미사 제거로 역명 정규화.
+ * @param {string} name
+ * @returns {string}
+ */
+export function normalizeStation(name) {
+  if (!name) return '';
+  const trimmed = name.trim();
+  if (STATION_ALIASES[trimmed]) return STATION_ALIASES[trimmed];
+  // "역" 접미사 제거 후 다시 사전 조회
+  const withoutSuffix = trimmed.replace(/역$/, '').trim();
+  if (STATION_ALIASES[withoutSuffix]) return STATION_ALIASES[withoutSuffix];
+  return withoutSuffix || trimmed;
+}
+
 /**
  * DB에서 고유 역명 목록을 지역별 그룹으로 추출.
  * @returns {{ region: string, stations: string[] }[] }
@@ -689,15 +731,28 @@ export function getStationList() {
 }
 
 /**
- * 출발지+도착지로 매칭되는 노선 목록 반환.
+ * 출발지+도착지로 매칭되는 노선 목록 반환 (별칭 자동 정규화).
  */
 export function findRoutesByStations(from, to) {
   if (!from || !to) return [];
+  const nFrom = normalizeStation(from);
+  const nTo = normalizeStation(to);
   return TIMETABLE_DB.filter((r) => {
     const m = (r.label || '').match(/^(.+?)\s*→\s*(.+?)(?:\s*\(|$)/);
     if (!m) return false;
-    return m[1].trim() === from && m[2].trim() === to;
+    return m[1].trim() === nFrom && m[2].trim() === nTo;
   });
+}
+
+/**
+ * moveFrom/moveTo 직접 매칭 (별칭 정규화 적용).
+ * @returns {{ routeId: string, route: object } | null}
+ */
+export function matchByFromTo(moveFrom, moveTo) {
+  if (!moveFrom || !moveTo) return null;
+  const routes = findRoutesByStations(moveFrom, moveTo);
+  if (routes.length === 0) return null;
+  return { routeId: routes[0].id, route: routes[0] };
 }
 
 export function findBestTrain(trains, targetTime) {
@@ -756,12 +811,18 @@ export function matchTimetableRoute(desc) {
   const parsed = parseMoveDesc(desc);
   if (!parsed) return null;
   const { from, to } = parsed;
+  // 1순위: normalizeStation 으로 정확 매칭
+  const nFrom = normalizeStation(normForLabel(from));
+  const nTo = normalizeStation(normForLabel(to));
+  const exact = findRoutesByStations(nFrom, nTo);
+  if (exact.length > 0) return { routeId: exact[0].id, route: exact[0] };
+  // 2순위: 라벨 부분 문자열 매칭 (기존 fallback)
   const fromNorm = normForLabel(from);
   const toNorm = normForLabel(to);
   const route = TIMETABLE_DB.find((r) => {
     const label = r.label || '';
-    const iFrom = label.indexOf(fromNorm) !== -1 ? label.indexOf(fromNorm) : label.indexOf(from);
-    const iTo = label.indexOf(toNorm) !== -1 ? label.indexOf(toNorm) : label.indexOf(to);
+    const iFrom = label.indexOf(nFrom) !== -1 ? label.indexOf(nFrom) : label.indexOf(fromNorm) !== -1 ? label.indexOf(fromNorm) : label.indexOf(from);
+    const iTo = label.indexOf(nTo) !== -1 ? label.indexOf(nTo) : label.indexOf(toNorm) !== -1 ? label.indexOf(toNorm) : label.indexOf(to);
     return iFrom !== -1 && iTo !== -1 && iFrom < iTo;
   });
   if (!route) return null;

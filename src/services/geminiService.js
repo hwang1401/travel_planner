@@ -153,7 +153,7 @@ const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
 1. 시간이 명시된 항목만 time을 채우세요. 시간이 없으면 time을 빈 문자열로.
 2. food, spot, shop, stay 타입은 가능한 한 detail.address를 포함하세요 (문서에 주소가 있으면 그대로, 없으면 장소명으로 검색 가능한 이름을 넣으세요).
 3. 쇼핑 가이드나 기념품 목록은 개별 일정이 아니라, 관련 쇼핑 일정의 tip에 요약해서 넣으세요.
-4. 이동 구간은 출발지→도착지 형태로 desc에 넣으세요.
+4. 이동 구간은 출발지→도착지 형태로 desc에 넣으세요. 또한 type이 "move"인 경우 반드시 "moveFrom"(출발지명)과 "moveTo"(도착지명) 필드를 최상위에 별도로 추가하세요. 예: {"type":"move","desc":"하카타 → 구마모토","moveFrom":"하카타","moveTo":"구마모토",...}
 5. 시간순으로 정렬해주세요.
 6. 문서가 여행 일정이 아닌 경우에도 최대한 시간대별 활동을 추론해주세요.
 7. detail.timetable은 "영업시간" 문자열입니다 (예: "11:00~23:00").
@@ -254,10 +254,20 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus, a
               ...(Array.isArray(item.detail.highlights) && item.detail.highlights.length > 0 ? { highlights: item.detail.highlights } : {}),
             }
           : null;
-        // For move: attach transport timetable from our DB if desc matches a route
-        if (itemType === "move" && detailFromAI) {
-          const matched = matchTimetableRoute(item.desc);
-          if (matched) {
+        // For move: attach transport timetable from our DB — moveFrom/moveTo 우선, desc fallback
+        if (itemType === "move") {
+          if (!detailFromAI) {
+            // detail이 없어도 시간표를 붙이기 위해 생성
+          }
+          const mf = item.moveFrom?.trim();
+          const mt = item.moveTo?.trim();
+          let matched = null;
+          if (mf && mt) {
+            const routes = findRoutesByStations(mf, mt);
+            if (routes.length > 0) matched = { routeId: routes[0].id, route: routes[0] };
+          }
+          if (!matched) matched = matchTimetableRoute(item.desc);
+          if (matched && detailFromAI) {
             const bestIdx = findBestTrain(matched.route.trains, timeStr);
             detailFromAI.timetable = {
               _routeId: matched.routeId,
@@ -273,6 +283,8 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus, a
           type: itemType,
           desc: item.desc,
           sub: item.sub || "",
+          ...(itemType === "move" && item.moveFrom ? { moveFrom: item.moveFrom } : {}),
+          ...(itemType === "move" && item.moveTo ? { moveTo: item.moveTo } : {}),
           ...(detailFromAI ? { detail: detailFromAI } : {}),
           _extra: true,
           _custom: true,
@@ -584,6 +596,8 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
           desc: item.desc,
           sub: item.sub || "",
           ...(ragId != null ? { _ragId: ragId } : {}),
+          ...(itemType === "move" && item.moveFrom ? { moveFrom: item.moveFrom } : {}),
+          ...(itemType === "move" && item.moveTo ? { moveTo: item.moveTo } : {}),
           ...(item.detail && Object.keys(item.detail).some((k) => item.detail[k])
             ? {
                 detail: {
@@ -678,7 +692,7 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 - food: 식사, 카페, 간식
 - spot: 관광지, 명소, 전망
 - shop: 쇼핑, 기념품, 드럭스토어
-- move: 이동 (전철, 버스, 택시, 도보). 비행기/항공은 type: flight로 구분하세요.
+- move: 이동 (전철, 버스, 택시, 도보). 비행기/항공은 type: flight로 구분하세요. move 타입은 반드시 최상위에 "moveFrom"(출발지명)과 "moveTo"(도착지명) 필드를 추가하세요.
 - flight: 항공 (비행기)
 - stay: 숙소 체크인/아웃
 - info: 기타 정보
@@ -891,9 +905,16 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
                 ...(lat != null && lon != null && !Number.isNaN(lat) && !Number.isNaN(lon) ? { lat, lon } : {}),
               };
             }
-            // 교통(move): desc만 있어도 시간표 매칭 시도 — AI가 detail 없이 move만 줄 수 있음
+            // 교통(move): moveFrom/moveTo 우선, desc fallback으로 시간표 매칭
             if (typeVal === "move") {
-              const matched = matchTimetableRoute(it.desc);
+              const mf = it.moveFrom?.trim();
+              const mt = it.moveTo?.trim();
+              let matched = null;
+              if (mf && mt) {
+                const routes = findRoutesByStations(mf, mt);
+                if (routes.length > 0) matched = { routeId: routes[0].id, route: routes[0] };
+              }
+              if (!matched) matched = matchTimetableRoute(it.desc);
               if (matched) {
                 if (!detail) {
                   detail = { name: it.desc, category: "교통" };
@@ -912,6 +933,8 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
               type: typeVal,
               desc: it.desc,
               sub: it.sub || "",
+              ...(typeVal === "move" && it.moveFrom ? { moveFrom: it.moveFrom } : {}),
+              ...(typeVal === "move" && it.moveTo ? { moveTo: it.moveTo } : {}),
               ...(detail ? { detail } : {}),
               ...(it.rag_id != null ? { _ragId: it.rag_id } : {}),
               _extra: true,

@@ -9,7 +9,7 @@ import { useScrollLock } from '../../hooks/useScrollLock';
 import BottomSheet from '../common/BottomSheet';
 import { MultiImagePicker } from '../common/ImagePicker';
 import { uploadImage, generateImagePath } from '../../services/imageService';
-import { TIMETABLE_DB, findBestTrain, matchTimetableRoute } from '../../data/timetable';
+import { TIMETABLE_DB, findBestTrain, matchTimetableRoute, matchByFromTo } from '../../data/timetable';
 import TimetablePreview from '../common/TimetablePreview';
 import { readFileAsText, detectConflicts } from '../../utils/scheduleParser';
 import { analyzeScheduleWithAI, getAIRecommendation } from '../../services/geminiService';
@@ -76,10 +76,12 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   );
   const [showTimetableSearch, setShowTimetableSearch] = useState(false);
 
-  // 교통(move): desc/시간 바뀌면 맞는 노선 자동 매칭 → 시간표 리스트 표시 (검색은 필요할 때만)
+  // 교통(move): moveFrom/moveTo 또는 desc 변경 시 자동 재매칭
   useEffect(() => {
-    if (type !== 'move' || !desc.trim() || loadedTimetable?.trains?.length) return;
-    const matched = matchTimetableRoute(desc.trim());
+    if (type !== 'move' || !desc.trim()) return;
+    // moveFrom/moveTo 우선
+    let matched = matchByFromTo(item?.moveFrom, item?.moveTo);
+    if (!matched) matched = matchTimetableRoute(desc.trim());
     if (matched) {
       const bestIdx = findBestTrain(matched.route.trains, time);
       setLoadedTimetable({
@@ -89,8 +91,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         trains: matched.route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
       });
       setSelectedRoute(matched.routeId);
+    } else {
+      setLoadedTimetable(null);
     }
-  }, [type, desc, time, loadedTimetable]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, desc, item?.moveFrom, item?.moveTo]);
 
   /* ── Image handlers ── */
   const handleAddImage = useCallback(async (file) => {
@@ -418,6 +423,8 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       desc: desc.trim(),
       type,
       ...(sub.trim() ? { sub: sub.trim() } : {}),
+      ...(type === "move" && item?.moveFrom ? { moveFrom: item.moveFrom } : {}),
+      ...(type === "move" && item?.moveTo ? { moveTo: item.moveTo } : {}),
       _custom: true,
     };
 

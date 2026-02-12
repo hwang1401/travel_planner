@@ -421,6 +421,8 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
       desc: desc.trim(),
       type,
       ...(sub.trim() ? { sub: sub.trim() } : {}),
+      ...(type === 'move' && moveFrom ? { moveFrom } : {}),
+      ...(type === 'move' && moveTo ? { moveTo } : {}),
       _custom: true,
       detail: {
         name: desc.trim(),

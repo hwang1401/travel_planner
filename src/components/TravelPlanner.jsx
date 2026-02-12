@@ -34,7 +34,8 @@ import AddRAGPlaceSheet from "./dialogs/AddRAGPlaceSheet";
 import DocumentDialog from "./dialogs/DocumentDialog";
 import ShoppingGuideDialog from "./dialogs/ShoppingGuideDialog";
 import DayInfoDialog from "./dialogs/DayInfoDialog";
-import EditItemDialog from "./dialogs/EditItemDialog";
+import AIChatDialog from "./dialogs/AIChatDialog";
+import TimePickerDialog from "./common/TimePickerDialog";
 import AddDayDialog from "./dialogs/AddDayDialog";
 import DuplicateReviewDialog from "./dialogs/DuplicateReviewDialog";
 
@@ -212,6 +213,10 @@ export default function TravelPlanner() {
   const [dayInfoTab, setDayInfoTab] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [openAiTab, setOpenAiTab] = useState(false);
+  const [showAiChat, setShowAiChat] = useState(false);
+  const [longPressSelection, setLongPressSelection] = useState(new Set());
+  const [showLongPressMoveSheet, setShowLongPressMoveSheet] = useState(false);
+  const [timeEditItem, setTimeEditItem] = useState(null); // { item, si, ii, dayIdx }
   const [showMap, setShowMap] = useState(false);
   const [editingDayIdx, setEditingDayIdx] = useState(null);
   const [editDayLabel, setEditDayLabel] = useState("");
@@ -506,6 +511,8 @@ export default function TravelPlanner() {
         name: detail.name || enrichedItem.desc || "",
         category: detail.category || TYPE_LABELS[enrichedItem.type] || "정보",
         timetable: detail.timetable ?? enrichedItem.detail?.timetable,
+        image: detail.image ?? enrichedItem.detail?.image,
+        images: detail.images ?? enrichedItem.detail?.images,
         _item: enrichedItem,
         _si: effectiveSi,
         _ii: ii,
@@ -847,8 +854,8 @@ export default function TravelPlanner() {
         if (!next[dayIdx]) next[dayIdx] = {};
         if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
         if (itemIdx !== undefined && itemIdx !== null) {
-          // Editing existing extra item — find by old item reference
-          const oldItem = editTarget?.item;
+          // Editing existing extra item — find by old item reference or by newItem._id
+          const oldItem = editTarget?.item ?? newItem;
           if (oldItem) {
             const idx = findItemIndex(next[dayIdx].extraItems, oldItem);
             if (idx >= 0) {
@@ -875,7 +882,7 @@ export default function TravelPlanner() {
           next[dayIdx].sections = { ...next[dayIdx].sections };
           const sec = next[dayIdx].sections[sectionIdx];
           const newItems = [...(sec.items || [])];
-          const oldItem = editTarget?.item;
+          const oldItem = editTarget?.item ?? newItem;
           if (oldItem) {
             const matchIdx = findItemIndex(newItems, oldItem);
             if (matchIdx >= 0) newItems[matchIdx] = newItem;
@@ -921,7 +928,7 @@ export default function TravelPlanner() {
         if (!next[dayIdx]) next[dayIdx] = {};
         if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
         if (itemIdx !== undefined && itemIdx !== null) {
-          const oldItem = editTarget?.item;
+          const oldItem = editTarget?.item ?? newItem;
           if (oldItem) {
             const idx = findItemIndex(next[dayIdx].extraItems, oldItem);
             if (idx >= 0) {
@@ -935,12 +942,11 @@ export default function TravelPlanner() {
       } else {
         if (!next[dayIdx]) next[dayIdx] = {};
         if (!next[dayIdx].sections) next[dayIdx].sections = {};
-        // 기존/신규 구분 없이, 화면에 보이는(머지된) 해당 섹션 아이템을 기준으로 저장 → 로드 시 동일하게 반영
         const displayedItems = mergedDayForSave?.sections?.[sectionIdx]?.items ?? [];
         const baseItems = Array.isArray(displayedItems) ? displayedItems.filter((it) => it && !it._extra) : [];
         if (itemIdx !== undefined && itemIdx !== null) {
           const newItems = [...baseItems];
-          const oldItemSave = editTarget?.item;
+          const oldItemSave = editTarget?.item ?? newItem;
           if (oldItemSave) {
             const matchIdx = findItemIndex(newItems, oldItemSave);
             if (matchIdx >= 0) newItems[matchIdx] = newItem;
@@ -958,7 +964,7 @@ export default function TravelPlanner() {
           const edSec = edSections[sectionIdx];
           const edItems = Array.isArray(edSec?.items) ? [...edSec.items] : [];
           if (itemIdx !== undefined && itemIdx !== null) {
-            const oldItemEd = editTarget?.item;
+            const oldItemEd = editTarget?.item ?? newItem;
             const edMatchIdx = oldItemEd ? findItemIndex(edItems, oldItemEd) : -1;
             if (edMatchIdx >= 0) {
               edItems[edMatchIdx] = newItem;
@@ -1101,6 +1107,25 @@ export default function TravelPlanner() {
     });
   }, [performDeleteItem]);
 
+  /* DetailDialog 인라인 수정: 필드 단위 저장 (displayIdx → origIdx 변환) */
+  const handleSaveFieldFromDetail = useCallback((displayIdx, sectionIdx, itemIdx, updatedItem) => {
+    const dayIdx = toOrigIdx(displayIdx);
+    handleSaveItem(updatedItem, dayIdx, sectionIdx, itemIdx, { skipDuplicateCheck: true });
+    // activeDetail도 갱신
+    setActiveDetail((prev) => {
+      if (!prev) return prev;
+      const newDetail = updatedItem.detail || {};
+      return {
+        ...prev,
+        ...newDetail,
+        name: newDetail.name || updatedItem.desc || prev.name,
+        category: newDetail.category || prev.category,
+        timetable: newDetail.timetable ?? prev.timetable,
+        _item: updatedItem,
+      };
+    });
+  }, [handleSaveItem, toOrigIdx]);
+
   /* 정보 다이얼로그에서 삭제 시: 다이얼로그 닫고 확인 후 삭제 */
   const handleDeleteFromDetail = useCallback((d) => {
     if (!d?._item?._custom) return;
@@ -1195,6 +1220,81 @@ export default function TravelPlanner() {
     setToast({ message: `${targetLabel}(으)로 이동했어요`, icon: "check" });
     setSelectedDay(targetDisplayIdx);
   }, [updateCustomData, DAYS, toOrigIdx, selectedDay, baseLen]);
+
+  /* ── 롱프레스 선택 모드 ── */
+  const longPressMode = longPressSelection.size > 0;
+
+  const handleLongPressToggle = useCallback((item) => {
+    if (bulkDeleteMode) return; // 기존 bulk 모드와 동시 비활성
+    setLongPressSelection((prev) => {
+      const next = new Set(prev);
+      const key = item._id || `${item.time}-${item.desc}`;
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, [bulkDeleteMode]);
+
+  const isLongPressSelected = useCallback((item) => {
+    const key = item._id || `${item.time}-${item.desc}`;
+    return longPressSelection.has(key);
+  }, [longPressSelection]);
+
+  const handleLongPressDelete = useCallback(() => {
+    if (longPressSelection.size === 0) return;
+    const items = currentDayItems.filter(({ item }) => {
+      const key = item._id || `${item.time}-${item.desc}`;
+      return longPressSelection.has(key);
+    });
+    if (items.length === 0) return;
+    setConfirmDialog({
+      title: `${items.length}개 삭제`,
+      message: `선택한 ${items.length}개 일정을 삭제하시겠습니까?`,
+      confirmLabel: "삭제",
+      onConfirm: () => {
+        for (const { item, si, ii, section } of items) {
+          const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
+          performDeleteItem(toOrigIdx(selectedDay), effectiveSi, ii, item);
+        }
+        setLongPressSelection(new Set());
+        setConfirmDialog(null);
+      },
+    });
+  }, [longPressSelection, currentDayItems, performDeleteItem, toOrigIdx, selectedDay]);
+
+  const handleLongPressMoveToDay = useCallback((targetDisplayIdx) => {
+    if (longPressSelection.size === 0) return;
+    const items = currentDayItems.filter(({ item }) => {
+      const key = item._id || `${item.time}-${item.desc}`;
+      return longPressSelection.has(key);
+    });
+    for (const { item, si, ii, section } of items) {
+      const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
+      handleMoveToDay({
+        _item: item,
+        _si: effectiveSi,
+        _ii: ii,
+        _di: selectedDay,
+      }, targetDisplayIdx);
+    }
+    setLongPressSelection(new Set());
+    setShowLongPressMoveSheet(false);
+  }, [longPressSelection, currentDayItems, handleMoveToDay, selectedDay]);
+
+  /* ── PlaceCard 시간 탭 핸들러 ── */
+  const handleTimeClickFromCard = useCallback((item, si, ii) => {
+    if (!item._custom) return;
+    setTimeEditItem({ item, si, ii, dayIdx: toOrigIdx(selectedDay) });
+  }, [toOrigIdx, selectedDay]);
+
+  const handleTimeEditSave = useCallback((newTime) => {
+    if (!timeEditItem) return;
+    const { item, si, ii, dayIdx } = timeEditItem;
+    const updated = { ...item, time: newTime };
+    if (updated.detail) updated.detail = { ...updated.detail };
+    handleSaveItem(updated, dayIdx, si, ii, { skipDuplicateCheck: true });
+    setTimeEditItem(null);
+  }, [timeEditItem, handleSaveItem]);
 
   const runBulkDeleteWithPayload = useCallback((payload) => {
     if (!payload) return;
@@ -1861,9 +1961,13 @@ export default function TravelPlanner() {
                           item={enrichedItem}
                           order={itemOrder}
                           isNow={isNow}
-                          isClickable={!bulkDeleteMode && isClickable}
+                          isClickable={!bulkDeleteMode && !longPressMode && isClickable}
                           onClick={handleClick}
                           isLast={isLastItem}
+                          onTimeClick={canEdit && enrichedItem._custom ? (itm) => handleTimeClickFromCard(itm, effectiveSi, ii) : undefined}
+                          onLongPress={canEdit ? handleLongPressToggle : undefined}
+                          isSelected={isLongPressSelected(enrichedItem)}
+                          selectionMode={longPressMode}
                         />
                       </div>
                     </div>
@@ -1909,14 +2013,9 @@ export default function TravelPlanner() {
         detail={activeDetail}
         onClose={() => setActiveDetail(null)}
         dayColor="var(--color-primary)"
-        onEdit={canEdit ? (d) => {
-          const item = d._item;
-          if (item) {
-            setEditTarget({ item, sectionIdx: d._si, itemIdx: d._ii, dayIdx: toOrigIdx(d._di ?? selectedDay) });
-          }
-        } : undefined}
         onDelete={canEdit && activeDetail?._item?._custom ? handleDeleteFromDetail : undefined}
         onMoveToDay={canEdit && activeDetail?._item?._custom ? handleMoveToDay : undefined}
+        onSaveField={canEdit ? handleSaveFieldFromDetail : undefined}
         moveDayOptions={DAYS.map((d, i) => ({ label: d.label || `Day ${d.day}`, displayIdx: i }))}
         currentDayDisplayIdx={selectedDay}
         allDetailPayloads={allDetailPayloads}
@@ -1946,7 +2045,7 @@ export default function TravelPlanner() {
             {[
               { icon: "pin", iconColor: "var(--color-primary)", label: "직접 일정 추가", desc: "시간·유형·일정명을 직접 입력해요", onClick: () => { setShowAddSheet(false); setShowAddPlace(true); } },
               { icon: "document", iconColor: "var(--color-on-surface-variant)", label: "예약 정보 붙여넣기", desc: "확인메일, 바우처를 복붙하면 AI가 정리", onClick: () => { setShowAddSheet(false); setShowPasteInfo(true); } },
-              { icon: "flash", iconColor: "var(--color-on-surface-variant)", label: "AI와 대화하며 계획하기", desc: "여행 스타일을 알려주면 AI가 일정을 제안해요", onClick: () => { setShowAddSheet(false); setEditTarget({ dayIdx: toOrigIdx(selectedDay), sectionIdx: -1, itemIdx: null, item: null }); setOpenAiTab(true); } },
+              { icon: "flash", iconColor: "var(--color-on-surface-variant)", label: "AI와 대화하며 계획하기", desc: "여행 스타일을 알려주면 AI가 일정을 제안해요", onClick: () => { setShowAddSheet(false); setShowAiChat(true); } },
             ].map((action, i) => (
               <div
                 key={i}
@@ -1985,22 +2084,12 @@ export default function TravelPlanner() {
         </BottomSheet>
       )}
 
-      {/* Edit/Add Item Dialog (only if can edit) */}
-      {editTarget && canEdit && (
-        <EditItemDialog
-          item={editTarget.item}
-          sectionIdx={editTarget.sectionIdx}
-          itemIdx={editTarget.itemIdx}
-          dayIdx={editTarget.dayIdx}
-          onSave={handleSaveItem}
-          onDelete={editTarget.item?._custom ? handleDeleteItem : null}
-          onClose={() => { setEditTarget(null); setOpenAiTab(false); }}
-          color="var(--color-primary)"
-          tripId={isLegacy ? null : tripId}
-          currentDay={current}
+      {/* AI Chat Dialog */}
+      {showAiChat && (
+        <AIChatDialog
+          onClose={() => setShowAiChat(false)}
           onBulkImport={handleBulkImport}
-          initialTab={openAiTab ? 2 : 0}
-          aiOnly={openAiTab}
+          currentDay={current}
           destinations={tripMeta?.destinations}
           allDays={DAYS}
         />
@@ -2046,6 +2135,111 @@ export default function TravelPlanner() {
         )}
 
       {/* Confirm Dialog */}
+      {/* ── 롱프레스 선택 액션바 ── */}
+      {longPressMode && (
+        <div style={{
+          position: "fixed",
+          bottom: 0, left: 0, right: 0,
+          zIndex: 1500,
+          padding: `${SPACING.xl} ${SPACING.xxl}`,
+          paddingBottom: `calc(${SPACING.xl} + env(safe-area-inset-bottom, 0px))`,
+          display: "flex", gap: SPACING.lg, alignItems: "center",
+          borderTop: "1px solid var(--color-outline-variant)",
+          background: "var(--color-surface)",
+          boxShadow: "0 -4px 16px rgba(0,0,0,0.1)",
+          animation: "slideUpActionBar 0.2s ease",
+        }}>
+          <button
+            type="button"
+            onClick={() => setLongPressSelection(new Set())}
+            style={{
+              display: "flex", alignItems: "center", gap: SPACING.md,
+              border: "none", background: "var(--color-primary-container)",
+              borderRadius: "var(--radius-circle, 999px)",
+              padding: `${SPACING.ms} ${SPACING.lg} ${SPACING.ms} ${SPACING.md}`,
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            <Icon name="close" size={14} style={{ color: "var(--color-primary)" }} />
+            <span style={{ fontSize: "var(--typo-label-2-bold-size)", fontWeight: 700, color: "var(--color-primary)" }}>
+              {longPressSelection.size}개
+            </span>
+          </button>
+          <div style={{ flex: 1 }} />
+          {DAYS.length > 1 && (
+            <Button variant="ghost-neutral" size="sm" iconLeft="pin" onClick={() => setShowLongPressMoveSheet(true)}>
+              Day 이동
+            </Button>
+          )}
+          <Button variant="ghost-danger" size="sm" iconLeft="trash" onClick={handleLongPressDelete}>
+            삭제
+          </Button>
+          <style>{`@keyframes slideUpActionBar { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+        </div>
+      )}
+
+      {/* 롱프레스 Day 이동 시트 */}
+      {showLongPressMoveSheet && (
+        <BottomSheet onClose={() => setShowLongPressMoveSheet(false)} maxHeight="70vh" zIndex={3100} title="어느 날로 옮길까요?">
+          <div style={{ padding: `${SPACING.lg} ${SPACING.xxl} ${SPACING.xxxl}`, display: "flex", flexDirection: "column", gap: SPACING.md }}>
+            {DAYS.map((d, i) => {
+              if (i === selectedDay) return null;
+              const dayNum = i + 1;
+              const label = d.label || `Day ${d.day}`;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => handleLongPressMoveToDay(i)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: SPACING.lg,
+                    width: "100%", padding: `${SPACING.lg} ${SPACING.xl}`,
+                    border: "1px solid var(--color-outline-variant)",
+                    borderRadius: "var(--radius-lg, 12px)", background: "var(--color-surface-container-lowest)",
+                    cursor: "pointer", fontFamily: "inherit",
+                    transition: "background 0.15s, border-color 0.15s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-primary-container)"; e.currentTarget.style.borderColor = "var(--color-primary)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "var(--color-surface-container-lowest)"; e.currentTarget.style.borderColor = "var(--color-outline-variant)"; }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "var(--radius-md, 8px)",
+                    background: "var(--color-primary-container)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <span style={{ fontSize: "var(--typo-label-2-bold-size)", fontWeight: 700, color: "var(--color-primary)" }}>
+                      {dayNum}
+                    </span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                    <div style={{ fontSize: "var(--typo-label-2-medium-size)", fontWeight: 600, color: "var(--color-on-surface)" }}>
+                      Day {dayNum}
+                    </div>
+                    {label !== `Day ${d.day}` && (
+                      <div style={{ fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant2)", marginTop: "1px" }}>
+                        {label}
+                      </div>
+                    )}
+                  </div>
+                  <Icon name="chevronRight" size={14} style={{ opacity: 0.3, flexShrink: 0 }} />
+                </button>
+              );
+            })}
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* PlaceCard 시간 수정 다이얼로그 */}
+      {timeEditItem && (
+        <TimePickerDialog
+          value={timeEditItem.item.time || '12:00'}
+          onConfirm={handleTimeEditSave}
+          onClose={() => setTimeEditItem(null)}
+          minuteStep={5}
+        />
+      )}
+
       {confirmDialog && (
         <ConfirmDialog
           title={confirmDialog.title}
