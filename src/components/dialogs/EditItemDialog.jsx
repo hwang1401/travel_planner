@@ -9,13 +9,14 @@ import { useScrollLock } from '../../hooks/useScrollLock';
 import BottomSheet from '../common/BottomSheet';
 import { MultiImagePicker } from '../common/ImagePicker';
 import { uploadImage, generateImagePath } from '../../services/imageService';
-import { TIMETABLE_DB, findBestTrain, matchTimetableRoute, matchByFromTo } from '../../data/timetable';
+import { TIMETABLE_DB, findBestTrain, findRoutesByStations, matchTimetableRoute, matchByFromTo } from '../../data/timetable';
 import TimetablePreview from '../common/TimetablePreview';
 import { readFileAsText, detectConflicts } from '../../utils/scheduleParser';
 import { analyzeScheduleWithAI, getAIRecommendation } from '../../services/geminiService';
 import ImportPreviewDialog from './ImportPreviewDialog';
 import { SPACING, RADIUS, COLOR } from '../../styles/tokens';
-import TimetableSearchDialog from './TimetableSearchDialog';
+import FromToTimetablePicker from './FromToTimetablePicker';
+import AddressToStationPicker from './AddressToStationPicker';
 import TimePickerDialog from '../common/TimePickerDialog';
 
 /* ── Edit Item Dialog (일정 추가/수정) ── */
@@ -74,14 +75,22 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
   const [loadedTimetable, setLoadedTimetable] = useState(
     () => (item?.detail?.timetable?.trains?.length ? item.detail.timetable : null)
   );
-  const [showTimetableSearch, setShowTimetableSearch] = useState(false);
-
-  // 교통(move): moveFrom/moveTo 또는 desc 변경 시 자동 재매칭
+  const [showFromToTimetablePicker, setShowFromToTimetablePicker] = useState(false);
+  const [singleStationPicker, setSingleStationPicker] = useState(null);
+  const [moveFrom, setMoveFrom] = useState('');
+  const [moveTo, setMoveTo] = useState('');
   useEffect(() => {
-    if (type !== 'move' || !desc.trim()) return;
-    // moveFrom/moveTo 우선
-    let matched = matchByFromTo(item?.moveFrom, item?.moveTo);
-    if (!matched) matched = matchTimetableRoute(desc.trim());
+    setMoveFrom(item?.moveFrom || '');
+    setMoveTo(item?.moveTo || '');
+  }, [item?.moveFrom, item?.moveTo]);
+
+  // 교통(move): moveFrom/moveTo 또는 desc 변경 시 자동 재매칭 (로드 시 기존 데이터 반영)
+  useEffect(() => {
+    if (type !== 'move') return;
+    const from = moveFrom || item?.moveFrom;
+    const to = moveTo || item?.moveTo;
+    let matched = matchByFromTo(from, to);
+    if (!matched && desc.trim()) matched = matchTimetableRoute(desc.trim());
     if (matched) {
       const bestIdx = findBestTrain(matched.route.trains, time);
       setLoadedTimetable({
@@ -91,11 +100,11 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
         trains: matched.route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
       });
       setSelectedRoute(matched.routeId);
-    } else {
+    } else if (!loadedTimetable?.trains?.length) {
       setLoadedTimetable(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, desc, item?.moveFrom, item?.moveTo]);
+  }, [type, desc, moveFrom, moveTo, item?.moveFrom, item?.moveTo]);
 
   /* ── Image handlers ── */
   const handleAddImage = useCallback(async (file) => {
@@ -395,19 +404,50 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
 
   const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
 
-  const handleLoadTimetable = (routeId) => {
-    if (!routeId) { setLoadedTimetable(null); return; }
-    const route = TIMETABLE_DB.find((r) => r.id === routeId);
-    if (!route) return;
-    const bestIdx = findBestTrain(route.trains, time);
-    const trains = route.trains.map((t, i) => ({ ...t, picked: i === bestIdx }));
-    setLoadedTimetable({
-      _routeId: routeId,
-      station: route.station,
-      direction: route.direction,
-      trains,
-    });
-    setSelectedRoute(routeId);
+  const handleFromToTimetableSelect = ({ from, to, routeId, route }) => {
+    setMoveFrom(from);
+    setMoveTo(to);
+    if (!desc.trim()) setDesc(`${from} → ${to}`);
+    if (route) {
+      const bestIdx = findBestTrain(route.trains, time);
+      setLoadedTimetable({
+        _routeId: routeId,
+        station: route.station,
+        direction: route.direction,
+        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+      });
+      setSelectedRoute(routeId);
+    } else {
+      setLoadedTimetable(null);
+      setSelectedRoute('');
+    }
+    setShowFromToTimetablePicker(false);
+  };
+
+  const handleSingleStationSelect = (station) => {
+    const fromVal = moveFrom || item?.moveFrom || '';
+    const toVal = moveTo || item?.moveTo || '';
+    const from = singleStationPicker.mode === 'from' ? station : fromVal;
+    const to = singleStationPicker.mode === 'to' ? station : toVal;
+    setSingleStationPicker(null);
+    setMoveFrom(from);
+    setMoveTo(to);
+    if (!desc.trim()) setDesc(`${from} → ${to}`);
+    const routes = findRoutesByStations(from, to);
+    const route = routes[0] || null;
+    if (route) {
+      const bestIdx = findBestTrain(route.trains, time);
+      setLoadedTimetable({
+        _routeId: route.id,
+        station: route.station,
+        direction: route.direction,
+        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+      });
+      setSelectedRoute(route.id);
+    } else {
+      setLoadedTimetable(null);
+      setSelectedRoute('');
+    }
   };
 
   useScrollLock();
@@ -423,8 +463,8 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       desc: desc.trim(),
       type,
       ...(sub.trim() ? { sub: sub.trim() } : {}),
-      ...(type === "move" && item?.moveFrom ? { moveFrom: item.moveFrom } : {}),
-      ...(type === "move" && item?.moveTo ? { moveTo: item.moveTo } : {}),
+      ...(type === "move" && (moveFrom || item?.moveFrom) ? { moveFrom: moveFrom || item?.moveFrom } : {}),
+      ...(type === "move" && (moveTo || item?.moveTo) ? { moveTo: moveTo || item?.moveTo } : {}),
       _custom: true,
     };
 
@@ -731,7 +771,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
             {/* Chat input bar — 하단 세이프에리어 확보, 커서가 필드 내부에 보이도록 */}
             <div style={{
               padding: `${SPACING.lg} ${SPACING.xl}`,
-              paddingBottom: `calc(${SPACING.lg} + env(safe-area-inset-bottom, 0px))`,
+              paddingBottom: `calc(${SPACING.lg} + var(--safe-area-bottom, 0px))`,
               flexShrink: 0,
               borderTop: "1px solid var(--color-outline-variant)",
               display: "flex", gap: SPACING.md, alignItems: "flex-end",
@@ -1011,36 +1051,59 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
               placeholder="/images/filename.jpg" />
           )}
 
-          {/* Timetable: move 전용 — Field와 동일한 단일 필드 스타일, 탭 시 자동매칭 또는 검색 모달 */}
+          {/* Timetable: move 전용 — 출발지/도착지 각각 탭해서 변경 */}
           {type === "move" && (
             <>
               <div style={{ paddingBottom: "var(--spacing-sp40, 4px)", minHeight: "var(--field-label-row-height, 20px)", display: "flex", alignItems: "center" }}>
                 <span style={{ fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant)" }}>시간표</span>
               </div>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => setShowTimetableSearch(true)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowTimetableSearch(true); } }}
-                style={{
-                  display: "flex", alignItems: "center", gap: SPACING.md,
-                  width: "100%", height: "var(--height-lg, 36px)", padding: "0 var(--spacing-sp140, 14px)",
-                  border: "1px solid var(--color-outline-variant)", borderRadius: "var(--radius-md, 8px)",
-                  background: "var(--color-surface-container-lowest)", cursor: "pointer",
-                  transition: "border-color var(--transition-fast)", boxSizing: "border-box",
-                }}
-              >
-                <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
-                <span style={{
-                  flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  fontSize: "var(--typo-label-1-n---regular-size)", fontWeight: "var(--typo-label-1-n---regular-weight)",
-                  color: loadedTimetable?.trains?.length ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
-                }}>
-                  {loadedTimetable?.trains?.length
-                    ? (TIMETABLE_DB.find((r) => r.id === loadedTimetable._routeId)?.label || "노선 선택됨")
-                    : "노선·역명 검색 (예: 하카타, 오사카)"}
-                </span>
-                <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: SPACING.sm }}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { if (moveTo || item?.moveTo) setSingleStationPicker({ mode: "from" }); else setShowFromToTimetablePicker(true); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (moveTo || item?.moveTo) setSingleStationPicker({ mode: "from" }); else setShowFromToTimetablePicker(true); } }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: SPACING.md,
+                    width: "100%", height: "var(--height-lg, 36px)", padding: "0 var(--spacing-sp140, 14px)",
+                    border: "1px solid var(--color-outline-variant)", borderRadius: "var(--radius-md, 8px)",
+                    background: "var(--color-surface-container-lowest)", cursor: "pointer",
+                    transition: "border-color var(--transition-fast)", boxSizing: "border-box",
+                  }}
+                >
+                  <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
+                  <span style={{
+                    flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    fontSize: "var(--typo-label-1-n---regular-size)", fontWeight: "var(--typo-label-1-n---regular-weight)",
+                    color: (moveFrom || item?.moveFrom) ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
+                  }}>
+                    {moveFrom || item?.moveFrom || "출발지 선택"}
+                  </span>
+                  <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { if (moveFrom || item?.moveFrom) setSingleStationPicker({ mode: "to" }); else setShowFromToTimetablePicker(true); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (moveFrom || item?.moveFrom) setSingleStationPicker({ mode: "to" }); else setShowFromToTimetablePicker(true); } }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: SPACING.md,
+                    width: "100%", height: "var(--height-lg, 36px)", padding: "0 var(--spacing-sp140, 14px)",
+                    border: "1px solid var(--color-outline-variant)", borderRadius: "var(--radius-md, 8px)",
+                    background: "var(--color-surface-container-lowest)", cursor: "pointer",
+                    transition: "border-color var(--transition-fast)", boxSizing: "border-box",
+                  }}
+                >
+                  <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
+                  <span style={{
+                    flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    fontSize: "var(--typo-label-1-n---regular-size)", fontWeight: "var(--typo-label-1-n---regular-weight)",
+                    color: (moveTo || item?.moveTo) ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
+                  }}>
+                    {moveTo || item?.moveTo || "도착지 선택"}
+                  </span>
+                  <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
+                </div>
               </div>
               {loadedTimetable?.trains?.length > 0 && (
                 <div style={{ marginTop: SPACING.md }}>
@@ -1048,10 +1111,21 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
                 </div>
               )}
 
-              {showTimetableSearch && (
-                <TimetableSearchDialog
-                  onClose={() => setShowTimetableSearch(false)}
-                  onSelect={(routeId) => { handleLoadTimetable(routeId); setShowTimetableSearch(false); }}
+              {showFromToTimetablePicker && (
+                <FromToTimetablePicker
+                  initialFrom={moveFrom || item?.moveFrom || ''}
+                  initialTo={moveTo || item?.moveTo || ''}
+                  initialRouteId={loadedTimetable?._routeId || ''}
+                  onClose={() => setShowFromToTimetablePicker(false)}
+                  onSelect={handleFromToTimetableSelect}
+                />
+              )}
+              {singleStationPicker && (
+                <AddressToStationPicker
+                  mode={singleStationPicker.mode}
+                  fixedStation={singleStationPicker.mode === 'from' ? (moveTo || item?.moveTo || '') : (moveFrom || item?.moveFrom || '')}
+                  onClose={() => setSingleStationPicker(null)}
+                  onSelect={handleSingleStationSelect}
                 />
               )}
             </>
@@ -1064,7 +1138,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       {(activeTab === 0 || !isNew) && (
         <div style={{
           flexShrink: 0,
-          padding: `${SPACING.xl} ${SPACING.xxl} calc(${SPACING.xl} + env(safe-area-inset-bottom, 0px))`,
+          padding: `${SPACING.xl} ${SPACING.xxl} calc(${SPACING.xl} + var(--safe-area-bottom, 0px))`,
           display: "flex",
           gap: SPACING.md,
           borderTop: "1px solid var(--color-outline-variant)",

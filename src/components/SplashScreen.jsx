@@ -17,7 +17,7 @@ export default function SplashScreen() {
         justifyContent: 'center',
         background: 'var(--color-primary)',
         paddingTop: 'env(safe-area-inset-top, 0px)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        paddingBottom: 'var(--safe-area-bottom, 0px)',
       }}
     >
       <img

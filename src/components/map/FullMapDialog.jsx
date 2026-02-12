@@ -419,7 +419,7 @@ export default function FullMapDialog({ days, onClose, onAddItem }) {
         background: "var(--color-surface-container-lowest)", borderTop: "1px solid var(--color-outline-variant)", flexShrink: 0,
         maxHeight: cardExpanded ? "35vh" : "44px", transition: "max-height var(--transition-normal)",
         overflow: "hidden", display: "flex", flexDirection: "column",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        paddingBottom: "var(--safe-area-bottom, 0px)",
       }}>
         {/* Card header */}
         <button onClick={() => setCardExpanded(!cardExpanded)}

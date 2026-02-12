@@ -16,8 +16,8 @@ import TimePickerDialog from '../common/TimePickerDialog';
 import ChipSelector from '../common/ChipSelector';
 import ImagePicker from '../common/ImagePicker';
 import AddressSearch from '../common/AddressSearch';
-import StationPickerModal from './StationPickerModal';
-import TimetableSearchDialog from './TimetableSearchDialog';
+import FromToTimetablePicker from './FromToTimetablePicker';
+import AddressToStationPicker from './AddressToStationPicker';
 import { getNearbyPlaces } from '../../services/ragService';
 import { COLOR, SPACING, RADIUS, TYPE_CONFIG, TYPE_LABELS } from '../../styles/tokens';
 import { TIMETABLE_DB, findBestTrain, matchByFromTo, findRoutesByStations } from '../../data/timetable';
@@ -152,8 +152,8 @@ export default function DetailDialog({
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [timePickerInitialTime, setTimePickerInitialTime] = useState(null); // 시간표 행 탭 시 해당 시각으로 초기값
   const [timePickerPickedIndex, setTimePickerPickedIndex] = useState(null); // 시간표 행 탭 시 저장 시 해당 행을 picked로
-  const [showStationPicker, setShowStationPicker] = useState(false);
-  const [showTimetableSearch, setShowTimetableSearch] = useState(false);
+  const [showFromToTimetablePicker, setShowFromToTimetablePicker] = useState(false);
+  const [singleStationPicker, setSingleStationPicker] = useState(null); // { mode: 'from'|'to' }
   const [showAddressSearchDialog, setShowAddressSearchDialog] = useState(false);
   const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined });
 
@@ -387,33 +387,38 @@ export default function DetailDialog({
     setTimePickerPickedIndex(null);
   };
 
-  const handleStationSelect = (from, to) => {
+  const handleFromToTimetableSelect = ({ from, to, routeId, route }) => {
     const updates = { moveFrom: from, moveTo: to, desc: `${from} → ${to}` };
-    // 자동 재매칭
+    if (route) {
+      const bestIdx = findBestTrain(route.trains, item?.time || '');
+      updates.timetable = {
+        _routeId: routeId, station: route.station, direction: route.direction,
+        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+      };
+    } else {
+      updates.timetable = null;
+    }
+    saveField(updates);
+    setShowFromToTimetablePicker(false);
+  };
+
+  const handleSingleStationSelect = (station) => {
+    const from = singleStationPicker.mode === 'from' ? station : (item?.moveFrom || '');
+    const to = singleStationPicker.mode === 'to' ? station : (item?.moveTo || '');
+    setSingleStationPicker(null);
     const routes = findRoutesByStations(from, to);
-    if (routes.length > 0) {
-      const route = routes[0];
+    const route = routes[0] || null;
+    const updates = { moveFrom: from, moveTo: to, desc: `${from} → ${to}` };
+    if (route) {
       const bestIdx = findBestTrain(route.trains, item?.time || '');
       updates.timetable = {
         _routeId: route.id, station: route.station, direction: route.direction,
         trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
       };
+    } else {
+      updates.timetable = null;
     }
     saveField(updates);
-    setShowStationPicker(false);
-  };
-
-  const handleTimetableSelect = (routeId) => {
-    const route = TIMETABLE_DB.find(r => r.id === routeId);
-    if (!route) return;
-    const bestIdx = findBestTrain(route.trains, item?.time || '');
-    saveField({
-      timetable: {
-        _routeId: routeId, station: route.station, direction: route.direction,
-        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
-      },
-    });
-    setShowTimetableSearch(false);
   };
 
   const px = "var(--spacing-sp200)";
@@ -585,26 +590,26 @@ export default function DetailDialog({
 
   const renderTimetableTab = () => (
     <>
-      {/* 출발지/도착지 (교통) */}
-      {isMove && canEditInline && (
+      {/* 출발지 · 도착지 (각각 탭해서 변경) */}
+      {isMove && canEditTime && (
         <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
           <TappableRow
-            label="출발지 → 도착지"
-            value={item?.moveFrom && item?.moveTo ? `${item.moveFrom} → ${item.moveTo}` : ''}
-            placeholder="출발지/도착지 선택"
-            onClick={() => setShowStationPicker(true)}
+            label="출발지"
+            value={item?.moveFrom || ''}
+            placeholder="출발지 선택"
+            onClick={() => {
+              if (item?.moveTo) setSingleStationPicker({ mode: 'from' });
+              else setShowFromToTimetablePicker(true);
+            }}
           />
-        </div>
-      )}
-
-      {/* 노선 선택 */}
-      {isMove && canEditInline && (
-        <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
           <TappableRow
-            label="시간표 노선"
-            value={effectiveTimetable?._routeId ? TIMETABLE_DB.find(r => r.id === effectiveTimetable._routeId)?.label : ''}
-            placeholder="노선 검색"
-            onClick={() => setShowTimetableSearch(true)}
+            label="도착지"
+            value={item?.moveTo || ''}
+            placeholder="도착지 선택"
+            onClick={() => {
+              if (item?.moveFrom) setSingleStationPicker({ mode: 'to' });
+              else setShowFromToTimetablePicker(true);
+            }}
           />
         </div>
       )}
@@ -875,7 +880,7 @@ export default function DetailDialog({
       {!overlayDetail && allDetailPayloads && allDetailPayloads.length > 1 && (
         <div style={{
           flexShrink: 0,
-          padding: `${SPACING.md} ${px} calc(${SPACING.md} + env(safe-area-inset-bottom, 0px)) ${px}`,
+          padding: `${SPACING.md} ${px} calc(${SPACING.md} + var(--safe-area-bottom, 0px)) ${px}`,
           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: SPACING.xs,
           background: 'var(--color-surface)',
         }}>
@@ -916,7 +921,7 @@ export default function DetailDialog({
 
       {/* ══ 하단 고정 액션: overlay일 때 일정추가 ══ */}
       {overlayDetail && onAddToSchedule && overlayPlace && (
-        <div style={{ flexShrink: 0, padding: `${SPACING.xl} ${px} calc(${SPACING.xl} + env(safe-area-inset-bottom, 0px)) ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
+        <div style={{ flexShrink: 0, padding: `${SPACING.xl} ${px} calc(${SPACING.xl} + var(--safe-area-bottom, 0px)) ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
           <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => onAddToSchedule(overlayPlace)}>일정추가</Button>
         </div>
       )}
@@ -925,7 +930,7 @@ export default function DetailDialog({
       {!overlayDetail && (directionsUrl || (isCustom && onDelete)) && (
         <div style={{
           flexShrink: 0,
-          padding: `${SPACING.lg} ${px} calc(${SPACING.lg} + env(safe-area-inset-bottom, 0px)) ${px}`,
+          padding: `${SPACING.lg} ${px} calc(${SPACING.lg} + var(--safe-area-bottom, 0px)) ${px}`,
           display: 'flex', gap: SPACING.md,
           borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)',
         }}>
@@ -1165,21 +1170,21 @@ export default function DetailDialog({
         </CenterPopup>
       )}
 
-      {/* 출발지/도착지 선택 */}
-      {showStationPicker && (
-        <StationPickerModal
-          onClose={() => setShowStationPicker(false)}
-          onSelect={(from, to) => handleStationSelect(from, to)}
+      {showFromToTimetablePicker && (
+        <FromToTimetablePicker
+          onClose={() => setShowFromToTimetablePicker(false)}
+          onSelect={handleFromToTimetableSelect}
           initialFrom={item?.moveFrom || ''}
           initialTo={item?.moveTo || ''}
+          initialRouteId={effectiveTimetable?._routeId || ''}
         />
       )}
-
-      {/* 시간표 검색 */}
-      {showTimetableSearch && (
-        <TimetableSearchDialog
-          onClose={() => setShowTimetableSearch(false)}
-          onSelect={handleTimetableSelect}
+      {singleStationPicker && (
+        <AddressToStationPicker
+          mode={singleStationPicker.mode}
+          fixedStation={singleStationPicker.mode === 'from' ? (item?.moveTo || '') : (item?.moveFrom || '')}
+          onClose={() => setSingleStationPicker(null)}
+          onSelect={handleSingleStationSelect}
         />
       )}
     </>,

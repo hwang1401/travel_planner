@@ -171,7 +171,7 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
         flex: 1, overflowY: 'auto',
         overscrollBehavior: 'contain',
         WebkitOverflowScrolling: 'touch',
-        paddingBottom: `calc(${SPACING.xxl} + env(safe-area-inset-bottom, 0px))`,
+        paddingBottom: `calc(${SPACING.xxl} + var(--safe-area-bottom, 0px))`,
       }}>
         {filteredGroups.length === 0 ? (
           <div style={{ padding: `60px ${SPACING.xxl}`, textAlign: 'center' }}>

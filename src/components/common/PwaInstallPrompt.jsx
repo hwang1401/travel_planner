@@ -63,7 +63,7 @@ export default function PwaInstallPrompt() {
         right: 0,
         zIndex: 9999,
         padding: `${SPACING.lg} ${SPACING.xxl}`,
-        paddingBottom: 'calc(var(--spacing-sp120, 12px) + env(safe-area-inset-bottom, 0px))',
+        paddingBottom: 'calc(var(--spacing-sp120, 12px) + var(--safe-area-bottom, 0px))',
         background: 'var(--color-primary)',
         color: 'var(--color-on-primary)',
         boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',

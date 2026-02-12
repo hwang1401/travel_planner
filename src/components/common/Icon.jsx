@@ -50,17 +50,20 @@ const ICON_MAP = {
 
 export { ICON_MAP };
 
-/* img는 color를 받지 않으므로, error 색은 filter로 적용 (Button의 error 필터와 동일) */
+/* img는 color를 받지 않으므로, error/primary 색은 filter로 적용 */
 const ERROR_ICON_FILTER = "brightness(0) saturate(100%) invert(25%) sepia(90%) saturate(4000%) hue-rotate(350deg) brightness(95%) contrast(95%)";
+const PRIMARY_ICON_FILTER = "brightness(0) saturate(100%) invert(42%) sepia(48%) saturate(1827%) hue-rotate(234deg) brightness(95%) contrast(91%)";
 
 export default function Icon({ name, size = 16, style = {}, className = "" }) {
   const src = ICON_MAP[name] || name;
   const isErrorColor = style.color === "var(--color-error)";
+  const isPrimaryColor = style.color === "var(--color-primary)";
   const appliedStyle = {
     display: "block",
     flexShrink: 0,
     ...style,
     ...(isErrorColor ? { filter: ERROR_ICON_FILTER, color: undefined } : {}),
+    ...(isPrimaryColor ? { filter: PRIMARY_ICON_FILTER, color: undefined } : {}),
   };
   return <img src={src} alt="" width={size} height={size} style={appliedStyle} className={className} />;
 }

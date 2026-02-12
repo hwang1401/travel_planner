@@ -2122,7 +2122,7 @@ export default function TravelPlanner() {
         onClick={() => setShowMap(true)}
         title="여행 지도"
         style={{
-          position: "fixed", bottom: "calc(24px + env(safe-area-inset-bottom, 0px))", right: "24px", zIndex: "var(--z-fab)",
+          position: "fixed", bottom: "calc(24px + var(--safe-area-bottom, 0px))", right: "24px", zIndex: "var(--z-fab)",
           width: "52px", height: "52px",
           boxShadow: "var(--shadow-strong)",
         }} />
@@ -2147,7 +2147,7 @@ export default function TravelPlanner() {
           bottom: 0, left: 0, right: 0,
           zIndex: 1500,
           padding: `${SPACING.xl} ${SPACING.xxl}`,
-          paddingBottom: `calc(${SPACING.xl} + env(safe-area-inset-bottom, 0px))`,
+          paddingBottom: `calc(${SPACING.xl} + var(--safe-area-bottom, 0px))`,
           display: "flex", gap: SPACING.lg, alignItems: "center",
           borderTop: "1px solid var(--color-outline-variant)",
           background: "var(--color-surface)",

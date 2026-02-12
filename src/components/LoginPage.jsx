@@ -18,7 +18,7 @@ export default function LoginPage() {
       flexDirection: 'column',
       background: 'var(--color-surface)',
       paddingTop: 'env(safe-area-inset-top, 0px)',
-      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      paddingBottom: 'var(--safe-area-bottom, 0px)',
     }}>
       {/* Top: Branding — 스플래시와 동일(primary 배경, 흰색 로고, 슬로건) */}
       <div style={{

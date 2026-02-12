@@ -923,7 +923,7 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
 
       {/* Submit */}
       <div style={{
-        padding: `${SPACING.lx} ${SPACING.xxl} calc(${SPACING.lx} + env(safe-area-inset-bottom, 0px))`,
+        padding: `${SPACING.lx} ${SPACING.xxl} calc(${SPACING.lx} + var(--safe-area-bottom, 0px))`,
         flexShrink: 0,
         display: 'flex', flexDirection: 'column', gap: SPACING.md,
         borderTop: '1px solid var(--color-outline-variant)',

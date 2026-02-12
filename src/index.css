@@ -53,6 +53,12 @@
   --radius-full: var(--radius-circle);
 }
 
+/* ── Safe area (capped to prevent excessive spacing on some devices) ── */
+:root {
+  --safe-area-bottom: min(env(safe-area-inset-bottom, 0px), 34px);
+  --safe-area-top: min(env(safe-area-inset-top, 0px), 59px);
+}
+
 /* ── Z-Index (modals, viewer) ── */
 :root {
   --z-fab: 100;

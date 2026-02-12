@@ -11,9 +11,10 @@ import NumberCircle from '../common/NumberCircle';
 import { getPlacePredictions, getPlaceDetails } from '../../lib/googlePlaces.js';
 import { uploadImage, generateImagePath } from '../../services/imageService';
 import { TYPE_CONFIG, TYPE_LABELS, COLOR, SPACING, RADIUS } from '../../styles/tokens';
-import { TIMETABLE_DB, findBestTrain, matchTimetableRoute, findRoutesByStations } from '../../data/timetable';
+import { TIMETABLE_DB, findBestTrain, findRoutesByStations } from '../../data/timetable';
 import TimetablePreview from '../common/TimetablePreview';
-import StationPickerModal from '../dialogs/StationPickerModal';
+import FromToTimetablePicker from '../dialogs/FromToTimetablePicker';
+import AddressToStationPicker from '../dialogs/AddressToStationPicker';
 import TimePickerDialog from '../common/TimePickerDialog';
 
 /* ── AddPlacePage ──
@@ -219,6 +220,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
   const [moveFrom, setMoveFrom] = useState('');
   const [moveTo, setMoveTo] = useState('');
   const [showStationPicker, setShowStationPicker] = useState(false);
+  const [singleStationPicker, setSingleStationPicker] = useState(null);
 
   // Validation: field errors and toast
   const [errors, setErrors] = useState({});
@@ -446,12 +448,34 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
     onClose();
   };
 
-  // 출발지+도착지 선택 시 자동 매칭
-  useEffect(() => {
-    if (type !== 'move' || !moveFrom || !moveTo) { setLoadedTimetable(null); return; }
-    const routes = findRoutesByStations(moveFrom, moveTo);
-    if (routes.length > 0) {
-      const route = routes[0];
+  const handleFromToTimetableSelect = ({ from, to, routeId, route }) => {
+    setMoveFrom(from);
+    setMoveTo(to);
+    if (!desc.trim()) setDesc(`${from} → ${to}`);
+    if (route) {
+      const bestIdx = findBestTrain(route.trains, time);
+      setLoadedTimetable({
+        _routeId: routeId,
+        station: route.station,
+        direction: route.direction,
+        trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
+      });
+    } else {
+      setLoadedTimetable(null);
+    }
+    setShowStationPicker(false);
+  };
+
+  const handleSingleStationSelect = (station) => {
+    const from = singleStationPicker.mode === 'from' ? station : moveFrom;
+    const to = singleStationPicker.mode === 'to' ? station : moveTo;
+    setSingleStationPicker(null);
+    setMoveFrom(from);
+    setMoveTo(to);
+    if (!desc.trim()) setDesc(`${from} → ${to}`);
+    const routes = findRoutesByStations(from, to);
+    const route = routes[0] || null;
+    if (route) {
       const bestIdx = findBestTrain(route.trains, time);
       setLoadedTimetable({
         _routeId: route.id,
@@ -459,18 +483,9 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
         direction: route.direction,
         trains: route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
       });
-      // 일정명 자동 채움
-      if (!desc.trim()) setDesc(`${moveFrom} → ${moveTo}`);
     } else {
       setLoadedTimetable(null);
     }
-  }, [type, moveFrom, moveTo, time]);
-
-  // 출발지/도착지 선택 완료 핸들러
-  const handleStationSelect = (from, to) => {
-    setMoveFrom(from);
-    setMoveTo(to);
-    if (!desc.trim()) setDesc(`${from} → ${to}`);
   };
 
   // Reset state when page opens
@@ -482,7 +497,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
       setSelectedResultIdx(null);
       setTime('09:00'); setDesc(''); setType('spot'); setSub('');
       setAddress(''); setLat(null); setLon(null); setTip('');
-      setHighlights(''); setLoadedTimetable(null); setMoveFrom(''); setMoveTo(''); setShowStationPicker(false);
+      setHighlights(''); setLoadedTimetable(null); setMoveFrom(''); setMoveTo(''); setShowStationPicker(false); setSingleStationPicker(null);
       setStorageImageUrl(null); setSelectedPlaceId(null);
       setErrors({});
       setToast(null);
@@ -830,28 +845,53 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
                         시간표
                       </span>
                     </div>
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setShowStationPicker(true)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowStationPicker(true); } }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: SPACING.md,
-                        width: '100%', height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
-                        border: '1px solid var(--color-outline-variant)', borderRadius: 'var(--radius-md, 8px)',
-                        background: 'var(--color-surface-container-lowest)', cursor: 'pointer',
-                        transition: 'border-color var(--transition-fast)', boxSizing: 'border-box',
-                      }}
-                    >
-                      <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
-                      <span style={{
-                        flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)',
-                        color: (moveFrom && moveTo) ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
-                      }}>
-                        {moveFrom && moveTo ? `${moveFrom} → ${moveTo}` : '출발지 · 도착지 선택'}
-                      </span>
-                      <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => { if (moveTo) setSingleStationPicker({ mode: 'from' }); else setShowStationPicker(true); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (moveTo) setSingleStationPicker({ mode: 'from' }); else setShowStationPicker(true); } }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: SPACING.md,
+                          width: '100%', height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
+                          border: '1px solid var(--color-outline-variant)', borderRadius: 'var(--radius-md, 8px)',
+                          background: 'var(--color-surface-container-lowest)', cursor: 'pointer',
+                          transition: 'border-color var(--transition-fast)', boxSizing: 'border-box',
+                        }}
+                      >
+                        <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
+                        <span style={{
+                          flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)',
+                          color: moveFrom ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
+                        }}>
+                          {moveFrom || '출발지 선택'}
+                        </span>
+                        <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
+                      </div>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => { if (moveFrom) setSingleStationPicker({ mode: 'to' }); else setShowStationPicker(true); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (moveFrom) setSingleStationPicker({ mode: 'to' }); else setShowStationPicker(true); } }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: SPACING.md,
+                          width: '100%', height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
+                          border: '1px solid var(--color-outline-variant)', borderRadius: 'var(--radius-md, 8px)',
+                          background: 'var(--color-surface-container-lowest)', cursor: 'pointer',
+                          transition: 'border-color var(--transition-fast)', boxSizing: 'border-box',
+                        }}
+                      >
+                        <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
+                        <span style={{
+                          flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)',
+                          color: moveTo ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
+                        }}>
+                          {moveTo || '도착지 선택'}
+                        </span>
+                        <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
+                      </div>
                     </div>
 
                     {/* 시간표 미리보기 */}
@@ -866,13 +906,21 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
                       </div>
                     )}
 
-                    {/* 모달 */}
                     {showStationPicker && (
-                      <StationPickerModal
+                      <FromToTimetablePicker
                         initialFrom={moveFrom}
                         initialTo={moveTo}
+                        initialRouteId={loadedTimetable?._routeId || ''}
                         onClose={() => setShowStationPicker(false)}
-                        onSelect={handleStationSelect}
+                        onSelect={handleFromToTimetableSelect}
+                      />
+                    )}
+                    {singleStationPicker && (
+                      <AddressToStationPicker
+                        mode={singleStationPicker.mode}
+                        fixedStation={singleStationPicker.mode === 'from' ? moveTo : moveFrom}
+                        onClose={() => setSingleStationPicker(null)}
+                        onSelect={handleSingleStationSelect}
                       />
                     )}
                   </div>
@@ -883,7 +931,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
             {/* 장소 추가하기 — 스크롤 밖, 패널 하단 고정. 버튼 아래 여백만 padding + safe-area */}
             <div style={{
               flexShrink: 0,
-              padding: `${SPACING.lg} ${SPACING.xxl} calc(${SPACING.lg} + env(safe-area-inset-bottom, 0px))`,
+              padding: `${SPACING.lg} ${SPACING.xxl} calc(${SPACING.lg} + var(--safe-area-bottom, 0px))`,
               background: 'var(--color-surface-container-lowest)',
               borderTop: '1px solid var(--color-outline-variant)',
             }}>

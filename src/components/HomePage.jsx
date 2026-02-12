@@ -440,8 +440,8 @@ export default function HomePage() {
       {/* FAB: Create Trip (hide if empty state already has button) */}
       {totalTrips > 0 && (
         <div style={{
-          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)', zIndex: 10,
+          position: 'fixed', bottom: 'calc(24px + var(--safe-area-bottom, 0px))', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 10,
         }}>
           <Button variant="primary" size="xlg" iconLeft="plus"
             onClick={() => setShowCreate(true)}

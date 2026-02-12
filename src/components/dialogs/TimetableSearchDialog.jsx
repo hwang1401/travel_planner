@@ -7,6 +7,11 @@ import { SPACING, RADIUS } from '../../styles/tokens';
 
 /* ── 시간표 검색·선택 (교통 move 전용) ── 풀스크린 모달 */
 const FIELD_HEIGHT = 'var(--height-lg, 36px)';
+
+/** 검색어 오타·동의어 정규화 (쿄토→교토 등) */
+const SEARCH_ALIASES = {
+  '쿄토': '교토', '쿄토역': '교토',
+};
 const FIELD_PX = 'var(--spacing-sp140, 14px)';
 const FIELD_RADIUS = 'var(--radius-md, 8px)';
 
@@ -14,8 +19,9 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
-    const q = (query || '').trim().toLowerCase();
+    let q = (query || '').trim().toLowerCase();
     if (!q) return [];
+    q = SEARCH_ALIASES[q] || q;
     return TIMETABLE_DB.filter((r) => {
       const label = (r.label || '').toLowerCase();
       const station = (r.station || '').toLowerCase();
@@ -46,7 +52,7 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
       ...(viewportRect != null
         ? { top: viewportRect.top, left: viewportRect.left, width: viewportRect.width, height: viewportRect.height }
         : { inset: 0 }),
-      zIndex: 1100,
+      zIndex: 2100,
       display: 'flex',
       flexDirection: 'column',
       background: 'var(--color-surface)',
@@ -75,7 +81,7 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
         }}>
           <Icon name="search" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
           <input
-            type="search"
+            type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="노선·역명 검색 (예: 하카타, 오사카, 난바)"

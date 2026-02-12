@@ -332,7 +332,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
       {/* 입력바 */}
       <div style={{
         padding: `${SPACING.lg} ${SPACING.xl}`,
-        paddingBottom: `calc(${SPACING.lg} + env(safe-area-inset-bottom, 0px))`,
+        paddingBottom: `calc(${SPACING.lg} + var(--safe-area-bottom, 0px))`,
         flexShrink: 0, borderTop: '1px solid var(--color-outline-variant)',
         display: 'flex', gap: SPACING.md, alignItems: 'flex-end',
         background: 'var(--color-surface-container-lowest)',

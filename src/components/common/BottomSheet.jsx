@@ -66,7 +66,7 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
           overscrollBehavior: "contain",
           animation: isDragging ? 'none' : "bottomSheetUp 0.3s cubic-bezier(0.16,1,0.3,1)",
           display: "flex", flexDirection: "column",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          paddingBottom: "var(--safe-area-bottom, 0px)",
           transform: `translateY(${dragY}px)`,
           transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.16,1,0.3,1)',
         }}

@@ -26,7 +26,7 @@ export default function Toast({ message, icon, duration = 2500, onDone, actionLa
   return (
     <div style={{
       position: "fixed",
-      bottom: "calc(32px + env(safe-area-inset-bottom, 0px))",
+      bottom: "calc(32px + var(--safe-area-bottom, 0px))",
       left: "50%",
       transform: `translateX(-50%) translateY(${exiting ? "20px" : "0"})`,
       zIndex: "var(--z-toast)",
