@@ -921,7 +921,7 @@ export default function DetailDialog({
 
       {/* ══ 하단 고정 액션: overlay일 때 일정추가 ══ */}
       {overlayDetail && onAddToSchedule && overlayPlace && (
-        <div style={{ flexShrink: 0, padding: `${SPACING.xl} ${px} calc(${SPACING.xl} + var(--safe-area-bottom, 0px)) ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
+        <div style={{ flexShrink: 0, padding: `${SPACING.md} ${px} calc(${SPACING.md} + var(--safe-area-bottom, 0px)) ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
           <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => onAddToSchedule(overlayPlace)}>일정추가</Button>
         </div>
       )}
@@ -930,7 +930,7 @@ export default function DetailDialog({
       {!overlayDetail && (directionsUrl || (isCustom && onDelete)) && (
         <div style={{
           flexShrink: 0,
-          padding: `${SPACING.lg} ${px} calc(${SPACING.lg} + var(--safe-area-bottom, 0px)) ${px}`,
+          padding: `${SPACING.md} ${px} calc(${SPACING.md} + var(--safe-area-bottom, 0px)) ${px}`,
           display: 'flex', gap: SPACING.md,
           borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)',
         }}>

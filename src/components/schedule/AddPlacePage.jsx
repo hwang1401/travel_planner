@@ -931,7 +931,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
             {/* 장소 추가하기 — 스크롤 밖, 패널 하단 고정. 버튼 아래 여백만 padding + safe-area */}
             <div style={{
               flexShrink: 0,
-              padding: `${SPACING.lg} ${SPACING.xxl} calc(${SPACING.lg} + var(--safe-area-bottom, 0px))`,
+              padding: `${SPACING.lg} ${SPACING.xxl} calc(${SPACING.md} + var(--safe-area-bottom, 0px))`,
               background: 'var(--color-surface-container-lowest)',
               borderTop: '1px solid var(--color-outline-variant)',
             }}>

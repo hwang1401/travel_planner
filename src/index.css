@@ -53,10 +53,10 @@
   --radius-full: var(--radius-circle);
 }
 
-/* ── Safe area (capped to prevent excessive spacing on some devices) ── */
+/* ── Safe area (동적: 브라우저가 기기별로 제공하는 env 값 그대로 사용) ── */
 :root {
-  --safe-area-bottom: min(env(safe-area-inset-bottom, 0px), 34px);
-  --safe-area-top: min(env(safe-area-inset-top, 0px), 59px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
 }
 
 /* ── Z-Index (modals, viewer) ── */

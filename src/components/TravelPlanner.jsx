@@ -2147,7 +2147,7 @@ export default function TravelPlanner() {
           bottom: 0, left: 0, right: 0,
           zIndex: 1500,
           padding: `${SPACING.xl} ${SPACING.xxl}`,
-          paddingBottom: `calc(${SPACING.xl} + var(--safe-area-bottom, 0px))`,
+          paddingBottom: `calc(${SPACING.md} + var(--safe-area-bottom, 0px))`,
           display: "flex", gap: SPACING.lg, alignItems: "center",
           borderTop: "1px solid var(--color-outline-variant)",
           background: "var(--color-surface)",
