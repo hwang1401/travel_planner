@@ -1281,15 +1281,20 @@ export default function TravelPlanner() {
     setShowLongPressMoveSheet(false);
   }, [longPressSelection, currentDayItems, handleMoveToDay, selectedDay]);
 
-  /* ── PlaceCard 시간 탭 핸들러 ── */
+  /* ── PlaceCard 시간 영역 탭 → 시간 수정 다이얼로그 (canEdit이면 모든 아이템) ── */
   const handleTimeClickFromCard = useCallback((item, si, ii) => {
-    if (!item._custom) return;
     setTimeEditItem({ item, si, ii, dayIdx: toOrigIdx(selectedDay) });
   }, [toOrigIdx, selectedDay]);
 
   const handleTimeEditSave = useCallback((newTime) => {
     if (!timeEditItem) return;
     const { item, si, ii, dayIdx } = timeEditItem;
+    const prevTime = (item?.time || '').trim();
+    const nextTime = (newTime || '').trim();
+    if (prevTime === nextTime) {
+      setTimeEditItem(null);
+      return;
+    }
     const updated = { ...item, time: newTime };
     if (updated.detail) updated.detail = { ...updated.detail };
     handleSaveItem(updated, dayIdx, si, ii, { skipDuplicateCheck: true });
@@ -1964,7 +1969,7 @@ export default function TravelPlanner() {
                           isClickable={!bulkDeleteMode && !longPressMode && isClickable}
                           onClick={handleClick}
                           isLast={isLastItem}
-                          onTimeClick={canEdit && enrichedItem._custom ? (itm) => handleTimeClickFromCard(itm, effectiveSi, ii) : undefined}
+                          onTimeClick={canEdit ? (itm) => handleTimeClickFromCard(itm, effectiveSi, ii) : undefined}
                           onLongPress={canEdit ? handleLongPressToggle : undefined}
                           isSelected={isLongPressSelected(enrichedItem)}
                           selectionMode={longPressMode}
@@ -2230,9 +2235,10 @@ export default function TravelPlanner() {
         </BottomSheet>
       )}
 
-      {/* PlaceCard 시간 수정 다이얼로그 */}
+      {/* PlaceCard 시간 영역 탭 → 시간 변경 다이얼로그 (open 필수) */}
       {timeEditItem && (
         <TimePickerDialog
+          open
           value={timeEditItem.item.time || '12:00'}
           onConfirm={handleTimeEditSave}
           onClose={() => setTimeEditItem(null)}

@@ -6,12 +6,14 @@ import { SPACING, RADIUS } from '../../styles/tokens';
  * CenterPopup — 화면 중앙 팝업 (인라인 필드 수정용).
  *
  * Props:
- *  - title    : 상단 제목 (optional)
- *  - onClose  : 백드롭 클릭 / ESC로 닫기
- *  - children : 내부 콘텐츠
- *  - maxWidth : (default 320)
+ *  - title                : 상단 제목 (optional)
+ *  - onClose              : 백드롭 클릭 / ESC로 닫기
+ *  - children             : 내부 콘텐츠
+ *  - maxWidth             : (default 320)
+ *  - minHeight            : 최소 높이 (optional)
+ *  - contentOverflowVisible : true면 콘텐츠·자식(드롭다운 등)이 모달 밖으로 노출 가능
  */
-export default function CenterPopup({ title, onClose, children, maxWidth = 320 }) {
+export default function CenterPopup({ title, onClose, children, maxWidth = 320, minHeight, contentOverflowVisible }) {
   const [vpOffset, setVpOffset] = useState({ top: 0, height: window.innerHeight });
   const backdropRef = useRef(null);
 
@@ -55,8 +57,9 @@ export default function CenterPopup({ title, onClose, children, maxWidth = 320 }
         background: 'var(--color-surface)',
         borderRadius: RADIUS.xl,
         width: `min(${maxWidth}px, calc(100vw - 32px))`,
+        ...(minHeight != null ? { minHeight: typeof minHeight === 'number' ? `${minHeight}px` : minHeight } : {}),
         maxHeight: `calc(${vpOffset.height}px - 48px)`,
-        overflow: 'auto',
+        overflow: contentOverflowVisible ? 'visible' : 'auto',
         boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
         animation: 'centerPopupScaleIn 0.15s ease',
       }}>
@@ -71,7 +74,7 @@ export default function CenterPopup({ title, onClose, children, maxWidth = 320 }
             {title}
           </div>
         )}
-        <div style={{ padding: SPACING.xl }}>
+        <div style={{ padding: SPACING.xl, overflow: contentOverflowVisible ? 'visible' : undefined }}>
           {children}
         </div>
       </div>

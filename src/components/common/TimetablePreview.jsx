@@ -8,10 +8,11 @@
  */
 import { COLOR, RADIUS, SPACING } from '../../styles/tokens';
 
-export default function TimetablePreview({ timetable, variant = 'full', accentColor }) {
+export default function TimetablePreview({ timetable, variant = 'full', accentColor, onTimeRowClick }) {
   if (!timetable?.trains?.length) return null;
   const { station, direction, trains } = timetable;
   const accent = accentColor || COLOR.primary;
+  const canTapTime = typeof onTimeRowClick === 'function';
 
   if (variant === 'compact') {
     return (
@@ -34,6 +35,10 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
           {trains.map((t, i) => (
             <div
               key={i}
+              role={canTapTime ? 'button' : undefined}
+              tabIndex={canTapTime ? 0 : undefined}
+              onClick={canTapTime ? () => onTimeRowClick(t, i) : undefined}
+              onKeyDown={canTapTime ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTimeRowClick(t, i); } } : undefined}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -42,6 +47,7 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
                 borderRadius: 'var(--radius-md, 8px)',
                 background: t.picked ? 'var(--color-primary-container)' : 'transparent',
                 fontWeight: t.picked ? 700 : 400,
+                cursor: canTapTime ? 'pointer' : 'default',
               }}
             >
               <span style={{
@@ -89,6 +95,10 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
       {trains.map((t, i) => (
         <div
           key={i}
+          role={canTapTime ? 'button' : undefined}
+          tabIndex={canTapTime ? 0 : undefined}
+          onClick={canTapTime ? () => onTimeRowClick(t, i) : undefined}
+          onKeyDown={canTapTime ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTimeRowClick(t, i); } } : undefined}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -97,6 +107,7 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
             background: COLOR.surfaceLowest,
             borderBottom: i < trains.length - 1 ? `1px solid ${COLOR.outlineVariant}` : 'none',
             borderLeft: t.picked ? `3px solid ${accent}` : '3px solid transparent',
+            cursor: canTapTime ? 'pointer' : 'default',
           }}
         >
           <span

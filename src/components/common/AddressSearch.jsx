@@ -17,6 +17,7 @@ import { SPACING } from '../../styles/tokens';
  *   size          — "lg" | "md"
  *   variant       — "outlined" | "filled"
  *   style         — custom style
+ *   inlineResults — true면 필드 하단 드롭다운 대신, 하단 영역에 검색결과 인라인 표시 (모달용)
  */
 
 const SIZE_MAP = {
@@ -42,6 +43,7 @@ export default function AddressSearch({
   size = 'lg',
   variant = 'outlined',
   style: customStyle = {},
+  inlineResults = false,
 }) {
   const [query, setQuery] = useState(value);
   const [results, setResults] = useState([]);
@@ -51,8 +53,9 @@ export default function AddressSearch({
   const wrapperRef = useRef(null);
   const s = SIZE_MAP[size] || SIZE_MAP.lg;
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click (드롭다운 모드일 때만)
   useEffect(() => {
+    if (inlineResults) return;
     const handleClick = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         setShowResults(false);
@@ -60,7 +63,7 @@ export default function AddressSearch({
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+  }, [inlineResults]);
 
   // Sync external value
   useEffect(() => {
@@ -194,37 +197,69 @@ export default function AddressSearch({
         )}
       </div>
 
-      {/* Results dropdown */}
+      {/* 검색 결과: inlineResults면 모달 하단 영역에 인라인, 아니면 필드 하단 드롭다운 */}
       {showResults && results.length > 0 && (
         <div style={{
-          position: 'absolute', left: 0, right: 0, top: '100%', marginTop: SPACING.sm,
-          background: 'var(--color-surface-container-lowest)',
-          border: '1px solid var(--color-outline-variant)',
-          borderRadius: s.radius, boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-          zIndex: 100, maxHeight: '220px', overflowY: 'auto',
+          ...(inlineResults
+            ? {
+                marginTop: SPACING.lg,
+                maxHeight: '280px',
+                overflowY: 'auto',
+                borderRadius: 'var(--radius-md, 8px)',
+                background: 'var(--color-surface-container-lowest)',
+                border: '1px solid var(--color-outline-variant)',
+              }
+            : {
+                position: 'absolute', left: 0, right: 0, top: '100%', marginTop: SPACING.sm,
+                background: 'var(--color-surface-container-lowest)',
+                border: '1px solid var(--color-outline-variant)',
+                borderRadius: s.radius, boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                zIndex: 100, maxHeight: '220px', overflowY: 'auto',
+              }),
         }}>
           {results.map((r, i) => (
             <div
               key={i}
+              role="button"
+              tabIndex={0}
               onMouseDown={() => handleSelect(r)}
+              onClick={() => handleSelect(r)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(r); } }}
               style={{
-                display: 'flex', alignItems: 'center', gap: SPACING.md,
-                padding: `${SPACING.ml} ${SPACING.lx}`, cursor: 'pointer',
-                borderBottom: i < results.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
-                transition: 'background 0.1s',
+                display: 'flex',
+                alignItems: inlineResults ? 'flex-start' : 'center',
+                gap: SPACING.md,
+                padding: inlineResults ? `${SPACING.lg} ${SPACING.xl}` : `${SPACING.ml} ${SPACING.lx}`,
+                cursor: 'pointer',
+                borderBottom: i < results.length - 1 ? '1px solid var(--color-outline-variant)' : 'none',
+                transition: 'background 0.15s ease',
+                minHeight: inlineResults ? 44 : undefined,
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-container-lowest)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = inlineResults ? 'var(--color-surface-container-low)' : 'var(--color-surface-container-lowest)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
+              {inlineResults && (
+                <span style={{ flexShrink: 0, marginTop: 2, color: 'var(--color-on-surface-variant2)', opacity: 0.7 }}>
+                  <Icon name="pin" size={18} />
+                </span>
+              )}
               <span style={{
                 flex: 1, minWidth: 0,
-                fontSize: 'var(--typo-label-2-medium-size)',
-                fontWeight: 'var(--typo-label-2-medium-weight)', color: 'var(--color-on-surface)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontSize: inlineResults ? 'var(--typo-label-1-n---regular-size)' : 'var(--typo-label-2-medium-size)',
+                fontWeight: inlineResults ? 'var(--typo-label-1-n---regular-weight)' : 'var(--typo-label-2-medium-weight)',
+                color: 'var(--color-on-surface)',
+                lineHeight: inlineResults ? 1.4 : undefined,
+                ...(inlineResults
+                  ? { whiteSpace: 'normal', wordBreak: 'break-word' }
+                  : { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }),
               }}>
                 {r.name}
               </span>
-              <Icon name="chevronRight" size={14} style={{ opacity: 0.25, flexShrink: 0 }} />
+              <Icon name="chevronRight" size={16} style={{ opacity: 0.35, flexShrink: 0, marginTop: inlineResults ? 2 : 0 }} />
             </div>
           ))}
         </div>

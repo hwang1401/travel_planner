@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import BottomSheet from '../common/BottomSheet';
@@ -94,6 +96,31 @@ function ragPlaceToDetail(place) {
 
 const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
 
+/* 장소 검색 모달용: 선택한 위치에 핀 아이콘 */
+function createAddressPinIcon() {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:28px;height:28px;border-radius:50%;
+      background:var(--color-primary);color:#fff;font-size:14px;
+      display:flex;align-items:center;justify-content:center;
+      border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);
+    ">📍</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+function AddressMapFlyTo({ lat, lon }) {
+  const map = useMap();
+  useEffect(() => {
+    if (lat == null || lon == null) return;
+    map.invalidateSize?.();
+    map.flyTo([lat, lon], 15, { duration: 0.5 });
+  }, [lat, lon, map]);
+  return null;
+}
+
 export default function DetailDialog({
   detail, onClose, dayColor,
   onEdit, onDelete, onMoveToDay, onSaveField,
@@ -123,8 +150,12 @@ export default function DetailDialog({
   // ── 인라인 수정 state ──
   const [editField, setEditField] = useState(null); // { field, value }
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [timePickerInitialTime, setTimePickerInitialTime] = useState(null); // 시간표 행 탭 시 해당 시각으로 초기값
+  const [timePickerPickedIndex, setTimePickerPickedIndex] = useState(null); // 시간표 행 탭 시 저장 시 해당 행을 picked로
   const [showStationPicker, setShowStationPicker] = useState(false);
   const [showTimetableSearch, setShowTimetableSearch] = useState(false);
+  const [showAddressSearchDialog, setShowAddressSearchDialog] = useState(false);
+  const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined });
 
   // visualViewport
   const [viewportRect, setViewportRect] = useState(null);
@@ -241,6 +272,17 @@ export default function DetailDialog({
     if (overlayDetail && contentScrollRef.current) contentScrollRef.current.scrollTop = 0;
   }, [overlayDetail]);
 
+  // 장소 검색 다이얼로그 열릴 때 현재 주소로 pending 초기화
+  useEffect(() => {
+    if (showAddressSearchDialog) {
+      setAddressSearchPending({
+        address: effectiveDetail.address || '',
+        lat: effectiveDetail.lat,
+        lon: effectiveDetail.lon,
+      });
+    }
+  }, [showAddressSearchDialog]);
+
   /* ── 스와이프 ── */
   const MIN_SWIPE_PX = 60;
   const handleSwipeEnd = useCallback((endX, endY) => {
@@ -288,6 +330,8 @@ export default function DetailDialog({
 
   /* ── 필드 저장 헬퍼 ── */
   const canEditInline = !!onSaveField && isCustom && !overlayDetail;
+  /** onSaveField가 있으면 시간만 수정 가능 (커스텀 여부 무관) */
+  const canEditTime = !!onSaveField && !overlayDetail;
 
   const saveField = useCallback((fieldUpdates) => {
     if (!onSaveField || !item) return;
@@ -304,6 +348,8 @@ export default function DetailDialog({
     if (fieldUpdates.moveTo !== undefined) updated.moveTo = fieldUpdates.moveTo;
     if (!updated.detail) updated.detail = { name: updated.desc, category: catMap[updated.type] || '관광' };
     if (fieldUpdates.address !== undefined) updated.detail = { ...updated.detail, address: fieldUpdates.address };
+    if (fieldUpdates.lat !== undefined) updated.detail = { ...updated.detail, lat: fieldUpdates.lat };
+    if (fieldUpdates.lon !== undefined) updated.detail = { ...updated.detail, lon: fieldUpdates.lon };
     if (fieldUpdates.tip !== undefined) updated.detail = { ...updated.detail, tip: fieldUpdates.tip };
     if (fieldUpdates.price !== undefined) updated.detail = { ...updated.detail, price: fieldUpdates.price };
     if (fieldUpdates.hours !== undefined) updated.detail = { ...updated.detail, hours: fieldUpdates.hours };
@@ -333,8 +379,12 @@ export default function DetailDialog({
   };
 
   const handleTimeSave = (timeVal) => {
-    saveField({ time: timeVal });
+    const prevTime = (item?.time || '').trim();
+    const nextTime = (timeVal || '').trim();
+    if (prevTime !== nextTime) saveField({ time: timeVal });
     setShowTimePicker(false);
+    setTimePickerInitialTime(null);
+    setTimePickerPickedIndex(null);
   };
 
   const handleStationSelect = (from, to) => {
@@ -371,6 +421,22 @@ export default function DetailDialog({
   /* ── 콘텐츠 렌더 (칩별) ── */
   const renderInfoTab = () => (
     <>
+      {/* 시간 (부가정보 위) */}
+      {(canEditTime || item?.time) && (
+        canEditTime ? (
+          <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
+            <TappableRow label="시간" value={item?.time} placeholder="시간 선택" onClick={() => setShowTimePicker(true)} />
+          </div>
+        ) : (
+          <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `${SPACING.lg} 0` }}>
+              <div style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-surface-variant2)', marginBottom: SPACING.xs }}>시간</div>
+              <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface)', fontVariantNumeric: 'tabular-nums' }}>{item?.time}</span>
+            </div>
+          </div>
+        )
+      )}
+
       {/* 부가정보 */}
       {canEditInline ? (
         <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
@@ -384,10 +450,10 @@ export default function DetailDialog({
         </SectionWrap>
       )}
 
-      {/* 주소 */}
+      {/* 주소 — 수정 시 장소 검색 센터 다이얼로그 */}
       {canEditInline ? (
         <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
-          <TappableRow label="주소" value={effectiveDetail.address} placeholder="주소 입력" onClick={() => openTextEdit('address', '주소', effectiveDetail.address)} />
+          <TappableRow label="주소" value={effectiveDetail.address} placeholder="장소 검색" onClick={() => setShowAddressSearchDialog(true)} />
         </div>
       ) : effectiveDetail.address && (
         <SectionWrap label="주소" px="0">
@@ -629,7 +695,6 @@ export default function DetailDialog({
       paddingTop: 'env(safe-area-inset-top, 0px)',
       paddingLeft: 'env(safe-area-inset-left, 0px)',
       paddingRight: 'env(safe-area-inset-right, 0px)',
-      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       boxSizing: 'border-box',
     }}>
       {/* ══ 고정 헤더 ══ */}
@@ -656,7 +721,7 @@ export default function DetailDialog({
               {item?.time && (
                 <button
                   type="button"
-                  onClick={canEditInline ? () => setShowTimePicker(true) : undefined}
+                  onClick={canEditTime ? () => setShowTimePicker(true) : undefined}
                   style={{
                     padding: '2px 8px',
                     border: `1px solid ${typeConfig.border}`,
@@ -666,7 +731,7 @@ export default function DetailDialog({
                     fontWeight: 'var(--typo-caption-3-bold-weight)',
                     lineHeight: 'var(--typo-caption-3-bold-line-height)',
                     color: typeConfig.text,
-                    cursor: canEditInline ? 'pointer' : 'default',
+                    cursor: canEditTime ? 'pointer' : 'default',
                     fontFamily: 'inherit',
                     whiteSpace: 'nowrap',
                   }}
@@ -702,16 +767,27 @@ export default function DetailDialog({
           </div>
         )}
 
-        {/* 이미지 */}
+        {/* 이미지 — 웹에서 전체화면 차지 방지: maxHeight + flexShrink:0 */}
         {displayImages.length === 1 && (
-          <div onClick={() => setViewImage(displayImages[0])} style={{ width: '100%', aspectRatio: '16/7', overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest }}>
+          <div
+            onClick={() => setViewImage(displayImages[0])}
+            style={{
+              flexShrink: 0,
+              width: '100%',
+              maxHeight: '40vh',
+              aspectRatio: '16/7',
+              overflow: 'hidden',
+              cursor: 'zoom-in',
+              background: COLOR.surfaceLowest,
+            }}
+          >
             <img src={displayImages[0]} alt={effectiveDetail.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
           </div>
         )}
         {displayImages.length > 1 && (
-          <div style={{ overflowX: 'auto', overflowY: 'hidden', display: 'flex', gap: SPACING.ms, padding: `${SPACING.lg} ${px}`, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ flexShrink: 0, overflowX: 'auto', overflowY: 'hidden', display: 'flex', gap: SPACING.ms, padding: `${SPACING.lg} ${px}`, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
             {displayImages.map((img, i) => (
-              <div key={i} onClick={() => setViewImage(img)} style={{ flexShrink: 0, width: '75%', aspectRatio: '16/9', scrollSnapAlign: 'start', borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest }}>
+              <div key={i} onClick={() => setViewImage(img)} style={{ flexShrink: 0, width: '75%', maxHeight: '40vh', aspectRatio: '16/9', scrollSnapAlign: 'start', borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest }}>
                 <img src={img} alt={`${effectiveDetail.name} ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
             ))}
@@ -795,22 +871,52 @@ export default function DetailDialog({
         ) : renderActiveContent()}
       </div>
 
-      {/* ══ 하단 dot 인디케이터 ══ */}
+      {/* ══ 하단 dot 인디케이터 (탭 시 해당 항목으로 이동) ══ */}
       {!overlayDetail && allDetailPayloads && allDetailPayloads.length > 1 && (
         <div style={{
-          flexShrink: 0, padding: `${SPACING.md} ${px}`,
-          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: SPACING.ms,
-          background: 'var(--color-surface-container-lowest)',
+          flexShrink: 0,
+          padding: `${SPACING.md} ${px} calc(${SPACING.md} + env(safe-area-inset-bottom, 0px)) ${px}`,
+          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: SPACING.xs,
+          background: 'var(--color-surface)',
         }}>
           {allDetailPayloads.map((_, i) => (
-            <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: i === curIdx ? 'var(--color-primary)' : 'var(--color-outline-variant)', opacity: i === curIdx ? 1 : 0.6 }} />
+            <button
+              key={i}
+              type="button"
+              onClick={typeof onNavigateToIndex === 'function' ? () => onNavigateToIndex(i) : undefined}
+              aria-label={`${i + 1}번째 항목으로 이동`}
+              aria-current={i === curIdx ? 'true' : undefined}
+              style={{
+                width: 24,
+                height: 24,
+                padding: 0,
+                margin: 0,
+                border: 'none',
+                borderRadius: '50%',
+                background: 'transparent',
+                cursor: typeof onNavigateToIndex === 'function' ? 'pointer' : 'default',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: i === curIdx ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                  opacity: i === curIdx ? 1 : 0.6,
+                }}
+              />
+            </button>
           ))}
         </div>
       )}
 
       {/* ══ 하단 고정 액션: overlay일 때 일정추가 ══ */}
       {overlayDetail && onAddToSchedule && overlayPlace && (
-        <div style={{ flexShrink: 0, padding: `${SPACING.xl} ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
+        <div style={{ flexShrink: 0, padding: `${SPACING.xl} ${px} calc(${SPACING.xl} + env(safe-area-inset-bottom, 0px)) ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
           <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => onAddToSchedule(overlayPlace)}>일정추가</Button>
         </div>
       )}
@@ -818,7 +924,8 @@ export default function DetailDialog({
       {/* ══ 하단 고정 액션: 삭제 + 길찾기(primary) ══ */}
       {!overlayDetail && (directionsUrl || (isCustom && onDelete)) && (
         <div style={{
-          flexShrink: 0, padding: `${SPACING.lg} ${px}`,
+          flexShrink: 0,
+          padding: `${SPACING.lg} ${px} calc(${SPACING.lg} + env(safe-area-inset-bottom, 0px)) ${px}`,
           display: 'flex', gap: SPACING.md,
           borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)',
         }}>
@@ -937,14 +1044,68 @@ export default function DetailDialog({
         />
       )}
 
-      {/* 시간 수정 */}
+      {/* 시간 수정 — 다이얼로그 형식 (open 필수) */}
       {showTimePicker && (
         <TimePickerDialog
-          value={item?.time || ''}
+          open
+          value={timePickerInitialTime ?? item?.time ?? ''}
           onConfirm={handleTimeSave}
-          onClose={() => setShowTimePicker(false)}
+          onClose={() => { setShowTimePicker(false); setTimePickerInitialTime(null); setTimePickerPickedIndex(null); }}
           minuteStep={5}
         />
+      )}
+
+      {/* 주소 수정 — 장소 검색: 간단 맵 + 선택 시 핀, 검색결과 인라인, 확인 버튼으로 저장 */}
+      {showAddressSearchDialog && (
+        <CenterPopup title="장소 검색" onClose={() => setShowAddressSearchDialog(false)} maxWidth={400}>
+          {/* 선택한 주소에 좌표가 있으면 간단 맵 + 핀 노출 */}
+          {addressSearchPending.lat != null && addressSearchPending.lon != null && (
+            <div style={{
+              width: '100%',
+              height: 160,
+              borderRadius: RADIUS.md,
+              overflow: 'hidden',
+              border: '1px solid var(--color-outline-variant)',
+              marginBottom: SPACING.lg,
+            }}>
+              <MapContainer
+                center={[addressSearchPending.lat, addressSearchPending.lon]}
+                zoom={15}
+                style={{ height: '100%', width: '100%' }}
+                zoomControl={false}
+                attributionControl={false}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <AddressMapFlyTo lat={addressSearchPending.lat} lon={addressSearchPending.lon} />
+                <Marker
+                  position={[addressSearchPending.lat, addressSearchPending.lon]}
+                  icon={createAddressPinIcon()}
+                />
+              </MapContainer>
+            </div>
+          )}
+          <AddressSearch
+            value={addressSearchPending.address}
+            onChange={(address, lat, lon) => {
+              setAddressSearchPending({ address: address || '', lat: lat ?? undefined, lon: lon ?? undefined });
+            }}
+            placeholder="장소명, 주소를 검색하세요"
+            size="lg"
+            variant="outlined"
+            style={{ width: '100%' }}
+            inlineResults
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: SPACING.md, marginTop: SPACING.lg }}>
+            <Button variant="ghost-neutral" size="sm" onClick={() => setShowAddressSearchDialog(false)}>취소</Button>
+            <Button variant="primary" size="sm" onClick={() => {
+              saveField({ address: addressSearchPending.address || '', lat: addressSearchPending.lat, lon: addressSearchPending.lon });
+              setShowAddressSearchDialog(false);
+            }}>확인</Button>
+          </div>
+        </CenterPopup>
       )}
 
       {/* 텍스트 필드 수정 CenterPopup */}
@@ -964,19 +1125,38 @@ export default function DetailDialog({
               }}
             />
           ) : (
-            <input
-              autoFocus
-              type="text"
-              value={editField.value}
-              onChange={(e) => setEditField(prev => ({ ...prev, value: e.target.value }))}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleTextSave(); }}
-              style={{
-                width: '100%', border: '1px solid var(--color-outline-variant)', borderRadius: RADIUS.md,
-                padding: `${SPACING.md} ${SPACING.lg}`, fontSize: 'var(--typo-label-1-n---regular-size)',
-                fontFamily: 'inherit', color: 'var(--color-on-surface)',
-                background: 'var(--color-surface-container-lowest)', outline: 'none',
-              }}
-            />
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: SPACING.sm,
+              border: '1px solid var(--color-outline-variant)', borderRadius: RADIUS.md,
+              background: 'var(--color-surface-container-lowest)',
+            }}>
+              <input
+                autoFocus
+                type="text"
+                value={editField.value}
+                onChange={(e) => setEditField(prev => ({ ...prev, value: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleTextSave(); }}
+                style={{
+                  flex: 1, minWidth: 0, border: 'none', outline: 'none',
+                  padding: `${SPACING.md} ${SPACING.lg}`,
+                  fontSize: 'var(--typo-label-1-n---regular-size)', fontFamily: 'inherit',
+                  color: 'var(--color-on-surface)', background: 'transparent',
+                }}
+              />
+              {editField.value ? (
+                <button
+                  type="button"
+                  onClick={() => setEditField(prev => ({ ...prev, value: '' }))}
+                  style={{
+                    flexShrink: 0, padding: SPACING.xs, border: 'none', background: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                  aria-label="입력 지우기"
+                >
+                  <Icon name="close" size={16} style={{ opacity: 0.5 }} />
+                </button>
+              ) : null}
+            </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: SPACING.md, marginTop: SPACING.lg }}>
             <Button variant="ghost-neutral" size="sm" onClick={() => setEditField(null)}>취소</Button>
