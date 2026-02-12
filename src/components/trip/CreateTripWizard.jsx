@@ -810,7 +810,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
       {/* Bottom action bar (Step 1 & 2 only) */}
       {step < 3 && (
         <div style={{
-          padding: `${SPACING.lx} ${SPACING.xxl} calc(${SPACING.md} + var(--safe-area-bottom, 0px))`,
+          padding: `${SPACING.lx} ${SPACING.xxl} var(--safe-area-bottom, 0px)`,
           borderTop: '1px solid var(--color-outline-variant)',
           flexShrink: 0,
         }}>

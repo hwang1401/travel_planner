@@ -53,9 +53,9 @@
   --radius-full: var(--radius-circle);
 }
 
-/* ── Safe area (동적: 브라우저가 기기별로 제공하는 env 값 그대로 사용) ── */
+/* ── Safe area (동적 + 상한: env 값 사용, 다이얼로그 하단 여백 16px로 제한) ── */
 :root {
-  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-bottom: min(env(safe-area-inset-bottom, 0px), 16px);
   --safe-area-top: env(safe-area-inset-top, 0px);
 }
 

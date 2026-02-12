@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useScrollLock } from '../../hooks/useScrollLock';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import Icon from '../common/Icon';
@@ -128,6 +129,7 @@ export default function DetailDialog({
   allDetailPayloads, currentDetailIndex,
   onNavigateToIndex, onAddToSchedule,
 }) {
+  useScrollLock(!!detail);
   if (!detail) return null;
 
   const [viewImage, setViewImage] = useState(null);
@@ -169,22 +171,19 @@ export default function DetailDialog({
     return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
   }, []);
 
-  // 다이얼로그 노출 시 배경 스크롤·터치 차단
+  // 배경 스크롤 차단: useScrollLock이 overflow + touchmove 처리 (iOS overscroll 방지)
   useEffect(() => {
     if (!detail) return;
     const scrollY = window.scrollY ?? window.pageYOffset;
-    const prevOverflow = document.body.style.overflow;
     const prevPosition = document.body.style.position;
     const prevTop = document.body.style.top;
     const prevLeft = document.body.style.left;
     const prevRight = document.body.style.right;
-    document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
     document.body.style.left = '0';
     document.body.style.right = '0';
     document.body.style.top = `-${scrollY}px`;
     return () => {
-      document.body.style.overflow = prevOverflow;
       document.body.style.position = prevPosition;
       document.body.style.top = prevTop;
       document.body.style.left = prevLeft;
@@ -880,7 +879,7 @@ export default function DetailDialog({
       {!overlayDetail && allDetailPayloads && allDetailPayloads.length > 1 && (
         <div style={{
           flexShrink: 0,
-          padding: `${SPACING.md} ${px} calc(${SPACING.md} + var(--safe-area-bottom, 0px)) ${px}`,
+          padding: `${SPACING.md} ${px} var(--safe-area-bottom, 0px) ${px}`,
           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: SPACING.xs,
           background: 'var(--color-surface)',
         }}>
@@ -921,7 +920,7 @@ export default function DetailDialog({
 
       {/* ══ 하단 고정 액션: overlay일 때 일정추가 ══ */}
       {overlayDetail && onAddToSchedule && overlayPlace && (
-        <div style={{ flexShrink: 0, padding: `${SPACING.md} ${px} calc(${SPACING.md} + var(--safe-area-bottom, 0px)) ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
+        <div style={{ flexShrink: 0, padding: `${SPACING.md} ${px} var(--safe-area-bottom, 0px) ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
           <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => onAddToSchedule(overlayPlace)}>일정추가</Button>
         </div>
       )}
@@ -930,7 +929,7 @@ export default function DetailDialog({
       {!overlayDetail && (directionsUrl || (isCustom && onDelete)) && (
         <div style={{
           flexShrink: 0,
-          padding: `${SPACING.md} ${px} calc(${SPACING.md} + var(--safe-area-bottom, 0px)) ${px}`,
+          padding: `${SPACING.md} ${px} var(--safe-area-bottom, 0px) ${px}`,
           display: 'flex', gap: SPACING.md,
           borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)',
         }}>

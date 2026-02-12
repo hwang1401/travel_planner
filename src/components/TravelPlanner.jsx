@@ -2013,7 +2013,8 @@ export default function TravelPlanner() {
         />
       )}
 
-      {/* Detail Dialog */}
+      {/* Detail Dialog (activeDetail 있을 때만 마운트 → useScrollLock 정상 동작) */}
+      {activeDetail && (
       <DetailDialog
         detail={activeDetail}
         onClose={() => setActiveDetail(null)}
@@ -2028,6 +2029,7 @@ export default function TravelPlanner() {
         onNavigateToIndex={allDetailPayloads.length > 1 ? onDetailNavigateToIndex : undefined}
         onAddToSchedule={canEdit ? (place) => setAddNearbyPlace(place) : undefined}
       />
+      )}
 
       {/* Document Dialog */}
       {showDocs && <DocumentDialog onClose={() => setShowDocs(false)} tripId={isLegacy ? null : tripId} isLegacy={isLegacy} />}
@@ -2147,7 +2149,7 @@ export default function TravelPlanner() {
           bottom: 0, left: 0, right: 0,
           zIndex: 1500,
           padding: `${SPACING.xl} ${SPACING.xxl}`,
-          paddingBottom: `calc(${SPACING.md} + var(--safe-area-bottom, 0px))`,
+          paddingBottom: `var(--safe-area-bottom, 0px)`,
           display: "flex", gap: SPACING.lg, alignItems: "center",
           borderTop: "1px solid var(--color-outline-variant)",
           background: "var(--color-surface)",

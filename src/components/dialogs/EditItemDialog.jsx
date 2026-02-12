@@ -771,7 +771,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
             {/* Chat input bar — 하단 세이프에리어 확보, 커서가 필드 내부에 보이도록 */}
             <div style={{
               padding: `${SPACING.lg} ${SPACING.xl}`,
-              paddingBottom: `calc(${SPACING.md} + var(--safe-area-bottom, 0px))`,
+              paddingBottom: `var(--safe-area-bottom, 0px)`,
               flexShrink: 0,
               borderTop: "1px solid var(--color-outline-variant)",
               display: "flex", gap: SPACING.md, alignItems: "flex-end",
@@ -1138,7 +1138,7 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
       {(activeTab === 0 || !isNew) && (
         <div style={{
           flexShrink: 0,
-          padding: `${SPACING.xl} ${SPACING.xxl} calc(${SPACING.md} + var(--safe-area-bottom, 0px))`,
+          padding: `${SPACING.xl} ${SPACING.xxl} var(--safe-area-bottom, 0px)`,
           display: "flex",
           gap: SPACING.md,
           borderTop: "1px solid var(--color-outline-variant)",
