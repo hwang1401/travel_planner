@@ -1,0 +1,149 @@
+/* ── 지역 매핑 (역명 → 지역). 동일 역은 같은 지역으로 (하카타/하카타역 → 규슈) ── */
+const REGION_MAP = {
+  '후쿠오카': '규슈', '하카타': '규슈', '하카타역': '규슈', '덴진': '규슈', '덴진역': '규슈', '덴진남': '규슈', '덴진남역': '규슈',
+  '아소': '규슈', '아소역': '규슈', '유후인': '규슈', '유후인역': '규슈',
+  '후쿠오카공항': '규슈', '아소산': '규슈', '쿠사센리': '규슈', '쿠루메': '규슈',
+  '구마모토 노면전차': '규슈', '나가사키': '규슈', '나가사키역': '규슈', '가고시마': '규슈', '다자이후': '규슈', '운젠': '규슈', '사세보': '규슈',
+  '미야자키': '규슈', '오무타': '규슈', '미야자키공항': '규슈', '가고시마공항': '규슈', '다테노': '규슈', '다카모리': '규슈', '기쿠치': '규슈', '시마바라': '규슈', '이마리': '규슈', '이사하야': '규슈',
+  '오사카': '간사이', '교토': '간사이', '난바': '간사이', '우메다': '간사이',
+  '신오사카': '간사이', '덴덴타운': '간사이', '아라시야마': '간사이',
+  '도쿄': '간토', '시나가와': '간토', '시부야': '간토', '신주쿠': '간토',
+  '삿포로': '홋카이도', '신치토세공항': '홋카이도', '오타루': '홋카이도',
+};
+
+/* ── 역/도시 별칭 사전: 다양한 표기를 DB 라벨 정식 이름으로 정규화 ── */
+const STATION_ALIASES = {
+  '후쿠오카': '하카타', '福岡': '하카타', '博多': '하카타', '하카타역': '하카타', '후쿠오카역': '하카타',
+  '덴진역': '덴진', '天神': '덴진', '덴진남역': '덴진남', '天神南': '덴진남',
+  '구마모토역': '구마모토', '熊本': '구마모토',
+  '아소역': '아소', '아소산역': '아소산',
+  '유후인역': '유후인', '유후인온천': '유후인', '由布院': '유후인',
+  '쿠루메역': '쿠루메', '久留米': '쿠루메',
+  '나가사키역': '나가사키', '長崎': '나가사키', '가고시마역': '가고시마', '鹿児島': '가고시마', '가고시마중앙역': '가고시마',
+  '다자이후역': '다자이후', '太宰府': '다자이후', '나가사키공항역': '나가사키공항', '운젠역': '운젠', '사세보역': '사세보',
+  '오무타역': '오무타', '大牟田': '오무타', '미야자키역': '미야자키', '宮崎': '미야자키', '미야자키공항역': '미야자키공항',
+  '가고시마공항역': '가고시마공항', '鹿児島空港': '가고시마공항', '다테노역': '다테노', '다카모리역': '다카모리', '시마바라역': '시마바라', '島原': '시마바라', '이마리역': '이마리', '伊万里': '이마리', '이사하야역': '이사하야', '諫早': '이사하야',
+  '후쿠오카공항역': '후쿠오카공항',
+  '오사카역': '오사카', '大阪': '오사카', '大阪駅': '오사카',
+  '교토역': '교토', '京都': '교토', '京都駅': '교토',
+  '난바역': '난바', '難波': '난바', 'なんば': '난바',
+  '우메다역': '우메다', '梅田': '우메다',
+  '신오사카역': '신오사카', '新大阪': '신오사카',
+  '아라시야마역': '아라시야마', '嵐山': '아라시야마',
+  '도쿄역': '도쿄', '東京': '도쿄', '東京駅': '도쿄',
+  '시나가와역': '시나가와', '品川': '시나가와',
+  '시부야역': '시부야', '渋谷': '시부야',
+  '신주쿠역': '신주쿠', '新宿': '신주쿠',
+  '삿포로역': '삿포로', '札幌': '삿포로',
+  '치토세공항': '신치토세공항', '신치토세': '신치토세공항', '新千歳空港': '신치토세공항', '신치토세공항역': '신치토세공항',
+  '오타루역': '오타루', '小樽': '오타루',
+};
+
+export function normalizeStation(name) {
+  if (!name) return '';
+  const trimmed = name.trim();
+  if (STATION_ALIASES[trimmed]) return STATION_ALIASES[trimmed];
+  const withoutSuffix = trimmed.replace(/역$/, '').trim();
+  if (STATION_ALIASES[withoutSuffix]) return STATION_ALIASES[withoutSuffix];
+  return withoutSuffix || trimmed;
+}
+
+export function getStationsByRegion() {
+  const set = new Set();
+  TIMETABLE_DB.forEach((r) => {
+    const m = (r.label || '').match(/^(.+?)\s*→\s*(.+?)(?:\s*\(|$)/);
+    if (m) { set.add(m[1].trim()); set.add(m[2].trim()); }
+  });
+  const all = [...set].sort();
+  const groups = {};
+  all.forEach((s) => {
+    const region = REGION_MAP[s] || '기타';
+    if (!groups[region]) groups[region] = [];
+    groups[region].push(s);
+  });
+  const order = ['규슈', '간사이', '간토', '홋카이도', '기타'];
+  return order.filter((r) => groups[r]).map((r) => ({ region: r, stations: groups[r] }));
+}
+
+export function getStationList() {
+  const set = new Set();
+  TIMETABLE_DB.forEach((r) => {
+    const m = (r.label || '').match(/^(.+?)\s*→\s*(.+?)(?:\s*\(|$)/);
+    if (m) { set.add(m[1].trim()); set.add(m[2].trim()); }
+  });
+  return [...set].sort();
+}
+
+export function findRoutesByStations(from, to) {
+  if (!from || !to) return [];
+  const nFrom = normalizeStation(from);
+  const nTo = normalizeStation(to);
+  return TIMETABLE_DB.filter((r) => {
+    const m = (r.label || '').match(/^(.+?)\s*→\s*(.+?)(?:\s*\(|$)/);
+    if (!m) return false;
+    return m[1].trim() === nFrom && m[2].trim() === nTo;
+  });
+}
+
+export function matchByFromTo(moveFrom, moveTo) {
+  if (!moveFrom || !moveTo) return null;
+  const routes = findRoutesByStations(moveFrom, moveTo);
+  if (routes.length === 0) return null;
+  return { routeId: routes[0].id, route: routes[0] };
+}
+
+export function findBestTrain(trains, targetTime) {
+  if (!targetTime || !trains.length) return 0;
+  const [h, m] = targetTime.split(":").map(Number);
+  if (isNaN(h)) return 0;
+  const target = h * 60 + m;
+  let bestIdx = 0;
+  let bestDiff = Infinity;
+  trains.forEach((t, i) => {
+    const [th, tm] = t.time.split(":").map(Number);
+    if (isNaN(th)) return;
+    const diff = (th * 60 + tm) - target;
+    const score = diff >= 0 ? diff : 1440 + diff;
+    if (score < bestDiff) { bestDiff = score; bestIdx = i; }
+  });
+  return bestIdx;
+}
+
+function parseMoveDesc(desc) {
+  if (!desc || typeof desc !== 'string') return null;
+  const trimmed = desc.trim();
+  let parts = trimmed.split(/\s*[→\-－～]\s*|\s+to\s+/i).map((s) => s.replace(/\s*역\s*$/, '').trim()).filter(Boolean);
+  if (parts.length >= 2) return { from: parts[0], to: parts[1] };
+  const fromToMatch = trimmed.match(/(.+?)\s*(?:에서|から)\s*(.+?)(?:\s*(?:으로|로|까지|へ)\s*.*)?$/);
+  if (fromToMatch) {
+    const from = fromToMatch[1].replace(/\s*역\s*$/, '').trim();
+    const to = fromToMatch[2].replace(/\s*역\s*$/, '').trim();
+    if (from && to) return { from, to };
+  }
+  return null;
+}
+
+function normForLabel(name) {
+  const inParen = name.match(/\(([^)]+)\)/);
+  return (inParen ? inParen[1] : name).trim();
+}
+
+export function matchTimetableRoute(desc) {
+  const parsed = parseMoveDesc(desc);
+  if (!parsed) return null;
+  const { from, to } = parsed;
+  const nFrom = normalizeStation(normForLabel(from));
+  const nTo = normalizeStation(normForLabel(to));
+  const exact = findRoutesByStations(nFrom, nTo);
+  if (exact.length > 0) return { routeId: exact[0].id, route: exact[0] };
+  const fromNorm = normForLabel(from);
+  const toNorm = normForLabel(to);
+  const route = TIMETABLE_DB.find((r) => {
+    const label = r.label || '';
+    const iFrom = label.indexOf(nFrom) !== -1 ? label.indexOf(nFrom) : label.indexOf(fromNorm) !== -1 ? label.indexOf(fromNorm) : label.indexOf(from);
+    const iTo = label.indexOf(nTo) !== -1 ? label.indexOf(nTo) : label.indexOf(toNorm) !== -1 ? label.indexOf(toNorm) : label.indexOf(to);
+    return iFrom !== -1 && iTo !== -1 && iFrom < iTo;
+  });
+  if (!route) return null;
+  return { routeId: route.id, route };
+}

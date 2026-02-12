@@ -25,17 +25,13 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
   const [loading, setLoading] = useState(false);
 
   const regionGroups = useMemo(() => getStationsByRegion(), []);
+  const allStations = useMemo(
+    () => new Set(regionGroups.flatMap((g) => g.stations)),
+    [regionGroups]
+  );
   const stationList = useMemo(() => {
-    if (!fixedStation) return [];
-    if (mode === 'from') {
-      return regionGroups.flatMap((g) => g.stations).filter(
-        (s) => s !== fixedStation && findRoutesByStations(s, fixedStation).length > 0
-      );
-    }
-    return regionGroups.flatMap((g) => g.stations).filter(
-      (s) => s !== fixedStation && findRoutesByStations(fixedStation, s).length > 0
-    );
-  }, [mode, fixedStation, regionGroups]);
+    return [...allStations].filter((s) => s !== fixedStation);
+  }, [fixedStation, allStations]);
 
   const searchLower = (stationQuery || '').trim().toLowerCase();
   const filteredGroups = useMemo(() => {
@@ -139,19 +135,7 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
             </button>
           </div>
         ) : (
-          <div style={{ padding: `${SPACING.lg} ${SPACING.xxl}` }}>
-            <button
-              type="button"
-              onClick={() => setView(VIEW_ADDRESS)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.md,
-                border: 'none', background: 'none', cursor: 'pointer',
-                fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-primary)', fontFamily: 'inherit',
-              }}
-            >
-              <Icon name="pin" size={18} />
-              주소로 검색
-            </button>
+          <div style={{ padding: `0 ${SPACING.xxl} ${SPACING.lg}` }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: SPACING.md,
               height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
@@ -173,6 +157,19 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
                 </button>
               )}
             </div>
+            <button
+              type="button"
+              onClick={() => setView(VIEW_ADDRESS)}
+              style={{
+                marginTop: SPACING.lg,
+                display: 'flex', alignItems: 'center', gap: SPACING.sm,
+                border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-primary)', fontFamily: 'inherit',
+              }}
+            >
+              <Icon name="pin" size={18} style={{ color: 'var(--color-primary)' }} />
+              주소로 검색
+            </button>
           </div>
         )}
       </div>

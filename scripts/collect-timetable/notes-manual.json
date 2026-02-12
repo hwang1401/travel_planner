@@ -1,0 +1,104 @@
+{
+  "_comment": "노선별 수동 메모. merger.js가 이 데이터를 highlights에 병합합니다.",
+
+  "kansai-airport_namba_rapit": {
+    "price": "난카이 라피트 지정석 1,290엔 (특급권 포함 총 1,790엔)",
+    "pass": "간사이 스루패스/YOKOSO 오사카 티켓 이용 가능",
+    "highlights": ["약 34분 소요. 일반석과 슈퍼시트 좌석 선택 가능."]
+  },
+  "kansai-airport_kyoto_haruka": {
+    "price": "JR 하루카 지정석 1,800엔 (승차권 포함 총 3,640엔)",
+    "pass": "ICOCA & HARUKA 할인 티켓 이용 가능. JR패스 이용 가능.",
+    "highlights": ["간사이공항에서 교토까지 약 75분 직통."]
+  },
+  "tokyo_kyoto_shinkansen": {
+    "price": "노조미 지정석 13,320엔. 히카리/코다마도 동일 구간 이용 가능.",
+    "pass": "JR패스 이용 가능 (히카리/코다마만. 노조미 불가)",
+    "highlights": ["노조미 약 2시간 15분, 히카리 약 2시간 40분."]
+  },
+  "tokyo_shin-osaka_shinkansen": {
+    "price": "노조미 지정석 13,870엔",
+    "pass": "JR패스 이용 가능 (히카리/코다마만. 노조미 불가)",
+    "highlights": ["노조미 약 2시간 30분, 히카리 약 3시간."]
+  },
+  "hakata_kumamoto_shinkansen_v2": {
+    "price": "신칸센 자유석 4,700엔 / 지정석 5,230엔",
+    "pass": "JR 큐슈 패스 / JR 전국패스 이용 가능",
+    "highlights": ["사쿠라/미즈호 약 33분, 츠바메 약 50분."]
+  },
+  "hakata_nagasaki_shinkansen": {
+    "price": "니시규슈 신칸센(카모메) 자유석 3,600엔",
+    "pass": "JR 큐슈 패스 이용 가능",
+    "highlights": ["2022년 개통. 다케오온천에서 릴레이 카모메 환승."]
+  },
+  "hakata_beppu_sonic": {
+    "price": "JR 소닉 지정석 5,580엔 / 자유석 5,060엔",
+    "pass": "JR 큐슈 북부 패스 / JR 전규슈 패스 이용 가능",
+    "highlights": ["하카타에서 벳푸까지 약 2시간."]
+  },
+  "hakata_yufuin_v2": {
+    "price": "유후인노모리 전석 지정. 별도 특급권 필요.",
+    "pass": "JR 큐슈 패스 이용 가능 (지정석 횟수 차감)",
+    "highlights": ["1일 3편 운행. 사전 예약 필수. 인기 관광열차."]
+  },
+  "sapporo_noboribetsu": {
+    "price": "특급 스즈란 지정석 4,690엔",
+    "pass": "JR 홋카이도 패스 이용 가능",
+    "highlights": ["삿포로에서 노보리베츠까지 약 1시간 15분."]
+  },
+  "sapporo_furano": {
+    "price": "특급 라벤더 지정석 (여름 시즌 한정)",
+    "pass": "JR 홋카이도 패스 이용 가능",
+    "highlights": ["여름 시즌(6~9월) 한정 운행. 삿포로에서 약 2시간."]
+  },
+  "sapporo_asahikawa": {
+    "price": "특급 라이락/카무이 자유석 4,690엔",
+    "pass": "JR 홋카이도 패스 이용 가능",
+    "highlights": ["삿포로에서 아사히카와까지 약 1시간 25분."]
+  },
+  "osaka_kyoto_jr": {
+    "price": "JR 교토선 신쾌속 580엔",
+    "pass": "JR 간사이 패스 / ICOCA 이용 가능",
+    "highlights": ["신쾌속으로 약 29분. 쾌속은 약 45분."]
+  },
+  "kyoto_nara_miyakoji": {
+    "price": "JR 미야코지 쾌속 720엔",
+    "pass": "JR 간사이 패스 이용 가능",
+    "highlights": ["교토에서 나라까지 직통 약 45분."]
+  },
+  "namba_nara_kintetsu": {
+    "price": "킨테츠 특급 960엔 / 급행 680엔",
+    "pass": "킨테츠 레일패스 이용 가능",
+    "highlights": ["급행으로 약 40분. 특급(별도 특급권)은 약 35분."]
+  },
+  "osaka_kobe_jr": {
+    "price": "JR 코베선 신쾌속 420엔",
+    "pass": "JR 간사이 패스 / ICOCA 이용 가능",
+    "highlights": ["신쾌속으로 오사카-산노미야 약 21분."]
+  },
+  "hiroshima_miyajima": {
+    "price": "JR 산요본선 420엔 + 미야지마 페리 200엔",
+    "pass": "JR패스로 JR 열차 + JR 미야지마 페리 이용 가능",
+    "highlights": ["히로시마역에서 미야지마구치까지 약 28분 + 페리 10분."]
+  },
+  "okayama_matsuyama": {
+    "price": "특급 시오카제 지정석 6,650엔",
+    "pass": "JR패스 이용 가능",
+    "highlights": ["오카야마에서 마츠야마까지 약 2시간 40분."]
+  },
+  "kamakura_enoshima_enoden": {
+    "price": "에노덴 310엔 / 에노덴 1일 프리패스 800엔",
+    "pass": "에노덴·가마쿠라 프리 환경 절약 패스 이용 가능",
+    "highlights": ["가마쿠라에서 에노시마까지 약 25분. 해안 경관 노선."]
+  },
+  "tokyo_kanazawa_shinkansen": {
+    "price": "카가야키 지정석 14,380엔",
+    "pass": "JR패스 이용 가능",
+    "highlights": ["카가야키로 약 2시간 30분. 2024년 츠루기 연장 개통."]
+  },
+  "tokyo_sendai_shinkansen": {
+    "price": "하야부사 지정석 11,410엔",
+    "pass": "JR패스 이용 가능",
+    "highlights": ["하야부사로 약 1시간 30분."]
+  }
+}

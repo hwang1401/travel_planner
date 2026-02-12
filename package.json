@@ -8,6 +8,10 @@
     "dev": "npm run build:tokens && vite",
     "build": "npm run build:tokens && vite build",
     "preview": "vite preview",
+    "collect-timetable": "node scripts/collect-timetable/runner.js",
+    "collect-timetable:list": "node scripts/collect-timetable/runner.js --list",
+    "collect-timetable:dry": "node scripts/collect-timetable/runner.js --dry-run",
+    "gtfs-parse": "node scripts/collect-timetable/gtfs-parser.js",
     "rag-seed": "node scripts/rag-seed.js",
     "rag-seed:full": "node scripts/rag-seed.js --region osaka --type food",
     "rag-seed:all": "node scripts/rag-seed.js --all",
@@ -19,14 +23,17 @@
     "@supabase/supabase-js": "^2.95.3",
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
+    "pdf-parse": "^2.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.13.0"
+    "react-router-dom": "^7.13.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
     "@vitejs/plugin-react": "^4.3.0",
+    "adm-zip": "^0.5.16",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.1.18",
     "vite": "^6.0.0"

@@ -19,6 +19,7 @@ import ImagePicker from '../common/ImagePicker';
 import AddressSearch from '../common/AddressSearch';
 import FromToTimetablePicker from './FromToTimetablePicker';
 import AddressToStationPicker from './AddressToStationPicker';
+import { FromToStationField } from '../common/FromToStationField';
 import { getNearbyPlaces } from '../../services/ragService';
 import { COLOR, SPACING, RADIUS, TYPE_CONFIG, TYPE_LABELS } from '../../styles/tokens';
 import { TIMETABLE_DB, findBestTrain, matchByFromTo, findRoutesByStations } from '../../data/timetable';
@@ -592,24 +593,26 @@ export default function DetailDialog({
       {/* 출발지 · 도착지 (각각 탭해서 변경) */}
       {isMove && canEditTime && (
         <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
-          <TappableRow
-            label="출발지"
-            value={item?.moveFrom || ''}
-            placeholder="출발지 선택"
-            onClick={() => {
-              if (item?.moveTo) setSingleStationPicker({ mode: 'from' });
-              else setShowFromToTimetablePicker(true);
-            }}
-          />
-          <TappableRow
-            label="도착지"
-            value={item?.moveTo || ''}
-            placeholder="도착지 선택"
-            onClick={() => {
-              if (item?.moveFrom) setSingleStationPicker({ mode: 'to' });
-              else setShowFromToTimetablePicker(true);
-            }}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.xl }}>
+            <FromToStationField
+              label="출발지"
+              value={item?.moveFrom || ''}
+              placeholder="출발지 선택"
+              onClick={() => {
+                if (item?.moveTo) setSingleStationPicker({ mode: 'from' });
+                else setShowFromToTimetablePicker(true);
+              }}
+            />
+            <FromToStationField
+              label="도착지"
+              value={item?.moveTo || ''}
+              placeholder="도착지 선택"
+              onClick={() => {
+                if (item?.moveFrom) setSingleStationPicker({ mode: 'to' });
+                else setShowFromToTimetablePicker(true);
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -751,25 +754,35 @@ export default function DetailDialog({
           <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
         </div>
 
-        {/* 교통이면: 출발지 → 도착지 */}
-        {isMove && (item?.moveFrom || item?.moveTo || item?.desc) && (
-          <div
-            onClick={canEditInline ? () => setShowStationPicker(true) : undefined}
-            style={{
-              display: 'flex', alignItems: 'center', gap: SPACING.md,
-              padding: `${SPACING.md} ${px}`,
-              background: 'var(--color-surface-container-lowest)',
-              borderBottom: '1px solid var(--color-outline-variant)',
-              cursor: canEditInline ? 'pointer' : 'default',
-            }}
-          >
-            <Icon name="navigation" size={14} style={{ color: typeConfig.text, flexShrink: 0 }} />
-            <span style={{ fontSize: 'var(--typo-label-2-medium-size)', color: 'var(--color-on-surface)' }}>
-              {item?.moveFrom && item?.moveTo ? `${item.moveFrom} → ${item.moveTo}` : item?.desc}
-            </span>
-            {canEditInline && <Icon name="chevronRight" size={12} style={{ opacity: 0.3, marginLeft: 'auto' }} />}
-          </div>
-        )}
+        {/* 교통이면: 출발지 → 도착지 (예상 소요시간 표시) */}
+        {isMove && (item?.moveFrom || item?.moveTo || item?.desc) && (() => {
+          const routeLabel = item?.moveFrom && item?.moveTo ? `${item.moveFrom} → ${item.moveTo}` : item?.desc;
+          const mins = (effectiveTimetable?.trains || [])
+            .map((t) => t.note?.match(/(\d+)\s*분/))
+            .filter(Boolean)
+            .map((m) => parseInt(m[1], 10));
+          const durationMin = mins.length ? Math.min(...mins) : null;
+          return (
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: SPACING.md,
+                padding: `${SPACING.md} ${px}`,
+                background: 'var(--color-surface-container-lowest)',
+                borderBottom: '1px solid var(--color-outline-variant)',
+              }}
+            >
+              <Icon name="navigation" size={14} style={{ color: typeConfig.text, flexShrink: 0 }} />
+              <span style={{ fontSize: 'var(--typo-label-2-medium-size)', color: 'var(--color-on-surface)' }}>
+                {routeLabel}
+                {durationMin != null && (
+                  <span style={{ marginLeft: SPACING.sm, fontSize: 'var(--typo-caption-2-size)', color: 'var(--color-on-surface-variant2)' }}>
+                    약 {durationMin}분
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+        })()}
 
         {/* 이미지 — 웹에서 전체화면 차지 방지: maxHeight + flexShrink:0 */}
         {displayImages.length === 1 && (

@@ -16,6 +16,7 @@ import { analyzeScheduleWithAI, getAIRecommendation } from '../../services/gemin
 import ImportPreviewDialog from './ImportPreviewDialog';
 import { SPACING, RADIUS, COLOR } from '../../styles/tokens';
 import FromToTimetablePicker from './FromToTimetablePicker';
+import { FromToStationField } from '../common/FromToStationField';
 import AddressToStationPicker from './AddressToStationPicker';
 import TimePickerDialog from '../common/TimePickerDialog';
 
@@ -1057,53 +1058,19 @@ export default function EditItemDialog({ item, sectionIdx, itemIdx, dayIdx, onSa
               <div style={{ paddingBottom: "var(--spacing-sp40, 4px)", minHeight: "var(--field-label-row-height, 20px)", display: "flex", alignItems: "center" }}>
                 <span style={{ fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)", color: "var(--color-on-surface-variant)" }}>시간표</span>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: SPACING.sm }}>
-                <div
-                  role="button"
-                  tabIndex={0}
+              <div style={{ display: "flex", flexDirection: "column", gap: SPACING.xl }}>
+                <FromToStationField
+                  label="출발지"
+                  value={moveFrom || item?.moveFrom || ''}
+                  placeholder="출발지 선택"
                   onClick={() => { if (moveTo || item?.moveTo) setSingleStationPicker({ mode: "from" }); else setShowFromToTimetablePicker(true); }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (moveTo || item?.moveTo) setSingleStationPicker({ mode: "from" }); else setShowFromToTimetablePicker(true); } }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: SPACING.md,
-                    width: "100%", height: "var(--height-lg, 36px)", padding: "0 var(--spacing-sp140, 14px)",
-                    border: "1px solid var(--color-outline-variant)", borderRadius: "var(--radius-md, 8px)",
-                    background: "var(--color-surface-container-lowest)", cursor: "pointer",
-                    transition: "border-color var(--transition-fast)", boxSizing: "border-box",
-                  }}
-                >
-                  <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
-                  <span style={{
-                    flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    fontSize: "var(--typo-label-1-n---regular-size)", fontWeight: "var(--typo-label-1-n---regular-weight)",
-                    color: (moveFrom || item?.moveFrom) ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
-                  }}>
-                    {moveFrom || item?.moveFrom || "출발지 선택"}
-                  </span>
-                  <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
-                </div>
-                <div
-                  role="button"
-                  tabIndex={0}
+                />
+                <FromToStationField
+                  label="도착지"
+                  value={moveTo || item?.moveTo || ''}
+                  placeholder="도착지 선택"
                   onClick={() => { if (moveFrom || item?.moveFrom) setSingleStationPicker({ mode: "to" }); else setShowFromToTimetablePicker(true); }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (moveFrom || item?.moveFrom) setSingleStationPicker({ mode: "to" }); else setShowFromToTimetablePicker(true); } }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: SPACING.md,
-                    width: "100%", height: "var(--height-lg, 36px)", padding: "0 var(--spacing-sp140, 14px)",
-                    border: "1px solid var(--color-outline-variant)", borderRadius: "var(--radius-md, 8px)",
-                    background: "var(--color-surface-container-lowest)", cursor: "pointer",
-                    transition: "border-color var(--transition-fast)", boxSizing: "border-box",
-                  }}
-                >
-                  <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
-                  <span style={{
-                    flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    fontSize: "var(--typo-label-1-n---regular-size)", fontWeight: "var(--typo-label-1-n---regular-weight)",
-                    color: (moveTo || item?.moveTo) ? "var(--color-on-surface)" : "var(--color-on-surface-variant2)",
-                  }}>
-                    {moveTo || item?.moveTo || "도착지 선택"}
-                  </span>
-                  <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
-                </div>
+                />
               </div>
               {loadedTimetable?.trains?.length > 0 && (
                 <div style={{ marginTop: SPACING.md }}>

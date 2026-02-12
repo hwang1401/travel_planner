@@ -13,6 +13,7 @@ import { uploadImage, generateImagePath } from '../../services/imageService';
 import { TYPE_CONFIG, TYPE_LABELS, COLOR, SPACING, RADIUS } from '../../styles/tokens';
 import { TIMETABLE_DB, findBestTrain, findRoutesByStations } from '../../data/timetable';
 import TimetablePreview from '../common/TimetablePreview';
+import { FromToStationField } from '../common/FromToStationField';
 import FromToTimetablePicker from '../dialogs/FromToTimetablePicker';
 import AddressToStationPicker from '../dialogs/AddressToStationPicker';
 import TimePickerDialog from '../common/TimePickerDialog';
@@ -845,53 +846,19 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
                         시간표
                       </span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
-                      <div
-                        role="button"
-                        tabIndex={0}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.xl }}>
+                      <FromToStationField
+                        label="출발지"
+                        value={moveFrom}
+                        placeholder="출발지 선택"
                         onClick={() => { if (moveTo) setSingleStationPicker({ mode: 'from' }); else setShowStationPicker(true); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (moveTo) setSingleStationPicker({ mode: 'from' }); else setShowStationPicker(true); } }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: SPACING.md,
-                          width: '100%', height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
-                          border: '1px solid var(--color-outline-variant)', borderRadius: 'var(--radius-md, 8px)',
-                          background: 'var(--color-surface-container-lowest)', cursor: 'pointer',
-                          transition: 'border-color var(--transition-fast)', boxSizing: 'border-box',
-                        }}
-                      >
-                        <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
-                        <span style={{
-                          flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)',
-                          color: moveFrom ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
-                        }}>
-                          {moveFrom || '출발지 선택'}
-                        </span>
-                        <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
-                      </div>
-                      <div
-                        role="button"
-                        tabIndex={0}
+                      />
+                      <FromToStationField
+                        label="도착지"
+                        value={moveTo}
+                        placeholder="도착지 선택"
                         onClick={() => { if (moveFrom) setSingleStationPicker({ mode: 'to' }); else setShowStationPicker(true); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (moveFrom) setSingleStationPicker({ mode: 'to' }); else setShowStationPicker(true); } }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: SPACING.md,
-                          width: '100%', height: 'var(--height-lg, 36px)', padding: '0 var(--spacing-sp140, 14px)',
-                          border: '1px solid var(--color-outline-variant)', borderRadius: 'var(--radius-md, 8px)',
-                          background: 'var(--color-surface-container-lowest)', cursor: 'pointer',
-                          transition: 'border-color var(--transition-fast)', boxSizing: 'border-box',
-                        }}
-                      >
-                        <Icon name="navigation" size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
-                        <span style={{
-                          flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)',
-                          color: moveTo ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
-                        }}>
-                          {moveTo || '도착지 선택'}
-                        </span>
-                        <Icon name="chevronRight" size={14} style={{ flexShrink: 0, opacity: 0.3 }} />
-                      </div>
+                      />
                     </div>
 
                     {/* 시간표 미리보기 */}
