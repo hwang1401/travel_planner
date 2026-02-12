@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import BottomSheet from '../common/BottomSheet';
+import ConfirmDialog from '../common/ConfirmDialog';
 import ImageViewer from '../common/ImageViewer';
 import CategoryBadge from '../common/CategoryBadge';
 import TimetablePreview from '../common/TimetablePreview';
@@ -86,6 +87,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
   const [overlayPlace, setOverlayPlace] = useState(null);
   const [showMoveSheet, setShowMoveSheet] = useState(false);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
+  const [showDirectionsConfirm, setShowDirectionsConfirm] = useState(false);
   const [nearbyByType, setNearbyByType] = useState({ food: [], spot: [], shop: [] });
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const nearbyCacheRef = useRef({});
@@ -210,6 +212,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
   }, []);
 
   return (
+    <>
     <BottomSheet onClose={onClose} maxHeight="85vh">
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         {/* ── 헤더: 제목 + 뱃지(제목 옆) + 닫기(우측) ── */}
@@ -330,7 +333,7 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
               </div>
               {directionsUrl && (
                 <Button variant="primary" size="sm" iconLeft="navigation"
-                  onClick={() => window.open(directionsUrl, "_blank")}
+                  onClick={() => setShowDirectionsConfirm(true)}
                   style={{ flexShrink: 0 }}>
                   길찾기
                 </Button>
@@ -606,5 +609,18 @@ export default function DetailDialog({ detail, onClose, dayColor, onEdit, onDele
         )}
       </div>
     </BottomSheet>
+    {showDirectionsConfirm && directionsUrl && (
+      <ConfirmDialog
+        title="구글맵으로 이동"
+        message="구글맵으로 이동합니다"
+        confirmLabel="확인"
+        onConfirm={() => {
+          window.open(directionsUrl, "_blank");
+          setShowDirectionsConfirm(false);
+        }}
+        onCancel={() => setShowDirectionsConfirm(false)}
+      />
+    )}
+    </>
   );
 }
