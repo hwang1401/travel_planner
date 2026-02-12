@@ -602,6 +602,11 @@ export default function DetailDialog({
       display: 'flex',
       flexDirection: 'column',
       background: 'var(--color-surface)',
+      paddingTop: 'env(safe-area-inset-top, 0px)',
+      paddingLeft: 'env(safe-area-inset-left, 0px)',
+      paddingRight: 'env(safe-area-inset-right, 0px)',
+      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      boxSizing: 'border-box',
     }}>
       {/* ══ 고정 헤더 ══ */}
       <div style={{ flexShrink: 0 }}>
