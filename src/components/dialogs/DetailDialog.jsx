@@ -185,19 +185,19 @@ export default function DetailDialog({
   const imagesArray = effectiveDetail.images ?? item?.detail?.images;
   const displayImages = useMemo(() => {
     const imgs = [];
-    // 1순위: 사용자 업로드/RAG 이미지
     if (mainImage) imgs.push(mainImage);
     if (imagesArray?.length) {
       for (const img of imagesArray) {
         if (img && !imgs.includes(img)) imgs.push(img);
       }
     }
-    // 2순위: ragImage
     if (ragImage && !imgs.includes(ragImage)) imgs.push(ragImage);
-    // 3순위: Google Places 런타임 사진으로 보충
-    for (const url of placePhotos) {
-      if (imgs.length >= 3) break;
-      if (url && !imgs.includes(url)) imgs.push(url);
+    // placePhotos는 사용자/RAG 이미지가 하나도 없을 때만 보충
+    if (imgs.length === 0) {
+      for (const url of placePhotos) {
+        if (imgs.length >= 3) break;
+        if (url && !imgs.includes(url)) imgs.push(url);
+      }
     }
     return imgs.slice(0, 3);
   }, [mainImage, imagesArray, ragImage, placePhotos]);
@@ -482,38 +482,26 @@ export default function DetailDialog({
     }
   }, [tripId, onSaveField, saveField]);
 
-  const handleReplaceImage = useCallback(() => {
-    if (!tripId || !onSaveField || imageUploading) return;
-    imageFileRef.current?.click();
-  }, [tripId, onSaveField, imageUploading]);
-
-  const handleRemoveImage = useCallback(() => {
-    if (!onSaveField) return;
-    saveField({ image: '', images: [] });
-    setRagImage(null);
-  }, [onSaveField, saveField]);
-
   const handleReplaceImageWithFile = useCallback(async (file, oldUrl) => {
     if (!tripId || !onSaveField || !oldUrl) return;
     setImageUploading(true);
     try {
       const path = generateImagePath(tripId, 'items');
       const newUrl = await uploadImage(file, path);
-      if (oldUrl === mainImage) {
-        saveField({ image: newUrl });
-      } else if (imagesArray?.includes(oldUrl)) {
-        saveField({ images: imagesArray.map((u) => (u === oldUrl ? newUrl : u)) });
-      } else if (oldUrl === ragImage) {
-        setRagImage(null);
-        saveField({ image: newUrl });
-      }
+      // displayImages 전체에서 교체한 결과를 image+images에 저장 (Google Photos URL도 영속화)
+      const updated = displayImages.map((u) => (u === oldUrl ? newUrl : u));
+      if (oldUrl === ragImage) setRagImage(null);
+      saveField({
+        image: updated[0] || '',
+        images: updated.length > 1 ? updated.slice(1) : [],
+      });
     } catch (err) {
       console.error('[DetailDialog] Replace image error:', err);
     } finally {
       setImageUploading(false);
       setImageToReplace(null);
     }
-  }, [tripId, onSaveField, saveField, mainImage, imagesArray, ragImage]);
+  }, [tripId, onSaveField, saveField, displayImages, ragImage]);
 
   const handleSingleStationSelect = (station) => {
     const from = singleStationPicker.mode === 'from' ? station : (item?.moveFrom || '');
@@ -1231,9 +1219,6 @@ export default function DetailDialog({
                 gap: SPACING.md,
               }}>
               {displayImages.map((img, i) => {
-                // Google Places API로 런타임에 가져온 URL — 우리 DB에 없어 삭제/교체 저장 불가. 탭 시 확대만.
-                const isPlacePhoto = placePhotos.includes(img);
-                const isUserImage = !isPlacePhoto;
                 const isSelected = selectedForDelete.has(img);
                 return (
                   <div
@@ -1244,11 +1229,11 @@ export default function DetailDialog({
                       borderRadius: RADIUS.md,
                       overflow: 'hidden',
                       background: COLOR.surfaceLowest,
-                      outline: deleteMode && isUserImage && isSelected ? '3px solid var(--color-primary)' : 'none',
+                      outline: deleteMode && isSelected ? '3px solid var(--color-primary)' : 'none',
                       outlineOffset: 2,
                     }}
                   >
-                    {deleteMode && isUserImage ? (
+                    {deleteMode ? (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1272,6 +1257,7 @@ export default function DetailDialog({
                           alignItems: 'flex-start',
                           justifyContent: 'flex-end',
                           padding: SPACING.sm,
+                          zIndex: 1,
                         }}
                       >
                         <span style={{
@@ -1297,29 +1283,16 @@ export default function DetailDialog({
                         height: '100%',
                         objectFit: 'cover',
                         display: 'block',
-                        cursor: deleteMode && isUserImage ? 'default' : isUserImage ? 'pointer' : 'zoom-in',
-                        pointerEvents: deleteMode && isUserImage ? 'none' : 'auto',
+                        cursor: deleteMode ? 'default' : 'pointer',
+                        pointerEvents: deleteMode ? 'none' : 'auto',
                       }}
                       onClick={(e) => {
-                        if (deleteMode && isUserImage) return;
+                        if (deleteMode) return;
                         e.stopPropagation();
-                        if (isPlacePhoto) {
-                          setViewImage(img);
-                        } else {
-                          setImageToReplace(img);
-                          imageFileRef.current?.click();
-                        }
+                        setImageToReplace(img);
+                        imageFileRef.current?.click();
                       }}
                     />
-                    {!deleteMode && isPlacePhoto && (
-                      <span style={{
-                        position: 'absolute', bottom: 4, left: 4,
-                        fontSize: 'var(--typo-caption-3-size)', color: 'rgba(255,255,255,0.9)',
-                        background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: RADIUS.xs,
-                      }}>
-                        Google
-                      </span>
-                    )}
                   </div>
                 );
               })}
@@ -1353,15 +1326,16 @@ export default function DetailDialog({
                     iconLeft="trash"
                     disabled={selectedForDelete.size === 0 || imageUploading}
                     onClick={() => {
-                      const toRemove = selectedForDelete;
-                      const newImage = mainImage && !toRemove.has(mainImage) ? mainImage : '';
-                      const newImages = imagesArray ? imagesArray.filter((x) => !toRemove.has(x)) : [];
-                      if (toRemove.has(ragImage)) setRagImage(null);
-                      saveField({ image: newImage, images: newImages, _imageRemovedByUser: toRemove.size > 0 });
+                      const remaining = displayImages.filter((u) => !selectedForDelete.has(u));
+                      if (selectedForDelete.has(ragImage)) setRagImage(null);
+                      saveField({
+                        image: remaining[0] || '',
+                        images: remaining.length > 1 ? remaining.slice(1) : [],
+                        _imageRemovedByUser: remaining.length === 0,
+                      });
                       setSelectedForDelete(new Set());
                       setDeleteMode(false);
-                      const userCount = displayImages.filter((u) => !placePhotos.includes(u)).length;
-                      if (userCount <= toRemove.size) setShowImageManageDialog(false);
+                      if (remaining.length === 0) setShowImageManageDialog(false);
                     }}
                     style={{ flex: 1 }}
                   >
