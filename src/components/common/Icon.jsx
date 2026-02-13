@@ -32,6 +32,7 @@ const ICON_MAP = {
   info: "/icons/Info.svg",
   flag: "/icons/Flag.svg",
   star: "/icons/Star/fiiled.svg",
+  starOutlined: "/icons/Star/outlined.svg",
   chevronDown: "/icons/Arrow/Chevron/Down.svg",
   chevronUp: "/icons/Arrow/Chevron/Up.svg",
   chevronRight: "/icons/Arrow/Chevron/Right.svg",
@@ -50,20 +51,28 @@ const ICON_MAP = {
 
 export { ICON_MAP };
 
-/* img는 color를 받지 않으므로, error/primary 색은 filter로 적용 */
+/* img는 color를 받지 않으므로, error/primary/rating 색은 filter로 적용 */
 const ERROR_ICON_FILTER = "brightness(0) saturate(100%) invert(25%) sepia(90%) saturate(4000%) hue-rotate(350deg) brightness(95%) contrast(95%)";
 const PRIMARY_ICON_FILTER = "brightness(0) saturate(100%) invert(42%) sepia(48%) saturate(1827%) hue-rotate(234deg) brightness(95%) contrast(91%)";
+/** 평점 별 아이콘용 골드/노랑 */
+const RATING_ICON_FILTER = "brightness(0) saturate(100%) invert(77%) sepia(52%) saturate(1000%) hue-rotate(1deg) brightness(95%) contrast(92%)";
+/** 평점 빈 별(아웃라인)용 회색 */
+const RATING_OUTLINE_ICON_FILTER = "brightness(0) saturate(100%) invert(75%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(90%)";
 
 export default function Icon({ name, size = 16, style = {}, className = "" }) {
   const src = ICON_MAP[name] || name;
   const isErrorColor = style.color === "var(--color-error)";
   const isPrimaryColor = style.color === "var(--color-primary)";
+  const isRatingColor = style.color === "var(--color-rating)" || (name === "star" && style.color === undefined);
+  const isRatingOutline = name === "starOutlined" && style.color === undefined;
   const appliedStyle = {
     display: "block",
     flexShrink: 0,
     ...style,
     ...(isErrorColor ? { filter: ERROR_ICON_FILTER, color: undefined } : {}),
     ...(isPrimaryColor ? { filter: PRIMARY_ICON_FILTER, color: undefined } : {}),
+    ...(isRatingColor ? { filter: RATING_ICON_FILTER, color: undefined } : {}),
+    ...(isRatingOutline ? { filter: RATING_OUTLINE_ICON_FILTER, color: undefined } : {}),
   };
   return <img src={src} alt="" width={size} height={size} style={appliedStyle} className={className} />;
 }

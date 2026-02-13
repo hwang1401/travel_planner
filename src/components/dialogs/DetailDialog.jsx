@@ -53,6 +53,80 @@ const SectionWrap = ({ label, children, px }) => (
   </div>
 );
 
+/** 영업시간 문자열을 요일별 배열로 파싱. 실패 시 null. */
+const DAY_ORDER = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+const EN_DAY = { Monday: '월요일', Tuesday: '화요일', Wednesday: '수요일', Thursday: '목요일', Friday: '금요일', Saturday: '토요일', Sunday: '일요일' };
+/** getDay() 0=일, 1=월, ... 6=토 → 한국어 요일 */
+const TODAY_BY_GETDAY = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
+function parseHoursToDays(hours) {
+  if (!hours || typeof hours !== 'string') return null;
+  const raw = hours.split(/\s*[;；]\s*/).map((s) => s.trim()).filter(Boolean);
+  const parsed = [];
+  for (const segment of raw) {
+    const match = segment.match(/^(월요일|화요일|수요일|목요일|금요일|토요일|일요일|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s*[:：]\s*(.+)$/i);
+    if (!match) continue;
+    let day = match[1];
+    if (EN_DAY[day]) day = EN_DAY[day];
+    parsed.push({ day, time: match[2].trim() });
+  }
+  if (parsed.length === 0) return null;
+  parsed.sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
+  return parsed;
+}
+
+/** 조회일(우선 요일) 기준으로 재정렬. 우선 요일이 맨 앞, 이어서 그다음 요일 순. */
+function reorderHoursByPriority(parsed, priorityDay) {
+  if (!parsed?.length || !priorityDay) return parsed;
+  const pi = DAY_ORDER.indexOf(priorityDay);
+  if (pi === -1) return parsed;
+  return [...parsed].sort((a, b) => {
+    const ai = DAY_ORDER.indexOf(a.day);
+    const bi = DAY_ORDER.indexOf(b.day);
+    return ((ai - pi + 7) % 7) - ((bi - pi + 7) % 7);
+  });
+}
+
+/** 한 요일의 시간 문자열 파싱 → { closed: true } 또는 { open: 'HH:mm', close: 'HH:mm' } */
+function parseTimeSegment(timeStr) {
+  const t = (timeStr || '').trim();
+  if (!t || /휴무|closed/i.test(t)) return { closed: true };
+  const parts = t.split(/\s*[~\-–—]\s*/).map((s) => s.trim()).filter(Boolean);
+  const to24 = (part) => {
+    const m = part.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const min = m[2];
+    if (m[3]) {
+      if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+      if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+    }
+    return `${String(h).padStart(2, '0')}:${min}`;
+  };
+  const open = parts[0] ? to24(parts[0]) : null;
+  const close = parts[1] ? to24(parts[1]) : null;
+  if (open && close) return { open, close, closed: false };
+  if (open) return { open, close: '23:59', closed: false };
+  return { closed: true };
+}
+
+/** 요일별 편집 초기값: parseHoursToDays 결과 + parseTimeSegment */
+function initHoursEditState(hoursString) {
+  const parsed = parseHoursToDays(hoursString || '');
+  const byDay = {};
+  if (parsed) for (const { day, time } of parsed) byDay[day] = parseTimeSegment(time);
+  return DAY_ORDER.map((day) => ({
+    day,
+    ...(byDay[day] || { closed: true }),
+    ...(byDay[day]?.closed !== false ? {} : { open: byDay[day].open || '09:00', close: byDay[day].close || '18:00' }),
+  })).map((row) => ({
+    day: row.day,
+    closed: row.closed !== false,
+    open: row.open || '09:00',
+    close: row.close || '18:00',
+  }));
+}
+
 /* RAG place → detail shape */
 function ragPlaceToDetail(place) {
   if (!place) return null;
@@ -77,10 +151,9 @@ function createAddressPinIcon() {
     className: '',
     html: `<div style="
       width:28px;height:28px;border-radius:50%;
-      background:var(--color-primary);color:#fff;font-size:14px;
-      display:flex;align-items:center;justify-content:center;
+      background:var(--color-primary);
       border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);
-    ">📍</div>`,
+    "></div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
   });
@@ -138,6 +211,9 @@ export default function DetailDialog({
   const [showAddressSearchDialog, setShowAddressSearchDialog] = useState(false);
   const [showImageManageDialog, setShowImageManageDialog] = useState(false);
   const [imageToReplace, setImageToReplace] = useState(null); // url when replacing one image
+  const [hoursExpanded, setHoursExpanded] = useState(false); // 영업시간 구글 스타일 접기/펼치기
+  const [hoursEditRows, setHoursEditRows] = useState([]); // 영업시간 편집 시 요일별 { day, open, close, closed }
+  const [hoursTimePicker, setHoursTimePicker] = useState(null); // { day, field: 'open'|'close' } | null
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState(() => new Set());
   const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined, photoUrl: undefined, rating: undefined, reviewCount: undefined, hours: undefined, priceLevel: undefined });
@@ -439,19 +515,31 @@ export default function DetailDialog({
 
   /* ── 인라인 수정 핸들러 ── */
   const openTextEdit = (field, label, currentValue, multiline = false) => {
+    if (field === 'hours') setHoursEditRows(initHoursEditState(currentValue || ''));
     setEditField({ field, label, value: currentValue || '', multiline });
   };
   const handleTextSave = () => {
     if (!editField) return;
     const { field, value } = editField;
     if (field === 'highlights') {
-      // 줄바꿈으로 분리
       const arr = value.split('\n').map(l => l.trim()).filter(Boolean);
       saveField({ highlights: arr.length > 0 ? arr : [] });
+    } else if (field === 'hours') {
+      const parts = hoursEditRows.map((r) =>
+        r.closed ? `${r.day}: 휴무` : `${r.day}: ${r.open}~${r.close}`
+      );
+      saveField({ hours: parts.join('; ') });
+      setEditField(null);
+      return;
     } else {
       saveField({ [field]: value });
     }
     setEditField(null);
+  };
+  const applyHoursToAllDays = () => {
+    const first = hoursEditRows[0];
+    if (!first) return;
+    setHoursEditRows(DAY_ORDER.map((day) => ({ ...first, day })));
   };
 
   const handleTimeSave = (timeVal) => {
@@ -542,64 +630,173 @@ export default function DetailDialog({
 
   const renderInfoTab = () => {
     const visibleRows = canEditInline ? infoRows : infoRows.filter(r => !!r.value);
+    const hoursRow = visibleRows.find((r) => r.label === '영업시간');
+    const hoursParsed = hoursRow?.value ? parseHoursToDays(hoursRow.value) : null;
+    const todayKorean = TODAY_BY_GETDAY[new Date().getDay()];
+    const hoursParsedOrdered = hoursParsed ? reorderHoursByPriority(hoursParsed, todayKorean) : null;
+    const showHoursGoogleStyle = hoursParsedOrdered && hoursParsedOrdered.length > 0;
 
-    return (
-      <>
-        {visibleRows.map((row, i) => (
+    const renderRow = (row, i, isLast) => {
+      if (row.label === '영업시간' && showHoursGoogleStyle) {
+        return (
           <div
             key={row.label}
-            role={canEditInline ? 'button' : undefined}
-            tabIndex={canEditInline ? 0 : undefined}
-            onClick={canEditInline ? row.onClick : undefined}
             style={{
-              display: 'flex', alignItems: 'flex-start', gap: SPACING.lg,
               padding: `${SPACING.lg} 0`,
-              borderBottom: i < visibleRows.length - 1 ? '1px solid var(--color-outline-variant)' : 'none',
-              cursor: canEditInline ? 'pointer' : 'default',
-              background: 'transparent',
+              borderBottom: !isLast ? '1px solid var(--color-outline-variant)' : 'none',
             }}
           >
-            <Icon name={row.icon} size={20} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0, marginTop: 2 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 'var(--typo-caption-1-bold-size)',
-                fontWeight: 600,
-                color: 'var(--color-on-surface-variant2)',
-                marginBottom: SPACING.xs,
-              }}>{row.label}</div>
-              <div style={{
-                fontSize: 'var(--typo-label-1-n---regular-size)',
-                lineHeight: 'var(--typo-label-1-n---regular-line-height)',
-                color: row.value ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
-                whiteSpace: row.multiline ? 'pre-line' : 'normal',
-                wordBreak: 'break-word',
-              }}>
-                {row.value || (canEditInline ? row.placeholder : '')}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setHoursExpanded((e) => !e)}
+              onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setHoursExpanded((e) => !e); } }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: SPACING.lg,
+                cursor: 'pointer',
+                background: 'transparent',
+                border: 'none',
+                width: '100%',
+                textAlign: 'left',
+                padding: 0,
+                font: 'inherit',
+                color: 'inherit',
+              }}
+            >
+              <Icon name="clock" size={20} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 'var(--typo-caption-1-bold-size)',
+                  fontWeight: 600,
+                  color: 'var(--color-on-surface-variant2)',
+                  marginBottom: SPACING.xs,
+                }}>영업시간</div>
+                <div style={{
+                  fontSize: 'var(--typo-label-1-n---regular-size)',
+                  lineHeight: 'var(--typo-label-1-n---regular-line-height)',
+                  color: 'var(--color-on-surface)',
+                }}>
+                  {hoursParsedOrdered[0].day} {hoursParsedOrdered[0].time}
+                  {hoursParsedOrdered[0].day === todayKorean && (
+                    <span style={{ marginLeft: SPACING.sm, fontSize: 'var(--typo-caption-1-bold-size)', color: 'var(--color-primary)' }}>· 오늘</span>
+                  )}
+                </div>
               </div>
+              <Icon
+                name={hoursExpanded ? 'chevronUp' : 'chevronDown'}
+                size={20}
+                style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0 }}
+              />
             </div>
-            {row.miniMap && hasCoords && (
-              <div
-                key={`minimap-${effectiveDetail.lat}-${effectiveDetail.lon}`}
-                style={{ width: 80, height: 80, borderRadius: RADIUS.md, overflow: 'hidden', flexShrink: 0 }}
-              >
-                <MapContainer
-                  center={[effectiveDetail.lat, effectiveDetail.lon]}
-                  zoom={15}
-                  style={{ height: '100%', width: '100%' }}
-                  zoomControl={false}
-                  attributionControl={false}
-                  dragging={false}
-                  scrollWheelZoom={false}
-                  doubleClickZoom={false}
-                  touchZoom={false}
-                >
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <Marker position={[effectiveDetail.lat, effectiveDetail.lon]} icon={createAddressPinIcon()} />
-                </MapContainer>
+            {hoursExpanded && (
+              <div style={{ marginTop: SPACING.md, marginLeft: 32, display: 'flex', flexDirection: 'column', gap: SPACING.xs }}>
+                {hoursParsedOrdered.map(({ day, time }) => (
+                  <div
+                    key={day}
+                    style={{
+                      fontSize: 'var(--typo-label-1-n---regular-size)',
+                      lineHeight: 'var(--typo-label-1-n---regular-line-height)',
+                      color: 'var(--color-on-surface)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: SPACING.lg,
+                    }}
+                  >
+                    <span style={{ color: 'var(--color-on-surface-variant2)' }}>
+                      {day}
+                      {day === todayKorean && (
+                        <span style={{ marginLeft: SPACING.sm, fontSize: 'var(--typo-caption-1-bold-size)', color: 'var(--color-primary)' }}>· 오늘</span>
+                      )}
+                    </span>
+                    <span>{time}</span>
+                  </div>
+                ))}
+                {canEditInline && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); hoursRow.onClick(); }}
+                    style={{
+                      marginTop: SPACING.sm,
+                      padding: 0,
+                      border: 'none',
+                      background: 'none',
+                      fontSize: 'var(--typo-caption-1-bold-size)',
+                      color: 'var(--color-primary)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    새로운 영업시간 제안
+                  </button>
+                )}
               </div>
             )}
           </div>
-        ))}
+        );
+      }
+      return (
+        <div
+          key={row.label}
+          role={canEditInline ? 'button' : undefined}
+          tabIndex={canEditInline ? 0 : undefined}
+          onClick={canEditInline ? row.onClick : undefined}
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: SPACING.lg,
+            padding: `${SPACING.lg} 0`,
+            borderBottom: !isLast ? '1px solid var(--color-outline-variant)' : 'none',
+            cursor: canEditInline ? 'pointer' : 'default',
+            background: 'transparent',
+          }}
+        >
+          <Icon name={row.icon} size={20} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0, marginTop: 2 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: 'var(--typo-caption-1-bold-size)',
+              fontWeight: 600,
+              color: 'var(--color-on-surface-variant2)',
+              marginBottom: SPACING.xs,
+            }}>{row.label}</div>
+            <div style={{
+              fontSize: 'var(--typo-label-1-n---regular-size)',
+              lineHeight: 'var(--typo-label-1-n---regular-line-height)',
+              color: row.value ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
+              whiteSpace: row.multiline ? 'pre-line' : 'normal',
+              wordBreak: 'break-word',
+            }}>
+              {row.value || (canEditInline ? row.placeholder : '')}
+            </div>
+          </div>
+          {row.miniMap && hasCoords && (
+            <div
+              key={`minimap-${effectiveDetail.lat}-${effectiveDetail.lon}`}
+              style={{ width: 80, height: 80, borderRadius: RADIUS.md, overflow: 'hidden', flexShrink: 0 }}
+            >
+              <MapContainer
+                center={[effectiveDetail.lat, effectiveDetail.lon]}
+                zoom={15}
+                style={{ height: '100%', width: '100%' }}
+                zoomControl={false}
+                attributionControl={false}
+                dragging={false}
+                scrollWheelZoom={false}
+                doubleClickZoom={false}
+                touchZoom={false}
+              >
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <Marker position={[effectiveDetail.lat, effectiveDetail.lon]} icon={createAddressPinIcon()} />
+              </MapContainer>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <>
+        {visibleRows.map((row, i) => renderRow(row, i, i === visibleRows.length - 1))}
         {visibleRows.length === 0 && (
           <p style={{ padding: `${SPACING.xxxl} 0`, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>정보 없음</p>
         )}
@@ -774,8 +971,12 @@ export default function DetailDialog({
           <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, marginBottom: item?.sub ? SPACING.sm : 0, flexWrap: 'wrap' }}>
             {effectiveDetail.rating != null ? (
               <>
-                <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
-                  {'⭐'} {Number(effectiveDetail.rating).toFixed(1)}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
+                  {[1, 2, 3, 4, 5].map((i) => {
+                    const filled = i <= Math.min(5, Math.round(Number(effectiveDetail.rating)));
+                    return <Icon key={i} name={filled ? 'star' : 'starOutlined'} size={14} />;
+                  })}
+                  <span style={{ marginLeft: SPACING.xs }}>{Number(effectiveDetail.rating).toFixed(1)}</span>
                 </span>
                 {effectiveDetail.reviewCount != null && (
                   <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant2)' }}>
@@ -1415,6 +1616,22 @@ export default function DetailDialog({
         />
       )}
 
+      {/* 영업시간 편집 시 시작/종료 시간 타임 피커 */}
+      {hoursTimePicker && editField?.field === 'hours' && (
+        <TimePickerDialog
+          open
+          value={hoursEditRows.find((r) => r.day === hoursTimePicker.day)?.[hoursTimePicker.field] ?? '09:00'}
+          onConfirm={(value) => {
+            setHoursEditRows((prev) =>
+              prev.map((r) => (r.day === hoursTimePicker.day ? { ...r, [hoursTimePicker.field]: value } : r))
+            );
+            setHoursTimePicker(null);
+          }}
+          onClose={() => setHoursTimePicker(null)}
+          minuteStep={5}
+        />
+      )}
+
       {/* 주소 수정 — 장소 검색: 간단 맵 + 선택 시 핀, 검색결과 인라인, 확인 버튼으로 저장 */}
       {showAddressSearchDialog && (
         <CenterPopup
@@ -1521,7 +1738,95 @@ export default function DetailDialog({
       {/* 텍스트 필드 수정 CenterPopup */}
       {editField && (
         <CenterPopup title={editField.label} onClose={() => setEditField(null)} maxWidth={360}>
-          {editField.multiline ? (
+          {editField.field === 'hours' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
+              <button
+                type="button"
+                onClick={applyHoursToAllDays}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: 0,
+                  border: 'none',
+                  background: 'none',
+                  fontSize: 'var(--typo-caption-1-bold-size)',
+                  color: 'var(--color-primary)',
+                  cursor: 'pointer',
+                  marginBottom: SPACING.xs,
+                }}
+              >
+                매일 동일하게 적용
+              </button>
+              {hoursEditRows.map((row) => (
+                <div
+                  key={row.day}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: SPACING.md,
+                    flexWrap: 'nowrap',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, flex: 1, minWidth: 0 }}>
+                    <span style={{ width: 28, flexShrink: 0, fontSize: 'var(--typo-label-2-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
+                      {row.day.replace('요일', '')}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={row.closed}
+                      onClick={() => { if (!row.closed) setHoursTimePicker({ day: row.day, field: 'open' }); }}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: `${SPACING.xs} ${SPACING.sm}`,
+                        border: '1px solid var(--color-outline-variant)',
+                        borderRadius: RADIUS.sm,
+                        fontSize: 'var(--typo-label-2-regular-size)',
+                        color: row.closed ? 'var(--color-on-surface-variant2)' : 'var(--color-on-surface)',
+                        background: row.closed ? 'var(--color-surface-container-low)' : 'var(--color-surface-container-lowest)',
+                        cursor: row.closed ? 'not-allowed' : 'pointer',
+                        opacity: row.closed ? 0.7 : 1,
+                      }}
+                    >
+                      {row.open}
+                    </button>
+                    <span style={{ flexShrink: 0, fontSize: 'var(--typo-label-2-regular-size)', color: 'var(--color-on-surface-variant2)' }}>~</span>
+                    <button
+                      type="button"
+                      disabled={row.closed}
+                      onClick={() => { if (!row.closed) setHoursTimePicker({ day: row.day, field: 'close' }); }}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: `${SPACING.xs} ${SPACING.sm}`,
+                        border: '1px solid var(--color-outline-variant)',
+                        borderRadius: RADIUS.sm,
+                        fontSize: 'var(--typo-label-2-regular-size)',
+                        color: row.closed ? 'var(--color-on-surface-variant2)' : 'var(--color-on-surface)',
+                        background: row.closed ? 'var(--color-surface-container-low)' : 'var(--color-surface-container-lowest)',
+                        cursor: row.closed ? 'not-allowed' : 'pointer',
+                        opacity: row.closed ? 0.7 : 1,
+                      }}
+                    >
+                      {row.close}
+                    </button>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACING.xs, flexShrink: 0, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={row.closed}
+                      onChange={(e) => {
+                        const closed = e.target.checked;
+                        setHoursEditRows((prev) => prev.map((r) => r.day === row.day ? { ...r, closed } : r));
+                      }}
+                      style={{ width: 18, height: 18, accentColor: 'var(--color-primary)' }}
+                    />
+                    <span style={{ fontSize: 'var(--typo-caption-1-regular-size)', color: 'var(--color-on-surface-variant2)' }}>휴무</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+          ) : editField.multiline ? (
             <textarea
               autoFocus
               value={editField.value}
