@@ -3,7 +3,7 @@ import Icon from './Icon';
 import { SPACING } from '../../styles/tokens';
 
 /* ── Toast Notification Component ── */
-export default function Toast({ message, icon, duration = 2500, onDone, actionLabel, onAction }) {
+export default function Toast({ message, icon, duration = 1500, onDone, actionLabel, onAction }) {
   const [visible, setVisible] = useState(true);
   const [exiting, setExiting] = useState(false);
 
