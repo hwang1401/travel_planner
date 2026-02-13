@@ -348,6 +348,27 @@ Deno.serve(async (req) => {
       };
     }
 
+    // region+name_ko 기준으로 이미 verified(수동 검증) 데이터가 있으면 덮어쓰지 않음
+    const { data: existingByName } = await supabase
+      .from("rag_places")
+      .select("id, confidence, address, lat, lon, image_url, google_place_id")
+      .eq("region", region)
+      .eq("name_ko", place.desc)
+      .maybeSingle();
+    if (existingByName?.confidence === "verified") {
+      return {
+        ok: true,
+        data: {
+          desc: place.desc,
+          address: existingByName.address || result.formattedAddress,
+          lat: existingByName.lat || result.location?.latitude || null,
+          lon: existingByName.lon || result.location?.longitude || null,
+          image_url: existingByName.image_url || null,
+          placeId: existingByName.google_place_id || result.id,
+        },
+      };
+    }
+
     const row = {
       region,
       name_ko: place.desc,

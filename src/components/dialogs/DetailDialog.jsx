@@ -160,7 +160,7 @@ export default function DetailDialog({
   const [timePickerPickedIndex, setTimePickerPickedIndex] = useState(null); // 시간표 행 탭 시 저장 시 해당 행을 picked로
   const [singleStationPicker, setSingleStationPicker] = useState(null); // { mode: 'from'|'to' }
   const [showAddressSearchDialog, setShowAddressSearchDialog] = useState(false);
-  const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined });
+  const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined, photoUrl: undefined });
 
   // visualViewport
   const [viewportRect, setViewportRect] = useState(null);
@@ -313,6 +313,7 @@ export default function DetailDialog({
         lat: effectiveDetail.lat,
         lon: effectiveDetail.lon,
         placeId: effectiveDetail.placeId,
+        photoUrl: undefined,
       });
     }
   }, [showAddressSearchDialog, effectiveDetail.address, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.placeId]);
@@ -396,6 +397,9 @@ export default function DetailDialog({
     if (fieldUpdates.images !== undefined) updated.detail = { ...updated.detail, images: fieldUpdates.images };
     if (fieldUpdates.image === '' || (fieldUpdates.images && fieldUpdates.images.length === 0)) {
       updated.detail = { ...updated.detail, _imageRemovedByUser: true };
+    }
+    if (fieldUpdates._imageRemovedByUser !== undefined) {
+      updated.detail = { ...updated.detail, _imageRemovedByUser: fieldUpdates._imageRemovedByUser };
     }
     if (fieldUpdates.timetable !== undefined) updated.detail = { ...updated.detail, timetable: fieldUpdates.timetable };
     updated.detail.name = updated.desc;
@@ -1283,12 +1287,19 @@ export default function DetailDialog({
               addressSearchPending.lat !== effectiveDetail.lat ||
               addressSearchPending.lon !== effectiveDetail.lon;
             if (changed && addressSearchPending.address) {
-              saveField({
+              const fields = {
                 address: addressSearchPending.address || '',
                 lat: addressSearchPending.lat,
                 lon: addressSearchPending.lon,
                 placeId: addressSearchPending.placeId,
-              });
+              };
+              if (addressSearchPending.photoUrl) {
+                fields.image = addressSearchPending.photoUrl;
+              } else {
+                fields.image = null;
+                fields._imageRemovedByUser = false;
+              }
+              saveField(fields);
             }
             setShowAddressSearchDialog(false);
           }}
@@ -1325,8 +1336,8 @@ export default function DetailDialog({
           )}
           <AddressSearch
             value={addressSearchPending.address}
-            onChange={(address, lat, lon, _photoUrl, placeId) => {
-              setAddressSearchPending({ address: address || '', lat: lat ?? undefined, lon: lon ?? undefined, placeId: placeId ?? undefined });
+            onChange={(address, lat, lon, photoUrl, placeId) => {
+              setAddressSearchPending({ address: address || '', lat: lat ?? undefined, lon: lon ?? undefined, placeId: placeId ?? undefined, photoUrl: photoUrl ?? undefined });
             }}
             placeholder="장소명, 주소를 검색하세요"
             size="lg"
@@ -1337,12 +1348,19 @@ export default function DetailDialog({
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: SPACING.md, marginTop: SPACING.lg }}>
             <Button variant="ghost-neutral" size="sm" onClick={() => setShowAddressSearchDialog(false)}>취소</Button>
             <Button variant="primary" size="sm" onClick={() => {
-              saveField({
+              const fields = {
                 address: addressSearchPending.address || '',
                 lat: addressSearchPending.lat,
                 lon: addressSearchPending.lon,
                 placeId: addressSearchPending.placeId,
-              });
+              };
+              if (addressSearchPending.photoUrl) {
+                fields.image = addressSearchPending.photoUrl;
+              } else {
+                fields.image = null;
+                fields._imageRemovedByUser = false;
+              }
+              saveField(fields);
               setShowAddressSearchDialog(false);
             }}>확인</Button>
           </div>
