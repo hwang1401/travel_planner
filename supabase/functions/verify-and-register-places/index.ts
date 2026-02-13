@@ -350,10 +350,42 @@ Deno.serve(async (req) => {
   const processOne = async (
     place: { desc: string; type: string; address?: string; region?: string }
   ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; placeId: string | null } }> => {
-    // 쿼리 구성: address > 일본어 도시명 > "日本" 순으로 구체적 힌트 사용
+    // ── 0. DB 먼저 조회: 이미 등록된 장소면 Text Search 스킵 ──
     const regionKey = place.region
       ? (LABEL_TO_REGION[place.region] || place.region.toLowerCase())
       : null;
+    // name_ko 기준으로 가능한 region들에서 조회
+    const possibleRegions = regionKey ? [regionKey] : [];
+    // regionHint에서도 region 추출 시도
+    if (possibleRegions.length === 0 && regionHint) {
+      const hintKey = LABEL_TO_REGION[regionHint] || regionHint.toLowerCase();
+      if (REGION_CENTERS[hintKey]) possibleRegions.push(hintKey);
+    }
+
+    if (possibleRegions.length > 0) {
+      const { data: cached } = await supabase
+        .from("rag_places")
+        .select("id, confidence, address, lat, lon, image_url, google_place_id")
+        .eq("name_ko", place.desc)
+        .in("region", possibleRegions)
+        .maybeSingle();
+
+      if (cached && cached.google_place_id) {
+        return {
+          ok: true,
+          data: {
+            desc: place.desc,
+            address: cached.address || null,
+            lat: cached.lat || null,
+            lon: cached.lon || null,
+            image_url: cached.image_url || null,
+            placeId: cached.google_place_id,
+          },
+        };
+      }
+    }
+
+    // ── 1. Text Search (DB에 없을 때만) ──
     const jaCity = regionKey ? REGION_JA_NAMES[regionKey] : null;
     const query = place.address
       ? `${place.desc.trim()} ${place.address}`
@@ -373,7 +405,6 @@ Deno.serve(async (req) => {
         console.warn(`[verify-and-register] name mismatch: ${place.desc} vs ${result.displayName}`);
         return { ok: false };
       }
-      // 한국어 매칭 성공 → 일본어 결과(주소/좌표)를 그대로 사용
     }
     const region =
       result.location != null
@@ -384,7 +415,7 @@ Deno.serve(async (req) => {
       return { ok: false };
     }
 
-    // 기존 데이터가 있어도 결과를 반환해야 함
+    // ── 2. google_place_id로 기존 데이터 조회 (Text Search 결과 기반) ──
     const { data: existing } = await supabase
       .from("rag_places")
       .select("id, confidence, address, lat, lon, image_url, google_place_id")
@@ -405,7 +436,7 @@ Deno.serve(async (req) => {
       };
     }
 
-    // region+name_ko 기준으로 이미 verified(수동 검증) 데이터가 있으면 덮어쓰지 않음
+    // region+name_ko 기준 verified 데이터가 있으면 덮어쓰지 않음
     const { data: existingByName } = await supabase
       .from("rag_places")
       .select("id, confidence, address, lat, lon, image_url, google_place_id")

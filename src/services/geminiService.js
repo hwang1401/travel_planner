@@ -807,6 +807,7 @@ function injectRAGData(days, ragPlaces) {
           }
           if (match.rating != null) item.detail.rating = match.rating;
           if (match.review_count != null) item.detail.reviewCount = match.review_count;
+          if (match.opening_hours) item.detail.hours = match.opening_hours;
         } else {
           // RAG 미매칭이면 Gemini가 넣은 주소는 신뢰 불가 → 전부 제거
           if (item.detail?.address) {
