@@ -38,6 +38,9 @@ function getRetrySeconds(rawMsg) {
 /** Sleep helper */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Type → Korean category label (used across multiple functions) */
+const TYPE_LABELS = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
+
 /**
  * Extract text from Gemini response.
  * Gemini 2.5 Flash includes "thought" parts — take the LAST text part (actual output).
@@ -633,9 +636,23 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
           item.detail.lon = match.lon;
         }
       } else {
-        clearVagueAddress(item);
+        // RAG 미매칭이면 Gemini가 넣은 주소는 신뢰 불가 → 전부 제거
+        if (item.detail?.address) {
+          delete item.detail.address;
+        }
       }
       delete item._ragId;
+    }
+
+    // AI 추천 아이템도 검증 및 주소 적용
+    // items를 임시 days 구조로 만들어서 처리
+    if (items.length > 0) {
+      const tempDays = [{
+        day: 1,
+        label: "temp",
+        sections: [{ title: "temp", items }]
+      }];
+      await verifyAndApplyUnmatchedPlaces(tempDays, ragPlaces);
     }
 
     const choices = Array.isArray(parsed.choices) ? parsed.choices : [];
@@ -720,31 +737,6 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 17. detail.address: 참고 목록에서 고른 장소(rag_id 있음)만 해당 장소의 실제 주소를 넣으세요. rag_id 없거나 "호텔 조식", "구마모토 시내", "시내", "근처" 같은 지도 검색 불가 표현은 address에 넣지 말고 비워두세요.`;
 
 /**
- * 모호한 주소(자연어)인지 판별. "호텔 조식", "구마모토 시내", "시내", "근처" 등 지도 검색 불가 표현 → true.
- */
-function isVagueAddress(str) {
-  if (!str || typeof str !== 'string') return true;
-  const s = str.trim();
-  if (s.length < 3) return true;
-  const vaguePatterns = [
-    /^(호텔\s*)?조식$/i, /^브런치$/i, /^시내$/i, /^근처$/i, /시내$/i, /근처$/i,
-    /^[가-힣]+ 시내$/i, /^[가-힣]+ 도심$/i, /^시가지$/i, /^도심$/i,
-    /^숙소$/i, /^호텔$/i, /시내에서$/i, /근처에서$/i,
-  ];
-  return vaguePatterns.some((p) => p.test(s));
-}
-
-/**
- * item.detail.address가 모호하면 제거 (RAG 매칭 시에만 실제 주소 사용).
- */
-function clearVagueAddress(item) {
-  if (!item?.detail?.address) return;
-  if (isVagueAddress(item.detail.address)) {
-    delete item.detail.address;
-  }
-}
-
-/**
  * Match an item against RAG places.
  * Priority: rag_id (from AI response) > exact name > contains name > null
  */
@@ -798,7 +790,10 @@ function injectRAGData(days, ragPlaces) {
             item.detail.lon = match.lon;
           }
         } else {
-          clearVagueAddress(item);
+          // RAG 미매칭이면 Gemini가 넣은 주소는 신뢰 불가 → 전부 제거
+          if (item.detail?.address) {
+            delete item.detail.address;
+          }
         }
         delete item._ragId;
       }
@@ -811,11 +806,13 @@ const PLACE_TYPES_FOR_VERIFICATION = ['food', 'spot', 'shop', 'stay'];
 const MAX_UNMATCHED_PLACES_TO_ENQUEUE = 10;
 
 /**
- * Collect RAG-unmatched items (food/spot/shop/stay) from days and POST to Edge Function
- * for background verification + registration. Fire-and-forget; does not block UI.
+ * Collect RAG-unmatched items from days, verify via Edge Function, and apply results immediately.
+ * This is now a synchronous operation that waits for verification results.
  */
-function enqueueUnmatchedPlacesForVerification(days, ragPlaces) {
+async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
   if (!Array.isArray(days) || days.length === 0) return;
+
+  // 1. 수집 로직 (기존과 동일)
   const collected = [];
   const seenDesc = new Set();
   let regionHint = '';
@@ -838,23 +835,65 @@ function enqueueUnmatchedPlacesForVerification(days, ragPlaces) {
     }
     if (collected.length >= MAX_UNMATCHED_PLACES_TO_ENQUEUE) break;
   }
+
   if (collected.length === 0) return;
+
+  // 2. Edge Function 호출 (await)
   const baseUrl = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!baseUrl || !anonKey) return;
+
   const url = `${baseUrl.replace(/\/$/, '')}/functions/v1/verify-and-register-places`;
-  const headers = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${anonKey}`,
-  };
-  fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ places: collected, regionHint: regionHint || undefined }),
-    keepalive: true,
-  }).catch((err) => {
-    console.warn('[GeminiService] RAG verify-and-register fire-and-forget failed:', err);
-  });
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${anonKey}`,
+      },
+      body: JSON.stringify({ places: collected, regionHint: regionHint || undefined }),
+    });
+
+    if (!res.ok) {
+      console.warn('[GeminiService] verify-and-register HTTP error:', res.status);
+      return;
+    }
+
+    const data = await res.json();
+    const results = data.results || [];
+
+    if (!Array.isArray(results) || results.length === 0) return;
+
+    // 3. 결과를 days에 반영
+    for (const day of days) {
+      for (const sec of day.sections || []) {
+        for (const item of sec.items || []) {
+          const verified = results.find(r => r.desc === (item.desc || '').trim());
+          if (!verified) continue;
+
+          // detail 객체가 없으면 생성
+          if (!item.detail) {
+            item.detail = {
+              name: item.desc,
+              category: TYPE_LABELS[item.type] || '정보'
+            };
+          }
+
+          // 검증된 데이터로 업데이트
+          if (verified.address) item.detail.address = verified.address;
+          if (verified.lat != null) item.detail.lat = verified.lat;
+          if (verified.lon != null) item.detail.lon = verified.lon;
+          if (verified.image_url) item.detail.image = verified.image_url;
+          if (verified.placeId) item.detail.placeId = verified.placeId;
+        }
+      }
+    }
+
+    console.log(`[GeminiService] Applied ${results.length} verified places to schedule`);
+  } catch (err) {
+    console.warn('[GeminiService] verifyAndApply failed:', err);
+    // 실패해도 일정 생성은 진행 (주소 없는 채로)
+  }
 }
 
 /** 장기 일정은 7일 단위로 나눠 요청 (MAX_TOKENS·무료플랜 한도 방지) */
@@ -1053,7 +1092,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
       }
       const days = normalizeDays(parsed.days, 0);
       injectRAGData(days, ragPlaces);
-      enqueueUnmatchedPlacesForVerification(days, ragPlaces);
+      await verifyAndApplyUnmatchedPlaces(days, ragPlaces);
       return { days, error: null };
     }
 
@@ -1069,7 +1108,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
       previousSummary = chunkDays.map((d) => `${d.day}일: ${d.label}`).join(" / ");
     }
     injectRAGData(allDays, ragPlaces);
-    enqueueUnmatchedPlacesForVerification(allDays, ragPlaces);
+    await verifyAndApplyUnmatchedPlaces(allDays, ragPlaces);
     return { days: allDays, error: null };
   } catch (err) {
     console.error("[GeminiService] Trip generation error:", err);

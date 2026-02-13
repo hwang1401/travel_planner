@@ -307,7 +307,7 @@ Deno.serve(async (req) => {
 
   const processOne = async (
     place: { desc: string; type: string }
-  ): Promise<{ ok: boolean }> => {
+  ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; placeId: string | null } }> => {
     const query = `${place.desc.trim()} 日本`;
     const result = await searchPlace(query, lat, lng, apiKey);
     if (!result || !result.id) {
@@ -327,13 +327,25 @@ Deno.serve(async (req) => {
       return { ok: false };
     }
 
+    // 기존 데이터가 있어도 결과를 반환해야 함
     const { data: existing } = await supabase
       .from("rag_places")
-      .select("id, confidence")
+      .select("id, confidence, address, lat, lon, image_url, google_place_id")
       .eq("google_place_id", result.id)
       .maybeSingle();
+
     if (existing) {
-      return { ok: true };
+      return {
+        ok: true,
+        data: {
+          desc: place.desc,
+          address: existing.address || result.formattedAddress,
+          lat: existing.lat || result.location?.latitude || null,
+          lon: existing.lon || result.location?.longitude || null,
+          image_url: existing.image_url || null,
+          placeId: existing.google_place_id || result.id
+        }
+      };
     }
 
     const row = {
@@ -362,8 +374,19 @@ Deno.serve(async (req) => {
       return { ok: false };
     }
     const rowId = upserted?.id;
-    if (!rowId) return { ok: true };
+    if (!rowId) return {
+      ok: true,
+      data: {
+        desc: place.desc,
+        address: result.formattedAddress,
+        lat: result.location?.latitude || null,
+        lon: result.location?.longitude || null,
+        image_url: null,
+        placeId: result.id
+      }
+    };
 
+    let imageUrl: string | null = null;
     try {
       const photoName = await getBestPhotoName(result.id, apiKey);
       if (photoName) {
@@ -375,27 +398,49 @@ Deno.serve(async (req) => {
           .upload(storagePath, buf, { contentType: "image/jpeg", upsert: true });
         if (!uploadErr) {
           const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-          await supabase.from("rag_places").update({ image_url: urlData.publicUrl }).eq("id", rowId);
+          imageUrl = urlData.publicUrl;
+          await supabase.from("rag_places").update({ image_url: imageUrl }).eq("id", rowId);
         }
       }
     } catch (e) {
       console.warn("[verify-and-register] photo skip:", (e as Error).message);
     }
-    return { ok: true };
+
+    return {
+      ok: true,
+      data: {
+        desc: place.desc,
+        address: result.formattedAddress,
+        lat: result.location?.latitude || null,
+        lon: result.location?.longitude || null,
+        image_url: imageUrl,
+        placeId: result.id
+      }
+    };
   };
 
   let registered = 0;
+  const results: Array<{
+    desc: string;
+    address: string | null;
+    lat: number | null;
+    lon: number | null;
+    image_url: string | null;
+    placeId: string | null;
+  }> = [];
+
   for (const place of toProcess) {
     try {
-      const { ok } = await processOne(place);
+      const { ok, data } = await processOne(place);
       if (ok) registered++;
+      if (data) results.push(data);
     } catch (e) {
       console.warn("[verify-and-register] place error:", (e as Error).message);
     }
     await new Promise((r) => setTimeout(r, 150));
   }
 
-  return new Response(JSON.stringify({ ok: true, registered }), {
+  return new Response(JSON.stringify({ ok: true, registered, results }), {
     status: 202,
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
