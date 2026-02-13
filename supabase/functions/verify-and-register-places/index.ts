@@ -265,7 +265,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  let body: { places?: Array<{ desc: string; type: string }>; regionHint?: string };
+  let body: { places?: Array<{ desc: string; type: string; address?: string; region?: string }>; regionHint?: string };
   try {
     body = await req.json();
   } catch {
@@ -306,10 +306,15 @@ Deno.serve(async (req) => {
   const BUCKET = "images";
 
   const processOne = async (
-    place: { desc: string; type: string }
+    place: { desc: string; type: string; address?: string; region?: string }
   ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; placeId: string | null } }> => {
-    const query = `${place.desc.trim()} 日本`;
-    const result = await searchPlace(query, lat, lng, apiKey);
+    const query = place.address
+      ? `${place.desc.trim()} ${place.address}`
+      : `${place.desc.trim()} 日本`;
+    const [pLat, pLng] = place.region
+      ? getRegionHintCenter(place.region)
+      : [lat, lng];
+    const result = await searchPlace(query, pLat, pLng, apiKey);
     if (!result || !result.id) {
       console.warn(`[verify-and-register] no result: ${place.desc}`);
       return { ok: false };
