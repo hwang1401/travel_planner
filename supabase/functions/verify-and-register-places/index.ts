@@ -56,6 +56,47 @@ const REGION_CENTERS: Record<string, [number, number]> = {
   ibusuki: [31.23, 130.64],
 };
 
+const REGION_JA_NAMES: Record<string, string> = {
+  osaka: "大阪",
+  tokyo: "東京",
+  kyoto: "京都",
+  fukuoka: "福岡",
+  okinawa: "沖縄",
+  sapporo: "札幌",
+  kobe: "神戸",
+  nara: "奈良",
+  nagoya: "名古屋",
+  hiroshima: "広島",
+  hakone: "箱根",
+  yokohama: "横浜",
+  kanazawa: "金沢",
+  beppu: "別府",
+  kamakura: "鎌倉",
+  nikko: "日光",
+  kumamoto: "熊本",
+  nagasaki: "長崎",
+  kagoshima: "鹿児島",
+  matsuyama: "松山",
+  takamatsu: "高松",
+  takayama: "高山",
+  hakodate: "函館",
+  sendai: "仙台",
+  kawaguchiko: "河口湖",
+  aso: "阿蘇",
+  yufuin: "由布院",
+  miyajima: "宮島",
+  naoshima: "直島",
+  shirakawago: "白川郷",
+  otaru: "小樽",
+  noboribetsu: "登別",
+  atami: "熱海",
+  miyazaki: "宮崎",
+  takachiho: "高千穂",
+  shimoda: "下田",
+  kinosaki: "城崎",
+  ibusuki: "指宿",
+};
+
 const LABEL_TO_REGION: Record<string, string> = {
   오사카: "osaka",
   도쿄: "tokyo",
@@ -155,7 +196,8 @@ async function searchPlace(
   textQuery: string,
   lat: number,
   lng: number,
-  apiKey: string
+  apiKey: string,
+  languageCode = "ja"
 ): Promise<{
   id: string | null;
   displayName: string;
@@ -175,7 +217,7 @@ async function searchPlace(
     },
     body: JSON.stringify({
       textQuery: String(textQuery),
-      languageCode: "ja",
+      languageCode,
       locationBias: {
         circle: {
           center: { latitude: lat, longitude: lng },
@@ -308,9 +350,14 @@ Deno.serve(async (req) => {
   const processOne = async (
     place: { desc: string; type: string; address?: string; region?: string }
   ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; placeId: string | null } }> => {
+    // 쿼리 구성: address > 일본어 도시명 > "日本" 순으로 구체적 힌트 사용
+    const regionKey = place.region
+      ? (LABEL_TO_REGION[place.region] || place.region.toLowerCase())
+      : null;
+    const jaCity = regionKey ? REGION_JA_NAMES[regionKey] : null;
     const query = place.address
       ? `${place.desc.trim()} ${place.address}`
-      : `${place.desc.trim()} 日本`;
+      : `${place.desc.trim()} ${jaCity || '日本'}`;
     const [pLat, pLng] = place.region
       ? getRegionHintCenter(place.region)
       : [lat, lng];
@@ -319,9 +366,14 @@ Deno.serve(async (req) => {
       console.warn(`[verify-and-register] no result: ${place.desc}`);
       return { ok: false };
     }
+    // nameSimilar: 일본어 displayName으로 먼저 비교, 실패 시 한국어로 재검색
     if (!nameSimilar(place.desc, result.displayName)) {
-      console.warn(`[verify-and-register] name mismatch: ${place.desc} vs ${result.displayName}`);
-      return { ok: false };
+      const koResult = await searchPlace(query, pLat, pLng, apiKey, "ko");
+      if (!koResult || !koResult.id || !nameSimilar(place.desc, koResult.displayName)) {
+        console.warn(`[verify-and-register] name mismatch: ${place.desc} vs ${result.displayName}`);
+        return { ok: false };
+      }
+      // 한국어 매칭 성공 → 일본어 결과(주소/좌표)를 그대로 사용
     }
     const region =
       result.location != null

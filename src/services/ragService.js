@@ -359,9 +359,8 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
       const desc = p.description || '';
       const tagStr = Array.isArray(p.tags) && p.tags.length ? ` 태그: ${p.tags.join(', ')}` : '';
       const extra = [p.price_range, p.opening_hours].filter(Boolean).join(' ');
-      const addrStr = p.address ? ` 주소: ${p.address}` : '';
       const coordStr = p.lat != null && p.lon != null ? ` [${Number(p.lat).toFixed(4)},${Number(p.lon).toFixed(4)}]` : '';
-      lines.push(`- [rag_id:${p.id}] [${p.region}] ${p.name_ko} (${p.type}): ${desc}${tagStr}${extra ? ` ${extra}` : ''}${addrStr}${coordStr}`);
+      lines.push(`- [rag_id:${p.id}] [${p.region}] ${p.name_ko} (${p.type}): ${desc}${tagStr}${extra ? ` ${extra}` : ''}${coordStr}`);
     }
     result.placesText = lines.join('\n');
     result.placeCount = places.length;

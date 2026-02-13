@@ -776,22 +776,6 @@ function findRAGMatch(item, ragPlaces) {
   for (const p of ragPlaces) {
     if (p.name_ko && (d.includes(p.name_ko) || p.name_ko.includes(d))) return p;
   }
-  // 4차: 토큰 겹침 (단어 단위) - "이치란 도톤보리" ↔ "이치란 라멘 도톤보리점" 등
-  const dTokens = d.split(/[\s·,()]+/).filter(t => t.length >= 2);
-  if (dTokens.length >= 2) {
-    let bestMatch = null;
-    let bestOverlap = 0;
-    for (const p of ragPlaces) {
-      if (!p.name_ko) continue;
-      const pTokens = p.name_ko.split(/[\s·,()]+/).filter(t => t.length >= 2);
-      const overlap = dTokens.filter(t => pTokens.some(pt => pt.includes(t) || t.includes(pt))).length;
-      if (overlap >= 2 && overlap > bestOverlap) {
-        bestOverlap = overlap;
-        bestMatch = p;
-      }
-    }
-    if (bestMatch) return bestMatch;
-  }
   return null;
 }
 
@@ -989,6 +973,17 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
     baseUserPrompt += "\n\n## 참고 데이터 (아래 목록에 있는 장소를 우선 사용하되, 부족하면 직접 추천도 가능합니다. 목록에서 고를 때만 rag_id를 넣고, 직접 추천 시 rag_id는 생략하세요.)\n\n" + placesText;
   }
 
+  // desc 후처리: "우메다역 근처 이자카야 '카메스시 소혼텐'" → "카메스시 소혼텐"
+  const cleanDesc = (desc, type) => {
+    if (!desc || !['food', 'spot', 'shop'].includes(type)) return desc;
+    // 따옴표로 감싸진 실제 장소명 추출 (한글 2자 이상)
+    const quoted = desc.match(/[''""]([가-힣a-zA-Z0-9\s·&-]{2,})[''""]/)
+    if (quoted) return quoted[1].trim();
+    // 따옴표 없이도 "근처/주변" 패턴이면 앞부분 제거: "OO 근처 XX NAME" → 마지막 명사구
+    // 이 경우는 정확한 추출이 어려우므로 따옴표 케이스만 처리
+    return desc;
+  };
+
   const normalizeDays = (rawDays, dayOffset = 0) => {
     const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
     return rawDays.map((day, i) => {
@@ -999,6 +994,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
           .map((it) => {
             const timeStr = (it.time || "").padStart(it.time?.includes(":") ? 5 : 0, "0");
             const typeVal = ["food", "spot", "shop", "move", "flight", "stay", "info"].includes(it.type) ? it.type : "info";
+            it.desc = cleanDesc(it.desc, typeVal);
             let detail = null;
             if (it.detail && Object.keys(it.detail).some((k) => it.detail[k])) {
               const lat = it.detail.lat != null ? Number(it.detail.lat) : null;
