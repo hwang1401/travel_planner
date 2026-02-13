@@ -16,10 +16,11 @@ import CenterPopup from '../common/CenterPopup';
 import TimePickerDialog from '../common/TimePickerDialog';
 import ChipSelector from '../common/ChipSelector';
 import ImagePicker from '../common/ImagePicker';
+import { uploadImage, generateImagePath } from '../../services/imageService';
 import AddressSearch from '../common/AddressSearch';
 import AddressToStationPicker from './AddressToStationPicker';
 import { FromToStationField } from '../common/FromToStationField';
-import { getNearbyPlaces } from '../../services/ragService';
+import { getNearbyPlaces, getPlaceByNameOrAddress } from '../../services/ragService';
 import { COLOR, SPACING, RADIUS, TYPE_CONFIG, TYPE_LABELS } from '../../styles/tokens';
 import { TIMETABLE_DB, findBestTrain, matchByFromTo, findRoutesByStations } from '../../data/timetable';
 
@@ -128,11 +129,14 @@ export default function DetailDialog({
   moveDayOptions = [], currentDayDisplayIdx,
   allDetailPayloads, currentDetailIndex,
   onNavigateToIndex, onAddToSchedule,
+  tripId,
 }) {
   useScrollLock(!!detail);
   if (!detail) return null;
 
   const [viewImage, setViewImage] = useState(null);
+  const [ragImage, setRagImage] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const [overlayDetail, setOverlayDetail] = useState(null);
   const [overlayPlace, setOverlayPlace] = useState(null);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
@@ -156,7 +160,7 @@ export default function DetailDialog({
   const [timePickerPickedIndex, setTimePickerPickedIndex] = useState(null); // 시간표 행 탭 시 저장 시 해당 행을 picked로
   const [singleStationPicker, setSingleStationPicker] = useState(null); // { mode: 'from'|'to' }
   const [showAddressSearchDialog, setShowAddressSearchDialog] = useState(false);
-  const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined });
+  const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined });
 
   // visualViewport
   const [viewportRect, setViewportRect] = useState(null);
@@ -201,8 +205,9 @@ export default function DetailDialog({
   const imagesArray = effectiveDetail.images ?? item?.detail?.images;
   const images = imagesArray && Array.isArray(imagesArray) && imagesArray.length > 0
     ? imagesArray : mainImage ? [mainImage] : [];
-  const displayImages = mainImage && images.length > 1
+  const baseDisplayImages = mainImage && images.length > 1
     ? [mainImage, ...images.filter((img) => img !== mainImage)] : images;
+  const displayImages = baseDisplayImages.length > 0 ? baseDisplayImages : (ragImage ? [ragImage] : []);
 
   const directionsUrl = effectiveDetail.placeId
     ? `https://www.google.com/maps/dir/?api=1&destination=place_id:${effectiveDetail.placeId}&destination_place_id=${effectiveDetail.placeId}`
@@ -250,6 +255,36 @@ export default function DetailDialog({
   /* ── 주변 추천 로딩 ── */
   useEffect(() => { setOverlayDetail(null); setOverlayPlace(null); }, [detail]);
 
+  /* ── RAG 이미지 자동 로드 및 적용 (주소/이름 매칭, 이미지 없을 때만) ── */
+  /* 사용자가 의도적으로 이미지 삭제한 경우(_imageRemovedByUser) RAG로 덮어쓰지 않음 */
+  useEffect(() => {
+    if (overlayDetail) { setRagImage(null); return; }
+    if (effectiveDetail._imageRemovedByUser) { setRagImage(null); return; }
+    const hasImage = mainImage || (imagesArray && imagesArray.length > 0);
+    if (hasImage) { setRagImage(null); return; }
+    const name = effectiveDetail.name || item?.desc || '';
+    const address = effectiveDetail.address || '';
+    if (!name.trim() && !address.trim()) { setRagImage(null); return; }
+    let cancelled = false;
+    getPlaceByNameOrAddress({ name, address }).then((place) => {
+      if (cancelled || !place?.image_url) {
+        if (!cancelled) setRagImage(null);
+        return;
+      }
+      setRagImage(place.image_url);
+      if (onSaveField && item) {
+        const di = effectiveDetail._di ?? detail._di;
+        const si = effectiveDetail._si ?? detail._si;
+        const ii = effectiveDetail._ii ?? detail._ii;
+        const updated = { ...item };
+        if (!updated.detail) updated.detail = { name: updated.desc, category: catMap[updated.type] || '관광' };
+        updated.detail = { ...updated.detail, image: place.image_url, name: updated.desc };
+        onSaveField(di, si, ii, updated);
+      }
+    }).catch(() => { if (!cancelled) setRagImage(null); });
+    return () => { cancelled = true; };
+  }, [effectiveDetail?.name, effectiveDetail?.address, item?.desc, mainImage, imagesArray, overlayDetail, onSaveField, item, effectiveDetail, detail]);
+
   useEffect(() => {
     if (!showNearby) return;
     const lat = Number(effectiveDetail.lat);
@@ -277,9 +312,10 @@ export default function DetailDialog({
         address: effectiveDetail.address || '',
         lat: effectiveDetail.lat,
         lon: effectiveDetail.lon,
+        placeId: effectiveDetail.placeId,
       });
     }
-  }, [showAddressSearchDialog]);
+  }, [showAddressSearchDialog, effectiveDetail.address, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.placeId]);
 
   /* ── 스와이프 ── */
   const MIN_SWIPE_PX = 60;
@@ -348,12 +384,19 @@ export default function DetailDialog({
     if (fieldUpdates.address !== undefined) updated.detail = { ...updated.detail, address: fieldUpdates.address };
     if (fieldUpdates.lat !== undefined) updated.detail = { ...updated.detail, lat: fieldUpdates.lat };
     if (fieldUpdates.lon !== undefined) updated.detail = { ...updated.detail, lon: fieldUpdates.lon };
+    if (fieldUpdates.placeId !== undefined) updated.detail = { ...updated.detail, placeId: fieldUpdates.placeId };
     if (fieldUpdates.tip !== undefined) updated.detail = { ...updated.detail, tip: fieldUpdates.tip };
     if (fieldUpdates.price !== undefined) updated.detail = { ...updated.detail, price: fieldUpdates.price };
     if (fieldUpdates.hours !== undefined) updated.detail = { ...updated.detail, hours: fieldUpdates.hours };
     if (fieldUpdates.highlights !== undefined) updated.detail = { ...updated.detail, highlights: fieldUpdates.highlights };
-    if (fieldUpdates.image !== undefined) updated.detail = { ...updated.detail, image: fieldUpdates.image };
+    if (fieldUpdates.image !== undefined) {
+      updated.detail = { ...updated.detail, image: fieldUpdates.image };
+      if (fieldUpdates.image) updated.detail._imageRemovedByUser = false; // 새 이미지 추가 시 플래그 해제
+    }
     if (fieldUpdates.images !== undefined) updated.detail = { ...updated.detail, images: fieldUpdates.images };
+    if (fieldUpdates.image === '' || (fieldUpdates.images && fieldUpdates.images.length === 0)) {
+      updated.detail = { ...updated.detail, _imageRemovedByUser: true };
+    }
     if (fieldUpdates.timetable !== undefined) updated.detail = { ...updated.detail, timetable: fieldUpdates.timetable };
     updated.detail.name = updated.desc;
     onSaveField(displayIdx, si, ii, updated);
@@ -384,6 +427,34 @@ export default function DetailDialog({
     setTimePickerInitialTime(null);
     setTimePickerPickedIndex(null);
   };
+
+  const imageFileRef = useRef(null);
+
+  const handleAddImage = useCallback(async (file) => {
+    if (!tripId || !onSaveField) return;
+    setImageUploading(true);
+    try {
+      const path = generateImagePath(tripId, 'items');
+      const url = await uploadImage(file, path);
+      saveField({ image: url });
+      setRagImage(null);
+    } catch (err) {
+      console.error('[DetailDialog] Image upload error:', err);
+    } finally {
+      setImageUploading(false);
+    }
+  }, [tripId, onSaveField, saveField]);
+
+  const handleReplaceImage = useCallback(() => {
+    if (!tripId || !onSaveField || imageUploading) return;
+    imageFileRef.current?.click();
+  }, [tripId, onSaveField, imageUploading]);
+
+  const handleRemoveImage = useCallback(() => {
+    if (!onSaveField) return;
+    saveField({ image: '', images: [] });
+    setRagImage(null);
+  }, [onSaveField, saveField]);
 
   const handleSingleStationSelect = (station) => {
     const from = singleStationPicker.mode === 'from' ? station : (item?.moveFrom || '');
@@ -761,36 +832,189 @@ export default function DetailDialog({
           );
         })()}
 
-        {/* 이미지 — 웹에서 전체화면 차지 방지: maxHeight + flexShrink:0 */}
-        {displayImages.length === 1 && (
-          <div
-            onClick={() => setViewImage(displayImages[0])}
-            style={{
-              flexShrink: 0,
-              width: '100%',
-              maxHeight: '40vh',
-              aspectRatio: '16/7',
-              overflow: 'hidden',
-              cursor: 'zoom-in',
-              background: COLOR.surfaceLowest,
-            }}
-          >
-            <img src={displayImages[0]} alt={effectiveDetail.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+        {/* 이미지 — 있으면 표시, 없으면 플레이스홀더 (수정 가능 시 이미지 위에 수정/삭제 아이콘 버튼) */}
+        {displayImages.length >= 1 && (
+          <div style={{ flexShrink: 0, paddingTop: SPACING.lg, position: 'relative' }}>
+            <input
+              ref={imageFileRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleAddImage(file);
+                e.target.value = '';
+              }}
+            />
+            {displayImages.length === 1 && (
+              <div
+                onClick={(e) => { if (!imageUploading && !e.target.closest('button')) setViewImage(displayImages[0]); }}
+                style={{
+                  position: 'relative',
+                  flexShrink: 0,
+                  width: '100%',
+                  maxHeight: '40vh',
+                  aspectRatio: '16/7',
+                  overflow: 'hidden',
+                  cursor: imageUploading ? 'default' : 'zoom-in',
+                  background: COLOR.surfaceLowest,
+                }}
+              >
+                {canEditInline && tripId && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: SPACING.sm,
+                      right: SPACING.sm,
+                      zIndex: 2,
+                      display: 'flex',
+                      gap: SPACING.md,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      iconOnly="edit"
+                      onClick={handleReplaceImage}
+                      disabled={imageUploading}
+                      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', width: 36, height: 36, border: 'none' }}
+                    />
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      iconOnly="trash"
+                      onClick={handleRemoveImage}
+                      disabled={imageUploading}
+                      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', width: 36, height: 36, border: 'none' }}
+                    />
+                  </div>
+                )}
+                <img src={displayImages[0]} alt={effectiveDetail.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+                {imageUploading && (
+                  <>
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(0,0,0,0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <div style={{
+                        width: 28, height: 28,
+                        border: '3px solid rgba(255,255,255,0.4)',
+                        borderTopColor: 'white',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                      }} />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {displayImages.length > 1 && (
+              <div style={{ flexShrink: 0, overflowX: 'auto', overflowY: 'hidden', display: 'flex', gap: SPACING.ms, padding: `0 ${px}`, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', position: 'relative' }}>
+                {canEditInline && tripId && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: SPACING.sm,
+                      right: SPACING.sm,
+                      zIndex: 2,
+                      display: 'flex',
+                      gap: SPACING.md,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      iconOnly="edit"
+                      onClick={handleReplaceImage}
+                      disabled={imageUploading}
+                      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', width: 36, height: 36, border: 'none' }}
+                    />
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      iconOnly="trash"
+                      onClick={handleRemoveImage}
+                      disabled={imageUploading}
+                      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', width: 36, height: 36, border: 'none' }}
+                    />
+                  </div>
+                )}
+                {displayImages.map((img, i) => (
+                  <div key={i} onClick={() => setViewImage(img)} style={{ flexShrink: 0, width: '75%', maxHeight: '40vh', aspectRatio: '16/9', scrollSnapAlign: 'start', borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest }}>
+                    <img src={img} alt={`${effectiveDetail.name} ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  </div>
+                ))}
+                {imageUploading && (
+                  <>
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(0,0,0,0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <div style={{
+                        width: 28, height: 28,
+                        border: '3px solid rgba(255,255,255,0.4)',
+                        borderTopColor: 'white',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                      }} />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
-        {displayImages.length > 1 && (
-          <div style={{ flexShrink: 0, overflowX: 'auto', overflowY: 'hidden', display: 'flex', gap: SPACING.ms, padding: `${SPACING.lg} ${px}`, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
-            {displayImages.map((img, i) => (
-              <div key={i} onClick={() => setViewImage(img)} style={{ flexShrink: 0, width: '75%', maxHeight: '40vh', aspectRatio: '16/9', scrollSnapAlign: 'start', borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest }}>
-                <img src={img} alt={`${effectiveDetail.name} ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        {displayImages.length === 0 && (
+          <div style={{ flexShrink: 0, padding: `${SPACING.xl} ${px} 0` }}>
+            {canEditInline && tripId ? (
+              <ImagePicker
+                value=""
+                onChange={handleAddImage}
+                onRemove={undefined}
+                placeholder="이미지 추가"
+                aspect="cover"
+                uploading={imageUploading}
+                disabled={!!overlayDetail}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  aspectRatio: '16/7',
+                  borderRadius: RADIUS.md,
+                  border: `2px dashed var(--color-outline-variant)`,
+                  background: 'var(--color-surface-container-lowest)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: SPACING.sm,
+                }}
+              >
+                <Icon name="file" size={32} style={{ opacity: 0.3 }} />
+                <span style={{ fontSize: 'var(--typo-caption-2-size)', color: 'var(--color-on-surface-variant2)' }}>
+                  이미지 없음
+                </span>
               </div>
-            ))}
+            )}
           </div>
         )}
 
         {/* 칩 네비게이션 — 2개 이상일 때만 */}
         {!overlayDetail && chipItems.length > 1 && (
-          <div style={{ padding: `${SPACING.md} ${px}`, borderBottom: '1px solid var(--color-outline-variant)', overflowX: 'auto' }}>
+          <div style={{ padding: `${SPACING.xl} ${px} ${SPACING.md}`, borderBottom: '1px solid var(--color-outline-variant)', overflowX: 'auto' }}>
             <ChipSelector
               items={chipItems}
               value={activeChip}
@@ -1051,7 +1275,25 @@ export default function DetailDialog({
 
       {/* 주소 수정 — 장소 검색: 간단 맵 + 선택 시 핀, 검색결과 인라인, 확인 버튼으로 저장 */}
       {showAddressSearchDialog && (
-        <CenterPopup title="장소 검색" onClose={() => setShowAddressSearchDialog(false)} maxWidth={400}>
+        <CenterPopup
+          title="장소 검색"
+          onClose={() => {
+            const changed =
+              (addressSearchPending.address || '') !== (effectiveDetail.address || '') ||
+              addressSearchPending.lat !== effectiveDetail.lat ||
+              addressSearchPending.lon !== effectiveDetail.lon;
+            if (changed && addressSearchPending.address) {
+              saveField({
+                address: addressSearchPending.address || '',
+                lat: addressSearchPending.lat,
+                lon: addressSearchPending.lon,
+                placeId: addressSearchPending.placeId,
+              });
+            }
+            setShowAddressSearchDialog(false);
+          }}
+          maxWidth={400}
+        >
           {/* 선택한 주소에 좌표가 있으면 간단 맵 + 핀 노출 */}
           {addressSearchPending.lat != null && addressSearchPending.lon != null && (
             <div style={{
@@ -1083,8 +1325,8 @@ export default function DetailDialog({
           )}
           <AddressSearch
             value={addressSearchPending.address}
-            onChange={(address, lat, lon) => {
-              setAddressSearchPending({ address: address || '', lat: lat ?? undefined, lon: lon ?? undefined });
+            onChange={(address, lat, lon, _photoUrl, placeId) => {
+              setAddressSearchPending({ address: address || '', lat: lat ?? undefined, lon: lon ?? undefined, placeId: placeId ?? undefined });
             }}
             placeholder="장소명, 주소를 검색하세요"
             size="lg"
@@ -1095,7 +1337,12 @@ export default function DetailDialog({
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: SPACING.md, marginTop: SPACING.lg }}>
             <Button variant="ghost-neutral" size="sm" onClick={() => setShowAddressSearchDialog(false)}>취소</Button>
             <Button variant="primary" size="sm" onClick={() => {
-              saveField({ address: addressSearchPending.address || '', lat: addressSearchPending.lat, lon: addressSearchPending.lon });
+              saveField({
+                address: addressSearchPending.address || '',
+                lat: addressSearchPending.lat,
+                lon: addressSearchPending.lon,
+                placeId: addressSearchPending.placeId,
+              });
               setShowAddressSearchDialog(false);
             }}>확인</Button>
           </div>

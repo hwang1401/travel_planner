@@ -10,7 +10,7 @@ import { SPACING } from '../../styles/tokens';
  *
  * Props:
  *   value        — current selected address string
- *   onChange      — (address: string, lat?: number, lon?: number) => void
+ *   onChange      — (address: string, lat?: number, lon?: number, placeId?: string) => void
  *   placeholder   — placeholder text
  *   label         — field label
  *   required      — show required indicator
@@ -108,10 +108,10 @@ export default function AddressSearch({
       const details = await getPlaceDetails(result.placeId);
       if (details) {
         const addr = details.formatted_address || details.name;
-        if (onChange) onChange(addr, details.lat, details.lon, details.photoUrl);
+        if (onChange) onChange(addr, details.lat, details.lon, details.photoUrl, details.placeId);
         setQuery('');
       } else {
-        if (onChange) onChange(result.name, null, null);
+        if (onChange) onChange(result.name, null, null, undefined, result.placeId);
         setQuery('');
       }
     } catch {

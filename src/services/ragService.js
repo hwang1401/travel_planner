@@ -66,7 +66,7 @@ const DESTINATION_TO_REGION = {
   가마쿠라: 'kamakura', kamakura: 'kamakura',
   닛코: 'nikko', nikko: 'nikko',
   // Tier 4 (큐슈·시코쿠·중부)
-  구마모토: 'kumamoto', 구마모토시: 'kumamoto', kumamoto: 'kumamoto',
+  구마모토: 'kumamoto', 구마모토시: 'kumamoto', 구마모토역: 'kumamoto', kumamoto: 'kumamoto',
   나가사키: 'nagasaki', 나가사키시: 'nagasaki', nagasaki: 'nagasaki',
   가고시마: 'kagoshima', 가고시마시: 'kagoshima', kagoshima: 'kagoshima',
   마츠야마: 'matsuyama', matsuyama: 'matsuyama',
@@ -368,6 +368,45 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
   } catch (err) {
     console.warn('[RAG] getRAGContext error:', err);
     return result;
+  }
+}
+
+/**
+ * 장소명 또는 주소로 RAG 장소 조회 (이미지 자동 로드용).
+ * @param {{ name?: string, address?: string }} params
+ * @returns {Promise<{ image_url: string, name_ko: string, ... } | null>}
+ */
+export async function getPlaceByNameOrAddress({ name, address }) {
+  const n = (name || '').trim();
+  const a = (address || '').trim();
+  if (!n && !a) return null;
+  try {
+    const cols = 'id, name_ko, address, image_url, region, type';
+    const confidenceOr = 'confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null';
+    let rows = [];
+    if (n) {
+      const { data, error } = await supabase
+        .from('rag_places')
+        .select(cols)
+        .or(confidenceOr)
+        .ilike('name_ko', `%${n}%`)
+        .limit(5);
+      if (!error && data?.length) rows = data;
+    }
+    if (rows.length === 0 && a) {
+      const { data, error } = await supabase
+        .from('rag_places')
+        .select(cols)
+        .or(confidenceOr)
+        .ilike('address', `%${a}%`)
+        .limit(5);
+      if (!error && data?.length) rows = data;
+    }
+    const withImage = rows.find((p) => p.image_url);
+    return withImage || null;
+  } catch (err) {
+    console.warn('[RAG] getPlaceByNameOrAddress error:', err);
+    return null;
   }
 }
 

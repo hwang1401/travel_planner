@@ -4,7 +4,7 @@
  */
 
 import { getRAGContext, extractTagsFromPreferences } from './ragService.js';
-import { matchTimetableRoute, findBestTrain } from '../data/timetable.js';
+import { matchTimetableRoute, findBestTrain, findRoutesByStations } from '../data/timetable.js';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const API_URL = API_KEY
@@ -370,10 +370,10 @@ rag_id: [참고 장소] 목록이 있으면 목록에 있는 장소를 우선 �
 1. 시간: 장소당 최소 체류(식사 1시간, 관광·쇼핑 1~2시간)와 이동 시간을 고려해 현실적인 간격을 두세요. 하루에 food+spot+shop 합쳐 최대 6~7개를 넘기지 마세요.
 2. 동선: [현재 일정]이나 [이번 여행 전체 일정 요약]이 있으면 이미 있는 장소 근처·같은 권역으로 이어지게 배치하세요. 왔다갔다 하지 마세요.
 3. [참고 장소] 목록에 태그(현지인맛집, 가성비 등)가 있으면 그 태그가 붙은 장소를 우선 활용하세요. 관광객용 뻔한 곳만 쓰지 말고 다양하게 골라주세요.
-4. 사용자가 언급한 장소/음식을 반드시 포함하세요. 식사·관광·쇼핑·숙소는 구체적인 장소명을 desc에 넣으세요.
+4. 사용자가 언급한 장소/음식을 반드시 포함하세요. "구마모토역 점심", "바사시 먹을거야"처럼 말하면 [참고 장소]에서 조건에 맞는 실제 장소를 골라 desc에 그 이름을 넣고 rag_id를 붙이세요. "OO 근처", "시내에서"만 쓰지 말고 반드시 구체적 장소명을 사용하세요.
 5. [참고 장소] 목록이 주어지면 목록에 있는 장소를 우선 사용하되, 부족하면 직접 추천도 가능합니다. 목록에서 고른 item에만 rag_id를 넣고, 직접 추천 시 rag_id는 생략하세요.
 6. sub에 예상 비용이나 소요시간을 넣어주세요.
-7. food, spot, shop, stay 타입은 반드시 detail.address를 포함하세요.
+7. detail.address: 참고 목록에서 고른 장소(rag_id 있음)는 해당 장소의 실제 주소만 넣으세요. rag_id 없이 직접 추천한 경우나, "호텔 조식", "구마모토 시내", "시내", "근처"처럼 지도 검색에 쓸 수 없는 모호한 표현은 절대 넣지 말고 address를 비워두세요. 매칭 가능한 실제 주소가 없으면 address 필드를 생략하세요.
 8. message는 존댓말(해요체)로, 친구에게 말하듯 편하게 쓰세요. 이모지는 사용하지 마세요.
 9. detail.highlights에는 해당 장소의 핵심 포인트를 2~4개 작성하세요. food, spot, shop 타입은 반드시 포함.
 10. food, spot, shop, stay 타입은 가능한 한 detail.lat, detail.lon을 포함하세요. 참고 목록에 좌표가 있으면 사용하세요.
@@ -390,6 +390,7 @@ rag_id: [참고 장소] 목록이 있으면 목록에 있는 장소를 우선 �
 
 참고 장소 사용 (내부: 사용자 메시지에 붙는 장소 목록. 사용자에게 "참고 장소"라고 말하지 말 것):
 - [참고 장소] 목록이 있으면 목록에 있는 장소를 우선 사용하되, 부족하면 직접 추천도 가능합니다. 목록에서 고른 item에는 해당 장소의 rag_id를 넣고, 직접 추천한 item은 rag_id를 생략하세요. 가상의 장소명은 만들지 마세요.
+- **반드시 구체적 매칭 (필수)**: 사용자가 "구마모토역에서 점심", "하카타 저녁", "바사시 먹을거야", "라멘 추천해"처럼 장소·지역·메뉴를 구체적으로 말하면, [참고 장소] 목록에서 **반드시** 조건에 맞는 실제 장소를 골라 desc에 그 장소명을 넣고 rag_id를 붙이세요. "구마모토역 근처에서", "시내에서 어디"처럼 모호하게만 쓰지 마세요. 목록의 name_ko, description, region, tags를 보고 매칭 가능한 장소가 있으면 꼭 사용하세요.
 - 사용자가 특정 지역을 말하면 (예: "유후인에서 구경할거리 찾아줘") [참고 장소]에서 해당 지역(region)이 붙은 장소([yufuin] 등)를 골라 사용하세요. 목록에 그 지역 장소가 있으면 "OO엔 추천 목록이 없어요"라고 말하지 마세요.
 - **지역/도시가 목록에 없을 때 (필수)**: 사용자가 "도쿄 가고싶어", "오사카 일정 추가해줘"처럼 특정 지역을 요청했는데 [참고 장소]에 그 지역이 하나도 없으면: (1) "OO에는 아직 추천 목록에 등록된 장소가 없어요. 제가 아는 곳으로 일정에 넣어드릴게요."처럼 짧게만 말하고, (2) **반드시** 해당 지역의 일정을 rag_id 없이 items에 채우세요. (3) **다른 지역(후쿠오카, 구마모토 등)을 대신 추천하지 마세요.** "정보가 없어요"만 하거나 "다른 지역은 어떠세요?"라고 하지 마세요.
 - 사용자가 "하카타에서 뭐 추천해줘"처럼만 말해도, [참고 장소] 목록이 주어졌으면 그 목록 안의 장소를 우선 사용하세요. 목록에 없는 메뉴/장소 타입(예: 돈까스)은 직접 추천(rag_id 생략)으로 채울 수 있습니다.
@@ -424,7 +425,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
     try {
       const rag = await getRAGContext({
         destinations: destArr,
-        preferences: "",
+        preferences: userMessage || "", // 사용자가 "현지인맛집", "가성비" 등 말하면 태그 필터 적용
         duration: 1,
         hintText: userMessage,
         expandToArea: true, // 채팅에서는 해당 권역 전체 RAG 열어두기 (벳푸·유후인·가고시마 등 포함)
@@ -631,6 +632,8 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
           item.detail.lat = match.lat;
           item.detail.lon = match.lon;
         }
+      } else {
+        clearVagueAddress(item);
       }
       delete item._ragId;
     }
@@ -712,7 +715,34 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 12. detail.highlights에는 해당 장소/일정의 핵심 포인트를 2~4개 작성하세요 (추천 메뉴, 주의사항, 꿀팁 등). food, spot, shop 타입은 반드시 highlights를 포함하세요.
 13. 모든 타입에 가능한 한 detail.lat, detail.lon (위도, 경도)을 포함하세요. 참고 목록에 좌표가 있으면 그대로 사용하세요.
 14. 참고 데이터/참고 장소가 제공되면, 목록에 있는 장소를 우선 사용하되, 부족하면 직접 추천도 가능합니다. 목록에서 고른 장소는 rag_id를 넣고, 직접 추천한 장소는 rag_id를 생략하세요. "말고기 전문점", "OO 맛집"처럼 가상의 장소명은 만들지 마세요.
-15. 참고 장소에 [rag_id:숫자] 형태가 있으면, 그 목록에서 고를 때만 rag_id 필드에 그 숫자(문자열)를 넣어주세요. 직접 추천 시에는 rag_id를 생략하세요.`;
+15. 참고 장소에 [rag_id:숫자] 형태가 있으면, 그 목록에서 고를 때만 rag_id 필드에 그 숫자(문자열)를 넣어주세요. 직접 추천 시에는 rag_id를 생략하세요.
+16. 사용자 요청에 "구마모토역 점심", "바사시 먹을거야", "하카타 저녁"처럼 구체적 장소·지역·메뉴가 있으면, 참고 목록에서 조건에 맞는 **실제 장소**를 골라 desc에 그 이름을 넣고 rag_id를 붙이세요. "OO 근처", "시내에서"처럼 모호하게만 쓰지 말고 반드시 구체적 장소명을 사용하세요.
+17. detail.address: 참고 목록에서 고른 장소(rag_id 있음)만 해당 장소의 실제 주소를 넣으세요. rag_id 없거나 "호텔 조식", "구마모토 시내", "시내", "근처" 같은 지도 검색 불가 표현은 address에 넣지 말고 비워두세요.`;
+
+/**
+ * 모호한 주소(자연어)인지 판별. "호텔 조식", "구마모토 시내", "시내", "근처" 등 지도 검색 불가 표현 → true.
+ */
+function isVagueAddress(str) {
+  if (!str || typeof str !== 'string') return true;
+  const s = str.trim();
+  if (s.length < 3) return true;
+  const vaguePatterns = [
+    /^(호텔\s*)?조식$/i, /^브런치$/i, /^시내$/i, /^근처$/i, /시내$/i, /근처$/i,
+    /^[가-힣]+ 시내$/i, /^[가-힣]+ 도심$/i, /^시가지$/i, /^도심$/i,
+    /^숙소$/i, /^호텔$/i, /시내에서$/i, /근처에서$/i,
+  ];
+  return vaguePatterns.some((p) => p.test(s));
+}
+
+/**
+ * item.detail.address가 모호하면 제거 (RAG 매칭 시에만 실제 주소 사용).
+ */
+function clearVagueAddress(item) {
+  if (!item?.detail?.address) return;
+  if (isVagueAddress(item.detail.address)) {
+    delete item.detail.address;
+  }
+}
 
 /**
  * Match an item against RAG places.
@@ -759,18 +789,17 @@ function injectRAGData(days, ragPlaces) {
           }
           if (match.image_url) item.detail.image = match.image_url;
           if (match.google_place_id) item.detail.placeId = match.google_place_id;
-          // Override address: prepend place name for readability
           if (match.address) {
             const namePrefix = match.name_ko && !match.address.includes(match.name_ko) ? `${match.name_ko}, ` : '';
             item.detail.address = namePrefix + match.address;
           }
-          // Override coordinates with verified ones
           if (match.lat != null && match.lon != null) {
             item.detail.lat = match.lat;
             item.detail.lon = match.lon;
           }
+        } else {
+          clearVagueAddress(item);
         }
-        // Clean up internal field
         delete item._ragId;
       }
     }

@@ -179,7 +179,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
       {/* 헤더 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: SPACING.md,
-        padding: `${SPACING.md} ${SPACING.md} ${SPACING.md} ${SPACING.sm}`,
+        padding: `calc(env(safe-area-inset-top, 0px) + ${SPACING.md}) ${SPACING.md} ${SPACING.md} ${SPACING.sm}`,
         borderBottom: '1px solid var(--color-outline-variant)',
         flexShrink: 0,
       }}>

@@ -245,6 +245,7 @@ export default function TravelPlanner() {
   /* ── Debounced save ref ── */
   const debouncedSaveRef = useRef(null);
   const lastSaveTimestampRef = useRef(0);
+  const lastSavedVersionRef = useRef(0);
   /* 일괄 삭제 확인 시 사용할 payload (클로저/배치로 인한 selectedBulkKeys 손실 방지) */
   const bulkDeletePayloadRef = useRef(null);
   /* 일괄 삭제 직후 즉시 저장할 데이터 (디바운서/리얼타임 덮어쓰기 방지) */
@@ -297,6 +298,7 @@ export default function TravelPlanner() {
           if (!hasLegacySections) schedData._standalone = true;
         }
         setCustomData(sanitizeScheduleData(ensureItemIds(schedData)));
+        lastSavedVersionRef.current = schedule.version ?? 0;
         setTripLoading(false);
         setScheduleLoading(false);
       } catch (err) {
@@ -343,19 +345,22 @@ export default function TravelPlanner() {
     if (isLegacy || !tripId) return;
 
     const unsubscribe = subscribeToSchedule(tripId, (payload) => {
-      // Skip if this was our own recent save (within 2s)
-      if (Date.now() - lastSaveTimestampRef.current < 2000) return;
-      // Only update if someone else changed it
-      if (payload.updatedBy !== user?.id) {
-        const rtData = payload.data || {};
-        if (!rtData._standalone) {
-          const hasLegacySections = Object.keys(rtData).some(
-            (k) => !k.startsWith("_") && !isNaN(Number(k)) && rtData[k]?.sections
-          );
-          if (!hasLegacySections) rtData._standalone = true;
-        }
-        setCustomData(sanitizeScheduleData(ensureItemIds(rtData)));
+      // 절대 본인 저장분을 realtime으로 덮어쓰지 않음 (순서 지연 시 이전 데이터로 롤백 방지)
+      if (payload.updatedBy === user?.id) return;
+      // 최근 저장 직후 5초간 realtime 무시 (동시성·이벤트 순서 이슈 방어)
+      if (Date.now() - lastSaveTimestampRef.current < 5000) return;
+      // 본인 저장보다 오래된 버전의 Realtime 무시 (지연 도착한 예전 이벤트가 저장을 덮어쓰는 것 방지)
+      const rtVersion = payload.version ?? 0;
+      if (rtVersion > 0 && rtVersion <= lastSavedVersionRef.current) return;
+
+      const rtData = payload.data || {};
+      if (!rtData._standalone) {
+        const hasLegacySections = Object.keys(rtData).some(
+          (k) => !k.startsWith("_") && !isNaN(Number(k)) && rtData[k]?.sections
+        );
+        if (!hasLegacySections) rtData._standalone = true;
       }
+      setCustomData(sanitizeScheduleData(ensureItemIds(rtData)));
     });
 
     return unsubscribe;
@@ -499,7 +504,8 @@ export default function TravelPlanner() {
   /* ── Detail payloads for current day (for modal prev/next) ── */
   const allDetailPayloads = useMemo(() => {
     return currentDayItems.map(({ item, si, ii, section }) => {
-      const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
+      // section._isExtra인 경우만 -1, item._extra인 경우는 실제 si 유지 (AI 생성 아이템은 sections에 있음)
+      const effectiveSi = (section._isExtra && !item._extra) ? -1 : si;
       const resolvedLoc = getItemCoords(item, selectedDay);
       const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
       const enrichedItem = resolvedAddress && !item.detail?.address
@@ -848,144 +854,103 @@ export default function TravelPlanner() {
       }
     }
 
-    updateCustomData((prev) => {
-      const next = { ...prev };
-      if (sectionIdx === -1) {
-        if (!next[dayIdx]) next[dayIdx] = {};
-        if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
-        if (itemIdx !== undefined && itemIdx !== null) {
-          // Editing existing extra item — find by old item reference or by newItem._id
-          const oldItem = editTarget?.item ?? newItem;
-          if (oldItem) {
-            const idx = findItemIndex(next[dayIdx].extraItems, oldItem);
-            if (idx >= 0) {
-              next[dayIdx].extraItems = [...next[dayIdx].extraItems];
-              next[dayIdx].extraItems[idx] = newItem;
-            }
-          }
-        } else {
-          next[dayIdx].extraItems.push(newItem);
-        }
-      } else {
-        if (!next[dayIdx]) next[dayIdx] = {};
-        if (!next[dayIdx].sections) next[dayIdx].sections = {};
-        if (!next[dayIdx].sections[sectionIdx]) {
-          // Get current items: from BASE_DAYS for legacy, from _extraDays for standalone
-          const sourceSec = baseLen > 0
-            ? BASE_DAYS[dayIdx]?.sections?.[sectionIdx]
-            : next._extraDays?.[dayIdx - baseLen]?.sections?.[sectionIdx];
-          next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec?.items || [])] };
-        }
-        if (itemIdx !== undefined && itemIdx !== null) {
-          // 불변 업데이트: day·section·items 복사 후 identity 매칭으로 교체
-          next[dayIdx] = { ...next[dayIdx] };
-          next[dayIdx].sections = { ...next[dayIdx].sections };
-          const sec = next[dayIdx].sections[sectionIdx];
-          const newItems = [...(sec.items || [])];
-          const oldItem = editTarget?.item ?? newItem;
-          if (oldItem) {
-            const matchIdx = findItemIndex(newItems, oldItem);
-            if (matchIdx >= 0) newItems[matchIdx] = newItem;
-            else if (itemIdx < newItems.length) newItems[itemIdx] = newItem;
-          } else if (itemIdx < newItems.length) {
-            newItems[itemIdx] = newItem;
-          }
-          next[dayIdx].sections[sectionIdx] = { ...sec, items: newItems };
+    let nextSnapshot = null;
 
-          // standalone: _extraDays에도 직접 반영 (identity 매칭)
-          if (baseLen === 0 && next._extraDays?.[dayIdx]) {
-            const ed = next._extraDays[dayIdx];
-            const edSections = ed.sections || [];
-            const edSec = edSections[sectionIdx];
-            if (edSec && Array.isArray(edSec.items)) {
-              const edNewItems = [...edSec.items];
-              const edMatchIdx = oldItem ? findItemIndex(edNewItems, oldItem) : -1;
-              if (edMatchIdx >= 0) {
-                edNewItems[edMatchIdx] = newItem;
-              } else if (itemIdx < edNewItems.length) {
-                edNewItems[itemIdx] = newItem;
-              }
-              const nextExtra = [...next._extraDays];
-              nextExtra[dayIdx] = {
-                ...ed,
-                sections: edSections.map((s, i) => i === sectionIdx ? { ...s, items: edNewItems } : s),
-              };
-              next._extraDays = nextExtra;
-            }
-          }
-        }
-      }
-      return { ...next };
-    });
-    setEditTarget(null);
-    // 수정 저장 직후 머지된 데이터를 즉시 서버에 저장 (시간표·detail 누락 방지).
-    // 기존 일정(baseLen > 0)에서도 시간표가 유지되도록, 저장 시 소스는 DAYS(화면에 보이는 머지 결과) 기준으로 사용.
-    const prev = customData;
-    const mergedDayForSave = DAYS.find((_, i) => toOrigIdx(i) === dayIdx);
-    const nextForSave = (() => {
-      const next = { ...prev };
-      if (sectionIdx === -1) {
-        if (!next[dayIdx]) next[dayIdx] = {};
-        if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
-        if (itemIdx !== undefined && itemIdx !== null) {
-          const oldItem = editTarget?.item ?? newItem;
-          if (oldItem) {
-            const idx = findItemIndex(next[dayIdx].extraItems, oldItem);
-            if (idx >= 0) {
-              next[dayIdx].extraItems = [...next[dayIdx].extraItems];
-              next[dayIdx].extraItems[idx] = newItem;
-            }
-          }
-        } else {
-          next[dayIdx].extraItems.push(newItem);
-        }
-      } else {
-        if (!next[dayIdx]) next[dayIdx] = {};
-        if (!next[dayIdx].sections) next[dayIdx].sections = {};
-        const displayedItems = mergedDayForSave?.sections?.[sectionIdx]?.items ?? [];
-        const baseItems = Array.isArray(displayedItems) ? displayedItems.filter((it) => it && !it._extra) : [];
-        if (itemIdx !== undefined && itemIdx !== null) {
-          const newItems = [...baseItems];
-          const oldItemSave = editTarget?.item ?? newItem;
-          if (oldItemSave) {
-            const matchIdx = findItemIndex(newItems, oldItemSave);
-            if (matchIdx >= 0) newItems[matchIdx] = newItem;
-            else if (itemIdx < newItems.length) newItems[itemIdx] = newItem;
-          } else if (itemIdx < newItems.length) {
-            newItems[itemIdx] = newItem;
-          }
-          next[dayIdx].sections[sectionIdx] = { items: newItems };
-        } else {
-          next[dayIdx].sections[sectionIdx] = { items: baseItems };
-        }
-        if (baseLen === 0 && next._extraDays?.[dayIdx]) {
-          const ed = next._extraDays[dayIdx];
-          const edSections = ed.sections || [];
-          const edSec = edSections[sectionIdx];
-          const edItems = Array.isArray(edSec?.items) ? [...edSec.items] : [];
+    updateCustomData((prev) => {
+      const computeNext = (p) => {
+        const next = { ...p };
+        if (sectionIdx === -1) {
+          if (!next[dayIdx]) next[dayIdx] = {};
+          if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
           if (itemIdx !== undefined && itemIdx !== null) {
-            const oldItemEd = editTarget?.item ?? newItem;
-            const edMatchIdx = oldItemEd ? findItemIndex(edItems, oldItemEd) : -1;
-            if (edMatchIdx >= 0) {
-              edItems[edMatchIdx] = newItem;
-            } else if (itemIdx < edItems.length) {
-              edItems[itemIdx] = newItem;
+            const oldItem = editTarget?.item ?? newItem;
+            if (oldItem) {
+              const idx = findItemIndex(next[dayIdx].extraItems, oldItem);
+              if (idx >= 0) {
+                next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+                next[dayIdx].extraItems[idx] = newItem;
+              } else if (Array.isArray(next[dayIdx].extraItems) && itemIdx < next[dayIdx].extraItems.length) {
+                next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+                next[dayIdx].extraItems[itemIdx] = newItem;
+              }
             }
-            const nextExtra = [...(next._extraDays || [])];
-            nextExtra[dayIdx] = { ...ed, sections: edSections.map((s, i) => (i === sectionIdx ? { ...s, items: edItems } : s)) };
-            next._extraDays = nextExtra;
+          } else {
+            next[dayIdx].extraItems.push(newItem);
+          }
+        } else {
+          if (!next[dayIdx]) next[dayIdx] = {};
+          if (!next[dayIdx].sections) next[dayIdx].sections = {};
+          if (!next[dayIdx].sections[sectionIdx]) {
+            const sourceSec = baseLen > 0
+              ? BASE_DAYS[dayIdx]?.sections?.[sectionIdx]
+              : next._extraDays?.[dayIdx - baseLen]?.sections?.[sectionIdx];
+            next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec?.items || [])] };
+          }
+          if (itemIdx !== undefined && itemIdx !== null) {
+            next[dayIdx] = { ...next[dayIdx] };
+            next[dayIdx].sections = { ...next[dayIdx].sections };
+            const sec = next[dayIdx].sections[sectionIdx];
+            const newItems = [...(sec.items || [])];
+            const oldItem = editTarget?.item ?? newItem;
+            if (oldItem) {
+              const matchIdx = findItemIndex(newItems, oldItem);
+              if (matchIdx >= 0) {
+                newItems[matchIdx] = newItem;
+              } else if (itemIdx < newItems.length) {
+                newItems[itemIdx] = newItem;
+              } else {
+                newItems.push(newItem);
+              }
+            } else if (itemIdx < newItems.length) {
+              newItems[itemIdx] = newItem;
+            }
+            next[dayIdx].sections[sectionIdx] = { ...sec, items: newItems };
+
+            if (baseLen === 0 && next._extraDays?.[dayIdx]) {
+              const ed = next._extraDays[dayIdx];
+              const edSections = ed.sections || [];
+              const edSec = edSections[sectionIdx];
+              if (edSec && Array.isArray(edSec.items)) {
+                const edNewItems = [...edSec.items];
+                const edMatchIdx = oldItem ? findItemIndex(edNewItems, oldItem) : -1;
+                if (edMatchIdx >= 0) {
+                  edNewItems[edMatchIdx] = newItem;
+                } else if (itemIdx < edNewItems.length) {
+                  edNewItems[itemIdx] = newItem;
+                }
+                const nextExtra = [...next._extraDays];
+                nextExtra[dayIdx] = {
+                  ...ed,
+                  sections: edSections.map((s, i) => i === sectionIdx ? { ...s, items: edNewItems } : s),
+                };
+                next._extraDays = nextExtra;
+              }
+            }
           }
         }
-      }
-      return next;
-    })();
-    if (tripId && !isLegacy && debouncedSaveRef.current) {
+        return { ...next };
+      };
+
+      const result = computeNext(prev);
+      nextSnapshot = result;
+      return result;
+    });
+
+    setEditTarget(null);
+    if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
-      debouncedSaveRef.current.cancel?.();
-      saveSchedule(tripId, nextForSave).catch((err) => {
-        console.error('[TravelPlanner] Immediate save after edit failed:', err);
-        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
-      });
+      debouncedSaveRef.current?.cancel?.();
+      saveSchedule(tripId, nextSnapshot)
+        .then((version) => {
+          if (version > 0) lastSavedVersionRef.current = version;
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('[TravelPlanner] Schedule saved', { dayIdx, sectionIdx, itemIdx });
+          }
+        })
+        .catch((err) => {
+          console.error('[TravelPlanner] Immediate save after edit failed:', err);
+          setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+        });
     } else if (isLegacy) {
       debouncedSaveRef.current?.flush?.();
     }
@@ -1008,7 +973,7 @@ export default function TravelPlanner() {
         setAddDestinationSheet({ regionNames: newRegionNames, regionCodes: newRegionCodes });
       }
     }
-  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget, baseLen, customData, tripId, isLegacy, tripMeta]);
+  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, editTarget, baseLen, tripId, isLegacy, tripMeta]);
 
   /* 삭제 실행 로직 (확인 다이얼로그 바깥에서 재사용) */
   const performDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
@@ -1253,7 +1218,8 @@ export default function TravelPlanner() {
       confirmLabel: "삭제",
       onConfirm: () => {
         for (const { item, si, ii, section } of items) {
-          const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
+          // section._isExtra인 경우만 -1, item._extra인 경우는 실제 si 유지
+          const effectiveSi = (section._isExtra && !item._extra) ? -1 : si;
           performDeleteItem(toOrigIdx(selectedDay), effectiveSi, ii, item);
         }
         setLongPressSelection(new Set());
@@ -1269,7 +1235,8 @@ export default function TravelPlanner() {
       return longPressSelection.has(key);
     });
     for (const { item, si, ii, section } of items) {
-      const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
+      // section._isExtra인 경우만 -1, item._extra인 경우는 실제 si 유지
+      const effectiveSi = (section._isExtra && !item._extra) ? -1 : si;
       handleMoveToDay({
         _item: item,
         _si: effectiveSi,
@@ -1889,7 +1856,8 @@ export default function TravelPlanner() {
               )}
               {allItems.map((entry, flatIdx) => {
                 const { item, si, ii, section } = entry;
-                const effectiveSi = (section._isExtra || item._extra) ? -1 : si;
+                // section._isExtra인 경우만 -1, item._extra인 경우는 실제 si 유지
+                const effectiveSi = (section._isExtra && !item._extra) ? -1 : si;
                 const resolvedLoc = getItemCoords(item, selectedDay);
                 const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
                 const enrichedItem = resolvedAddress && !item.detail?.address
@@ -2019,6 +1987,7 @@ export default function TravelPlanner() {
         detail={activeDetail}
         onClose={() => setActiveDetail(null)}
         dayColor="var(--color-primary)"
+        tripId={isLegacy ? null : tripId}
         onDelete={canEdit && activeDetail?._item?._custom ? handleDeleteFromDetail : undefined}
         onMoveToDay={canEdit && activeDetail?._item?._custom ? handleMoveToDay : undefined}
         onSaveField={canEdit ? handleSaveFieldFromDetail : undefined}
