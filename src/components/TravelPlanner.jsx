@@ -67,6 +67,16 @@ function findItemIndex(items, target) {
   );
 }
 
+/** 일정 항목 비교용 정규화 (키 순서 통일). 변경 여부 판단에 사용 */
+function normalizeForCompare(item) {
+  if (!item || typeof item !== "object") return item;
+  const detail = item.detail || {};
+  const detailKeys = Object.keys(detail).sort();
+  const normalizedDetail = {};
+  for (const k of detailKeys) normalizedDetail[k] = detail[k];
+  return { ...item, detail: normalizedDetail };
+}
+
 /**
  * 기존 데이터에 _id가 없는 아이템에 UUID 부여 (로드 시 마이그레이션).
  */
@@ -962,7 +972,9 @@ export default function TravelPlanner() {
     });
     const isEdit = itemIdx !== undefined && itemIdx !== null;
     const editToastMsg = opts.editKind
-      ? { address: '주소가 변경되었습니다', time: '시간이 변경되었습니다', desc: '이름이 변경되었습니다', tip: '메모가 변경되었습니다', price: '가격이 변경되었습니다', hours: '영업시간이 변경되었습니다', highlights: '포인트가 변경되었습니다', image: '이미지가 변경되었습니다', timetable: '시간표가 변경되었습니다', sub: '부가정보가 변경되었습니다', type: '유형이 변경되었습니다', move: '구간이 변경되었습니다' }[opts.editKind]
+      ? (opts.editKind === 'hours' && newItem?.type === 'stay'
+          ? '체크인·체크아웃이 변경되었습니다'
+          : { address: '주소가 변경되었습니다', time: '시간이 변경되었습니다', desc: '이름이 변경되었습니다', tip: '메모가 변경되었습니다', price: '가격이 변경되었습니다', hours: '영업시간이 변경되었습니다', highlights: '포인트가 변경되었습니다', image: '이미지가 변경되었습니다', timetable: '시간표가 변경되었습니다', sub: '부가정보가 변경되었습니다', type: '유형이 변경되었습니다', move: '구간이 변경되었습니다' }[opts.editKind])
       : null;
     setToast({ message: isEdit ? (editToastMsg ?? '일정이 수정되었습니다') : '일정이 추가되었습니다', icon: isEdit ? 'edit' : 'check' });
     // 일정 추가 직후에만: 새 지역이 있으면 "여행지에 추가할까요?" 시트 (직접 추가·AI·붙여넣기 공통)
@@ -1075,11 +1087,33 @@ export default function TravelPlanner() {
     });
   }, [performDeleteItem]);
 
-  /* DetailDialog 인라인 수정: 필드 단위 저장 (displayIdx → origIdx 변환) */
+  /* DetailDialog 인라인 수정: 필드 단위 저장 (displayIdx → origIdx 변환). 변경사항이 있을 때만 저장·토스트 */
   const handleSaveFieldFromDetail = useCallback((displayIdx, sectionIdx, itemIdx, updatedItem, editKind) => {
+    const currentItem = editTarget?.item;
+    const noChange = currentItem && (() => {
+      try {
+        return JSON.stringify(normalizeForCompare(currentItem)) === JSON.stringify(normalizeForCompare(updatedItem));
+      } catch {
+        return false;
+      }
+    })();
+    if (noChange) {
+      setActiveDetail((prev) => {
+        if (!prev) return prev;
+        const newDetail = updatedItem.detail || {};
+        return {
+          ...prev,
+          ...newDetail,
+          name: newDetail.name || updatedItem.desc || prev.name,
+          category: newDetail.category || prev.category,
+          timetable: newDetail.timetable ?? prev.timetable,
+          _item: updatedItem,
+        };
+      });
+      return;
+    }
     const dayIdx = toOrigIdx(displayIdx);
     handleSaveItem(updatedItem, dayIdx, sectionIdx, itemIdx, { skipDuplicateCheck: true, editKind });
-    // activeDetail도 갱신
     setActiveDetail((prev) => {
       if (!prev) return prev;
       const newDetail = updatedItem.detail || {};
@@ -1092,7 +1126,7 @@ export default function TravelPlanner() {
         _item: updatedItem,
       };
     });
-  }, [handleSaveItem, toOrigIdx]);
+  }, [handleSaveItem, toOrigIdx, editTarget?.item]);
 
   /* 정보 다이얼로그에서 삭제 시: 다이얼로그 닫고 확인 후 삭제 */
   const handleDeleteFromDetail = useCallback((d) => {

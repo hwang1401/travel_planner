@@ -110,6 +110,17 @@ function parseTimeSegment(timeStr) {
   return { closed: true };
 }
 
+/** 숙소 체크인/체크아웃 문자열 파싱. "15:00 / 11:00" 또는 "15:00~11:00" → { checkIn, checkOut } */
+function parseStayHours(hoursString) {
+  if (!hoursString || typeof hoursString !== 'string') return { checkIn: '15:00', checkOut: '11:00' };
+  const parts = hoursString.split(/\s*[\/~]\s*/).map((s) => s.trim()).filter(Boolean);
+  const match = (p) => /^\d{1,2}:\d{2}$/.test(p) ? p : null;
+  return {
+    checkIn: parts[0] ? match(parts[0]) || '15:00' : '15:00',
+    checkOut: parts[1] ? match(parts[1]) || '11:00' : '11:00',
+  };
+}
+
 /** 요일별 편집 초기값: parseHoursToDays 결과 + parseTimeSegment */
 function initHoursEditState(hoursString) {
   const parsed = parseHoursToDays(hoursString || '');
@@ -127,19 +138,22 @@ function initHoursEditState(hoursString) {
   }));
 }
 
-/* RAG place → detail shape */
+/* RAG place → detail shape. 대표 한 줄은 포인트(highlights[0])로 상단 노출, 부가정보(sub)는 별도. */
 function ragPlaceToDetail(place) {
   if (!place) return null;
   const cat = TYPE_LABELS[place.type];
   const tags = place.tags;
-  const highlights = Array.isArray(tags) && tags.length > 0 ? tags
-    : typeof tags === "string" && tags.trim() ? [tags.trim()] : [];
+  const oneLine = (Array.isArray(tags) && tags.length > 0 && tags[0])
+    ? String(tags[0]).slice(0, 80)
+    : (typeof place.description === 'string' && place.description.trim())
+      ? place.description.trim().split(/\n/)[0].slice(0, 80).trim()
+      : '';
   return {
     name: place.name_ko, address: place.address, lat: place.lat, lon: place.lon,
     image: place.image_url, placeId: place.google_place_id,
     categories: cat ? [cat] : [], tip: null,
-    highlights: highlights.length > 0 ? highlights : null,
-    _item: { desc: place.name_ko, sub: place.description || "" },
+    highlights: oneLine ? [oneLine] : null,
+    _item: { desc: place.name_ko, sub: place.description || '' },
   };
 }
 
@@ -214,6 +228,8 @@ export default function DetailDialog({
   const [hoursExpanded, setHoursExpanded] = useState(false); // 영업시간 구글 스타일 접기/펼치기
   const [hoursEditRows, setHoursEditRows] = useState([]); // 영업시간 편집 시 요일별 { day, open, close, closed }
   const [hoursTimePicker, setHoursTimePicker] = useState(null); // { day, field: 'open'|'close' } | null
+  const [stayCheckIn, setStayCheckIn] = useState('15:00');
+  const [stayCheckOut, setStayCheckOut] = useState('11:00');
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState(() => new Set());
   const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined, photoUrl: undefined, rating: undefined, reviewCount: undefined, hours: undefined, priceLevel: undefined });
@@ -255,6 +271,7 @@ export default function DetailDialog({
   const item = effectiveDetail._item;
   const itemType = item?.type;
   const isMove = itemType === 'move';
+  const isStay = itemType === 'stay';
   const isCustom = !!item?._custom;
 
   const mainImage = effectiveDetail.image ?? item?.detail?.image;
@@ -287,7 +304,6 @@ export default function DetailDialog({
   const effectiveTimetable = (effectiveDetail.timetable?.trains?.length ? effectiveDetail.timetable : null)
     ?? (item?.detail?.timetable?.trains?.length ? item.detail.timetable : null);
   const hasTimetable = !!effectiveTimetable?.trains?.length;
-  const hasHighlights = effectiveDetail.highlights && effectiveDetail.highlights.length > 0;
   const hasExtraText = !!(item?.desc || item?.sub);
   const hasCoords = effectiveDetail.lat != null && effectiveDetail.lon != null;
   const showNearby = hasCoords && itemType !== "flight" && !isMove;
@@ -515,7 +531,15 @@ export default function DetailDialog({
 
   /* ── 인라인 수정 핸들러 ── */
   const openTextEdit = (field, label, currentValue, multiline = false) => {
-    if (field === 'hours') setHoursEditRows(initHoursEditState(currentValue || ''));
+    if (field === 'hours') {
+      if (isStay) {
+        const { checkIn, checkOut } = parseStayHours(currentValue || '');
+        setStayCheckIn(checkIn);
+        setStayCheckOut(checkOut);
+      } else {
+        setHoursEditRows(initHoursEditState(currentValue || ''));
+      }
+    }
     setEditField({ field, label, value: currentValue || '', multiline });
   };
   const handleTextSave = () => {
@@ -525,10 +549,14 @@ export default function DetailDialog({
       const arr = value.split('\n').map(l => l.trim()).filter(Boolean);
       saveField({ highlights: arr.length > 0 ? arr : [] });
     } else if (field === 'hours') {
-      const parts = hoursEditRows.map((r) =>
-        r.closed ? `${r.day}: 휴무` : `${r.day}: ${r.open}~${r.close}`
-      );
-      saveField({ hours: parts.join('; ') });
+      if (isStay) {
+        saveField({ hours: `${stayCheckIn} / ${stayCheckOut}` });
+      } else {
+        const parts = hoursEditRows.map((r) =>
+          r.closed ? `${r.day}: 휴무` : `${r.day}: ${r.open}~${r.close}`
+        );
+        saveField({ hours: parts.join('; ') });
+      }
       setEditField(null);
       return;
     } else {
@@ -611,33 +639,50 @@ export default function DetailDialog({
   const px = SPACING.xxl; // 20px 가로 패딩
 
   /* ── 콘텐츠 렌더 (칩별) ── */
-  const showPoints = hasHighlights || (canEditInline && isCustom);
   const infoRows = [
-    { icon: 'clock', label: '영업시간', value: effectiveDetail.hours, placeholder: '영업시간 입력', onClick: () => openTextEdit('hours', '영업시간', effectiveDetail.hours) },
+    { field: 'hours', icon: 'clock', label: isStay ? '체크인·체크아웃' : '영업시간', value: effectiveDetail.hours, placeholder: isStay ? '체크인·체크아웃 입력' : '영업시간 입력', onClick: () => openTextEdit('hours', isStay ? '체크인·체크아웃' : '영업시간', effectiveDetail.hours) },
     { icon: 'pin', label: '주소', value: effectiveDetail.address, placeholder: '장소 검색', onClick: () => setShowAddressSearchDialog(true), miniMap: true },
     { icon: 'pricetag', label: '가격', value: effectiveDetail.price, placeholder: '가격 입력', onClick: () => openTextEdit('price', '가격', effectiveDetail.price) },
     { icon: 'info', label: '부가정보', value: item?.sub, placeholder: '부가정보 입력', onClick: () => openTextEdit('sub', '부가정보', item?.sub) },
     { icon: 'bulb', label: '메모', value: effectiveDetail.tip, placeholder: '메모를 입력하세요', onClick: () => openTextEdit('tip', '메모', effectiveDetail.tip, true), multiline: true },
-    ...(showPoints ? [{
-      icon: 'flag',
-      label: '포인트',
-      value: hasHighlights ? effectiveDetail.highlights.join('\n') : '',
-      placeholder: '포인트를 입력하세요 (줄바꿈으로 구분)',
-      onClick: () => openTextEdit('highlights', '포인트', hasHighlights ? effectiveDetail.highlights.join('\n') : '', true),
-      multiline: true,
-    }] : []),
   ];
 
   const renderInfoTab = () => {
     const visibleRows = canEditInline ? infoRows : infoRows.filter(r => !!r.value);
-    const hoursRow = visibleRows.find((r) => r.label === '영업시간');
-    const hoursParsed = hoursRow?.value ? parseHoursToDays(hoursRow.value) : null;
+    const hoursRow = visibleRows.find((r) => r.field === 'hours');
+    const hoursParsed = hoursRow?.value && !isStay ? parseHoursToDays(hoursRow.value) : null;
     const todayKorean = TODAY_BY_GETDAY[new Date().getDay()];
     const hoursParsedOrdered = hoursParsed ? reorderHoursByPriority(hoursParsed, todayKorean) : null;
-    const showHoursGoogleStyle = hoursParsedOrdered && hoursParsedOrdered.length > 0;
+    const showHoursGoogleStyle = !isStay && hoursParsedOrdered && hoursParsedOrdered.length > 0;
 
     const renderRow = (row, i, isLast) => {
-      if (row.label === '영업시간' && showHoursGoogleStyle) {
+      if (row.field === 'hours' && isStay) {
+        const parsed = hoursRow?.value ? parseStayHours(hoursRow.value) : null;
+        return (
+          <div
+            key={row.label}
+            role={canEditInline ? 'button' : undefined}
+            tabIndex={canEditInline ? 0 : undefined}
+            onClick={canEditInline ? row.onClick : undefined}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: SPACING.lg,
+              padding: `${SPACING.lg} 0`,
+              borderBottom: !isLast ? '1px solid var(--color-outline-variant)' : 'none',
+              cursor: canEditInline ? 'pointer' : 'default',
+              background: 'transparent',
+            }}
+          >
+            <Icon name="clock" size={20} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0, marginTop: SPACING.xs }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-surface-variant2)', marginBottom: SPACING.xs }}>체크인·체크아웃</div>
+              <div style={{ fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: parsed ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)' }}>
+                {parsed ? `체크인 ${parsed.checkIn} · 체크아웃 ${parsed.checkOut}` : (canEditInline ? row.placeholder : '')}
+              </div>
+            </div>
+          </div>
+        );
+      }
+      if (row.field === 'hours' && showHoursGoogleStyle) {
         return (
           <div
             key={row.label}
@@ -691,7 +736,7 @@ export default function DetailDialog({
               />
             </div>
             {hoursExpanded && (
-              <div style={{ marginTop: SPACING.md, marginLeft: 32, display: 'flex', flexDirection: 'column', gap: SPACING.xs }}>
+              <div style={{ marginTop: SPACING.md, marginLeft: SPACING.xxxxl, display: 'flex', flexDirection: 'column', gap: SPACING.xs }}>
                 {hoursParsedOrdered.map(({ day, time }) => (
                   <div
                     key={day}
@@ -751,7 +796,7 @@ export default function DetailDialog({
             background: 'transparent',
           }}
         >
-          <Icon name={row.icon} size={20} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0, marginTop: 2 }} />
+          <Icon name={row.icon} size={20} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0, marginTop: SPACING.xs }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: 'var(--typo-caption-1-bold-size)',
@@ -897,6 +942,9 @@ export default function DetailDialog({
   };
 
   const typeConfig = TYPE_CONFIG[itemType] || TYPE_CONFIG.info;
+  /** placeId가 없으면(주소만 넣은 장소) 저장된 평점은 이전 장소 것일 수 있으므로 표시하지 않음 */
+  const displayRating = effectiveDetail.placeId != null ? effectiveDetail.rating : null;
+  const displayReviewCount = effectiveDetail.placeId != null ? effectiveDetail.reviewCount : null;
 
   const fullscreenModal = (
     <div style={{
@@ -911,6 +959,7 @@ export default function DetailDialog({
       paddingTop: 'env(safe-area-inset-top, 0px)',
       paddingLeft: 'env(safe-area-inset-left, 0px)',
       paddingRight: 'env(safe-area-inset-right, 0px)',
+      paddingBottom: 0,
       boxSizing: 'border-box',
     }}>
       {/* ══ 고정 헤더 ══ */}
@@ -942,7 +991,7 @@ export default function DetailDialog({
                 style={(() => {
                   const c = getCategoryColor('정보');
                   return {
-                    padding: '4px 10px',
+                    padding: `${SPACING.sm} ${SPACING.ml}`,
                     border: `1px solid ${c.border}`,
                     background: c.bg,
                     borderRadius: 'var(--radius-sm)',
@@ -969,18 +1018,18 @@ export default function DetailDialog({
 
           {/* 라인 2: 평점 + 카테고리 (단순 텍스트) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, marginBottom: item?.sub ? SPACING.sm : 0, flexWrap: 'wrap' }}>
-            {effectiveDetail.rating != null ? (
+            {displayRating != null ? (
               <>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 0, fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
                   {[1, 2, 3, 4, 5].map((i) => {
-                    const filled = i <= Math.min(5, Math.round(Number(effectiveDetail.rating)));
+                    const filled = i <= Math.min(5, Math.round(Number(displayRating)));
                     return <Icon key={i} name={filled ? 'star' : 'starOutlined'} size={14} />;
                   })}
-                  <span style={{ marginLeft: SPACING.xs }}>{Number(effectiveDetail.rating).toFixed(1)}</span>
+                  <span style={{ marginLeft: SPACING.xs }}>{Number(displayRating).toFixed(1)}</span>
                 </span>
-                {effectiveDetail.reviewCount != null && (
+                {displayReviewCount != null && (
                   <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant2)' }}>
-                    ({effectiveDetail.reviewCount})
+                    ({displayReviewCount})
                   </span>
                 )}
                 <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 1, color: 'var(--color-on-surface-variant2)' }}>·</span>
@@ -995,7 +1044,7 @@ export default function DetailDialog({
               : effectiveDetail.category ? [effectiveDetail.category] : []
             ).map((cat, i) => (
               <span key={cat} style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1 }}>
-                {(i > 0 || effectiveDetail.rating == null) && (
+                {(i > 0 || displayRating == null) && (
                   <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant2)', marginRight: SPACING.sm }}>·</span>
                 )}
                 <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>{cat}</span>
@@ -1003,8 +1052,8 @@ export default function DetailDialog({
             ))}
           </div>
 
-          {/* 라인 3: 부가정보 (있을 때만) */}
-          {item?.sub && (
+          {/* 라인 3: 포인트 한 줄 (highlights[0] 우선, 없으면 부가정보 sub) */}
+          {(effectiveDetail.highlights?.[0] || item?.sub) && (
             <p style={{
               margin: 0,
               fontSize: 'var(--typo-label-1-n---regular-size)',
@@ -1015,7 +1064,7 @@ export default function DetailDialog({
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}>
-              {item.sub}
+              {effectiveDetail.highlights?.[0] || item?.sub}
             </p>
           )}
         </div>
@@ -1128,7 +1177,7 @@ export default function DetailDialog({
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <div style={{
-                    width: 28, height: 28,
+                    width: SPACING.xxxxl, height: SPACING.xxxxl,
                     border: '3px solid rgba(255,255,255,0.4)',
                     borderTopColor: 'white', borderRadius: '50%',
                     animation: 'spin 0.8s linear infinite',
@@ -1183,35 +1232,6 @@ export default function DetailDialog({
                 <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant)' }}>{effectiveDetail.address}</p>
               </SectionWrap>
             )}
-            {effectiveDetail.highlights?.length > 0 && (
-              <SectionWrap label="포인트" px="0">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
-                  {effectiveDetail.highlights.map((h, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: 'flex', alignItems: 'flex-start', gap: SPACING.lg,
-                        padding: `${SPACING.lg} ${SPACING.xl}`,
-                        borderRadius: RADIUS.lg,
-                        background: 'var(--color-primary-container)',
-                        border: '1px solid var(--color-primary)',
-                        borderLeftWidth: 4,
-                        borderLeftColor: accentColor,
-                      }}
-                    >
-                      <span style={{
-                        width: 24, height: 24, borderRadius: RADIUS.full, background: accentColor,
-                        color: 'var(--color-on-primary)', fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 700,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      }}>
-                        {i + 1}
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--typo-label-2-regular-size)', lineHeight: 1.45, color: 'var(--color-on-surface)', wordBreak: 'break-word' }}>{h}</span>
-                    </div>
-                  ))}
-                </div>
-              </SectionWrap>
-            )}
           </>
         ) : renderActiveContent()}
       </div>
@@ -1232,8 +1252,8 @@ export default function DetailDialog({
               aria-label={`${i + 1}번째 항목으로 이동`}
               aria-current={i === curIdx ? 'true' : undefined}
               style={{
-                width: 24,
-                height: 24,
+                width: SPACING.xxxl,
+                height: SPACING.xxxl,
                 padding: 0,
                 margin: 0,
                 border: 'none',
@@ -1247,8 +1267,8 @@ export default function DetailDialog({
             >
               <span
                 style={{
-                  width: 6,
-                  height: 6,
+                  width: SPACING.ms,
+                  height: SPACING.ms,
                   borderRadius: '50%',
                   background: i === curIdx ? 'var(--color-primary)' : 'var(--color-outline-variant)',
                   opacity: i === curIdx ? 1 : 0.6,
@@ -1460,8 +1480,8 @@ export default function DetailDialog({
                         }}
                       >
                         <span style={{
-                          width: 24,
-                          height: 24,
+                          width: SPACING.xxxl,
+                          height: SPACING.xxxl,
                           borderRadius: '50%',
                           border: '2px solid #fff',
                           background: isSelected ? 'var(--color-primary)' : 'rgba(0,0,0,0.3)',
@@ -1616,15 +1636,28 @@ export default function DetailDialog({
         />
       )}
 
-      {/* 영업시간 편집 시 시작/종료 시간 타임 피커 */}
+      {/* 영업시간/체크인·체크아웃 편집 시 타임 피커 — CenterPopup(9999) 위에 표시 */}
       {hoursTimePicker && editField?.field === 'hours' && (
         <TimePickerDialog
           open
-          value={hoursEditRows.find((r) => r.day === hoursTimePicker.day)?.[hoursTimePicker.field] ?? '09:00'}
+          zIndex={10000}
+          value={
+            hoursTimePicker.type === 'checkIn'
+              ? stayCheckIn
+              : hoursTimePicker.type === 'checkOut'
+                ? stayCheckOut
+                : (hoursEditRows.find((r) => r.day === hoursTimePicker.day)?.[hoursTimePicker.field] ?? '09:00')
+          }
           onConfirm={(value) => {
-            setHoursEditRows((prev) =>
-              prev.map((r) => (r.day === hoursTimePicker.day ? { ...r, [hoursTimePicker.field]: value } : r))
-            );
+            if (hoursTimePicker.type === 'checkIn') {
+              setStayCheckIn(value);
+            } else if (hoursTimePicker.type === 'checkOut') {
+              setStayCheckOut(value);
+            } else {
+              setHoursEditRows((prev) =>
+                prev.map((r) => (r.day === hoursTimePicker.day ? { ...r, [hoursTimePicker.field]: value } : r))
+              );
+            }
             setHoursTimePicker(null);
           }}
           onClose={() => setHoursTimePicker(null)}
@@ -1646,7 +1679,11 @@ export default function DetailDialog({
                 address: addressSearchPending.address || '',
                 lat: addressSearchPending.lat,
                 lon: addressSearchPending.lon,
-                placeId: addressSearchPending.placeId,
+                placeId: addressSearchPending.placeId ?? null,
+                rating: addressSearchPending.rating ?? null,
+                reviewCount: addressSearchPending.reviewCount ?? null,
+                hours: addressSearchPending.hours ?? null,
+                priceLevel: addressSearchPending.priceLevel ?? null,
               };
               if (addressSearchPending.photoUrl) {
                 fields.image = addressSearchPending.photoUrl;
@@ -1654,10 +1691,6 @@ export default function DetailDialog({
                 fields.image = null;
                 fields._imageRemovedByUser = false;
               }
-              if (addressSearchPending.rating != null) fields.rating = addressSearchPending.rating;
-              if (addressSearchPending.reviewCount != null) fields.reviewCount = addressSearchPending.reviewCount;
-              if (addressSearchPending.hours) fields.hours = addressSearchPending.hours;
-              if (addressSearchPending.priceLevel != null) fields.priceLevel = addressSearchPending.priceLevel;
               saveField(fields);
             }
             setShowAddressSearchDialog(false);
@@ -1716,7 +1749,11 @@ export default function DetailDialog({
                 address: addressSearchPending.address || '',
                 lat: addressSearchPending.lat,
                 lon: addressSearchPending.lon,
-                placeId: addressSearchPending.placeId,
+                placeId: addressSearchPending.placeId ?? null,
+                rating: addressSearchPending.rating ?? null,
+                reviewCount: addressSearchPending.reviewCount ?? null,
+                hours: addressSearchPending.hours ?? null,
+                priceLevel: addressSearchPending.priceLevel ?? null,
               };
               if (addressSearchPending.photoUrl) {
                 fields.image = addressSearchPending.photoUrl;
@@ -1724,10 +1761,6 @@ export default function DetailDialog({
                 fields.image = null;
                 fields._imageRemovedByUser = false;
               }
-              if (addressSearchPending.rating != null) fields.rating = addressSearchPending.rating;
-              if (addressSearchPending.reviewCount != null) fields.reviewCount = addressSearchPending.reviewCount;
-              if (addressSearchPending.hours) fields.hours = addressSearchPending.hours;
-              if (addressSearchPending.priceLevel != null) fields.priceLevel = addressSearchPending.priceLevel;
               saveField(fields);
               setShowAddressSearchDialog(false);
             }}>확인</Button>
@@ -1739,6 +1772,48 @@ export default function DetailDialog({
       {editField && (
         <CenterPopup title={editField.label} onClose={() => setEditField(null)} maxWidth={360}>
           {editField.field === 'hours' ? (
+            isStay ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+                  <span style={{ width: 80, flexShrink: 0, fontSize: 'var(--typo-label-2-regular-size)', color: 'var(--color-on-surface-variant2)' }}>체크인</span>
+                  <button
+                    type="button"
+                    onClick={() => setHoursTimePicker({ type: 'checkIn' })}
+                    style={{
+                      flex: 1,
+                      padding: `${SPACING.sm} ${SPACING.lg}`,
+                      border: '1px solid var(--color-outline-variant)',
+                      borderRadius: RADIUS.sm,
+                      fontSize: 'var(--typo-label-2-regular-size)',
+                      color: 'var(--color-on-surface)',
+                      background: 'var(--color-surface-container-lowest)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {stayCheckIn}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+                  <span style={{ width: 80, flexShrink: 0, fontSize: 'var(--typo-label-2-regular-size)', color: 'var(--color-on-surface-variant2)' }}>체크아웃</span>
+                  <button
+                    type="button"
+                    onClick={() => setHoursTimePicker({ type: 'checkOut' })}
+                    style={{
+                      flex: 1,
+                      padding: `${SPACING.sm} ${SPACING.lg}`,
+                      border: '1px solid var(--color-outline-variant)',
+                      borderRadius: RADIUS.sm,
+                      fontSize: 'var(--typo-label-2-regular-size)',
+                      color: 'var(--color-on-surface)',
+                      background: 'var(--color-surface-container-lowest)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {stayCheckOut}
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
               <button
                 type="button"
@@ -1768,7 +1843,7 @@ export default function DetailDialog({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, flex: 1, minWidth: 0 }}>
-                    <span style={{ width: 28, flexShrink: 0, fontSize: 'var(--typo-label-2-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
+                    <span style={{ width: SPACING.xxxxl, flexShrink: 0, fontSize: 'var(--typo-label-2-regular-size)', color: 'var(--color-on-surface-variant2)' }}>
                       {row.day.replace('요일', '')}
                     </span>
                     <button
@@ -1826,6 +1901,7 @@ export default function DetailDialog({
                 </div>
               ))}
             </div>
+            )
           ) : editField.multiline ? (
             <textarea
               autoFocus

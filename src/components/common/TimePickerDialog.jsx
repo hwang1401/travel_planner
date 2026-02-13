@@ -44,7 +44,7 @@ function snapScrollTop(el, maxIndex) {
  * 휠 타임 피커 다이얼로그. 화면 중앙 팝업. 웹(마우스 휠) + 모바일(터치) 모두 지원.
  * value "HH:mm", onConfirm(value), onClose. minuteStep 5 | 15 | 30.
  */
-export default function TimePickerDialog({ open, value, onConfirm, onClose, minuteStep = 5 }) {
+export default function TimePickerDialog({ open, value, onConfirm, onClose, minuteStep = 5, zIndex = 2000 }) {
   const [hourIndex, setHourIndex] = useState(12);
   const [minuteIndex, setMinuteIndex] = useState(0);
   const hourRef = useRef(null);
@@ -240,7 +240,7 @@ export default function TimePickerDialog({ open, value, onConfirm, onClose, minu
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 2000,
+        zIndex,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
