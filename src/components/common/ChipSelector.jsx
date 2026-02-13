@@ -11,7 +11,7 @@ import cn from '../../utils/cn';
  *   onChange   — (value) => void
  *   multi      — boolean (default false)
  *   variant    — "rect" | "pill" (default "rect")
- *   size       — "sm" | "md" (default "md")
+ *   size       — "sm" | "ms" | "md" (default "md")
  *   renderItem — optional (item, selected) => ReactNode
  *   style      — container style override
  */
@@ -48,6 +48,7 @@ export default function ChipSelector({
 
   const isPill = variant === "pill";
   const isSm = size === "sm";
+  const isMs = size === "ms";
 
   return (
     <div className={cn("flex flex-wrap gap-1", className)} style={style}>
@@ -61,10 +62,10 @@ export default function ChipSelector({
             onClick={() => handleClick(item.value)}
             disabled={item.disabled}
             className={cn(
-              'inline-flex items-center justify-center font-[inherit] outline-none',
+              'inline-flex items-center justify-center text-center font-[inherit] outline-none',
               '[transition:all_var(--transition-fast)]',
-              isSm ? 'gap-0.5 h-7' : 'gap-1 h-9 min-w-[44px]',
-              isPill ? (isSm ? 'px-3 rounded-full' : 'px-1 rounded-full') : (isSm ? 'px-2 rounded-md' : 'px-1 rounded-md'),
+              isSm ? 'gap-0.5 h-7' : isMs ? 'gap-1 h-8 min-w-[40px]' : 'gap-1 h-9 min-w-[44px]',
+              isPill ? (isSm ? 'px-3 rounded-full' : isMs ? 'rounded-full' : 'px-1 rounded-full') : (isSm ? 'px-2 rounded-md' : isMs ? 'px-2 rounded-md' : 'px-1 rounded-md'),
               item.disabled ? 'cursor-default opacity-40' : 'cursor-pointer opacity-100',
               /* Border */
               selected
@@ -79,17 +80,20 @@ export default function ChipSelector({
             )}
             style={{
               padding: isPill
-                ? `4px 12px`
-                : `0 ${isSm ? '8px' : '4px'}`,
+                ? (isSm ? '4px 12px' : isMs ? '5px 14px' : '4px 12px')
+                : `0 ${isSm ? '8px' : isMs ? '10px' : '4px'}`,
               fontSize: isSm
                 ? 'var(--typo-caption-2-regular-size)'
-                : 'var(--typo-label-2-medium-size)',
+                : isMs
+                  ? 'var(--typo-label-2-medium-size)'
+                  : 'var(--typo-label-2-medium-size)',
               fontWeight: selected
                 ? 'var(--typo-label-2-bold-weight)'
                 : 'var(--typo-label-2-medium-weight)',
+              lineHeight: 1,
             }}
           >
-            {item.icon && <Icon name={item.icon} size={isSm ? 11 : 14} />}
+            {item.icon && <Icon name={item.icon} size={isSm ? 11 : isMs ? 13 : 14} />}
             {item.label}
             {item.extra}
           </button>

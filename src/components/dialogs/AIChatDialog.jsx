@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useScrollLock } from '../../hooks/useScrollLock';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import BottomSheet from '../common/BottomSheet';
@@ -43,6 +44,8 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
   const [importPreview, setImportPreview] = useState(null);
   const chatScrollRef = useRef(null);
   const chatInputRef = useRef(null);
+
+  useScrollLock(true);
 
   const [viewportRect, setViewportRect] = useState(null);
   useEffect(() => {
@@ -332,7 +335,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
       {/* 입력바 */}
       <div style={{
         padding: `${SPACING.lg} ${SPACING.xl}`,
-        paddingBottom: `var(--safe-area-bottom, 0px)`,
+        paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${SPACING.lg})`,
         flexShrink: 0, borderTop: '1px solid var(--color-outline-variant)',
         display: 'flex', gap: SPACING.md, alignItems: 'flex-end',
         background: 'var(--color-surface-container-lowest)',

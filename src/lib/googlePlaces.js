@@ -141,3 +141,52 @@ export async function getPlaceDetails(placeId) {
 
   return null;
 }
+
+/**
+ * placeId로 사진 URL 최대 maxCount개 가져오기.
+ * @returns {Promise<string[]>} 사진 URL 배열 (빈 배열 가능)
+ */
+export async function getPlacePhotos(placeId, maxCount = 3) {
+  if (!placeId) return [];
+  await loadGoogleMapsScript();
+  const google = window.google;
+
+  // 새 API
+  if (google?.maps?.places?.Place) {
+    try {
+      const place = new google.maps.places.Place({ id: placeId });
+      await place.fetchFields({ fields: ['photos'] });
+      if (!place.photos?.length) return [];
+      return place.photos.slice(0, maxCount).map((photo) => {
+        try { return photo.getURI({ maxWidth: 800 }); }
+        catch { return null; }
+      }).filter(Boolean);
+    } catch (e) {
+      console.warn('[Places] getPlacePhotos failed, trying legacy', e);
+    }
+  }
+
+  // 레거시 폴백
+  if (google?.maps?.places?.PlacesService) {
+    return new Promise((resolve) => {
+      const div = document.createElement('div');
+      const service = new google.maps.places.PlacesService(div);
+      service.getDetails(
+        { placeId, fields: ['photos'] },
+        (place, status) => {
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !place?.photos) {
+            resolve([]);
+            return;
+          }
+          resolve(
+            place.photos.slice(0, maxCount)
+              .map((p) => p.getUrl?.({ maxWidth: 800 }))
+              .filter(Boolean)
+          );
+        }
+      );
+    });
+  }
+
+  return [];
+}

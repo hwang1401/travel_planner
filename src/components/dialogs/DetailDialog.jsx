@@ -8,20 +8,19 @@ import Button from '../common/Button';
 import BottomSheet from '../common/BottomSheet';
 import ConfirmDialog from '../common/ConfirmDialog';
 import ImageViewer from '../common/ImageViewer';
-import CategoryBadge from '../common/CategoryBadge';
 import TimetablePreview from '../common/TimetablePreview';
 import NearbyPlaceCard from './NearbyPlaceCard';
 import Skeleton from '../common/Skeleton';
 import CenterPopup from '../common/CenterPopup';
 import TimePickerDialog from '../common/TimePickerDialog';
 import ChipSelector from '../common/ChipSelector';
-import ImagePicker from '../common/ImagePicker';
 import { uploadImage, generateImagePath } from '../../services/imageService';
 import AddressSearch from '../common/AddressSearch';
 import AddressToStationPicker from './AddressToStationPicker';
 import { FromToStationField } from '../common/FromToStationField';
 import { getNearbyPlaces, getPlaceByNameOrAddress } from '../../services/ragService';
-import { COLOR, SPACING, RADIUS, TYPE_CONFIG, TYPE_LABELS } from '../../styles/tokens';
+import { getPlacePhotos } from '../../lib/googlePlaces';
+import { COLOR, SPACING, RADIUS, TYPE_CONFIG, TYPE_LABELS, getCategoryColor } from '../../styles/tokens';
 import { TIMETABLE_DB, findBestTrain, matchByFromTo, findRoutesByStations } from '../../data/timetable';
 
 /**
@@ -36,7 +35,7 @@ import { TIMETABLE_DB, findBestTrain, matchByFromTo, findRoutesByStations } from
 /* ── 내부 헬퍼 ── */
 const SectionLabel = ({ children }) => (
   <p style={{
-    margin: "0 0 var(--spacing-sp80)",
+    margin: `0 0 ${SPACING.md}`,
     fontSize: "var(--typo-caption-1-bold-size)",
     fontWeight: "var(--typo-caption-1-bold-weight)",
     lineHeight: "var(--typo-caption-1-bold-line-height)",
@@ -48,36 +47,10 @@ const SectionLabel = ({ children }) => (
 );
 
 const SectionWrap = ({ label, children, px }) => (
-  <div style={{ padding: `var(--spacing-sp200) ${px} 0` }}>
+  <div style={{ padding: `${SPACING.xxl} ${px} 0` }}>
     {label && <SectionLabel>{label}</SectionLabel>}
     {children}
   </div>
-);
-
-/** 탭 가능 필드 행 */
-const TappableRow = ({ label, value, placeholder, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      width: '100%', padding: `${SPACING.lg} 0`,
-      border: 'none', background: 'transparent', cursor: 'pointer',
-      textAlign: 'left', fontFamily: 'inherit',
-    }}
-  >
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-surface-variant2)', marginBottom: SPACING.xs }}>{label}</div>
-      <div style={{
-        fontSize: 'var(--typo-label-1-n---regular-size)',
-        color: value ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
-        whiteSpace: 'pre-line', wordBreak: 'break-word',
-      }}>
-        {value || placeholder || '탭하여 입력'}
-      </div>
-    </div>
-    <Icon name="chevronRight" size={14} style={{ opacity: 0.3, flexShrink: 0, marginLeft: SPACING.md }} />
-  </button>
 );
 
 /* RAG place → detail shape */
@@ -136,6 +109,8 @@ export default function DetailDialog({
 
   const [viewImage, setViewImage] = useState(null);
   const [ragImage, setRagImage] = useState(null);
+  const [placePhotos, setPlacePhotos] = useState([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [overlayDetail, setOverlayDetail] = useState(null);
   const [overlayPlace, setOverlayPlace] = useState(null);
@@ -160,6 +135,7 @@ export default function DetailDialog({
   const [timePickerPickedIndex, setTimePickerPickedIndex] = useState(null); // 시간표 행 탭 시 저장 시 해당 행을 picked로
   const [singleStationPicker, setSingleStationPicker] = useState(null); // { mode: 'from'|'to' }
   const [showAddressSearchDialog, setShowAddressSearchDialog] = useState(false);
+  const [showImageManageDialog, setShowImageManageDialog] = useState(false);
   const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined, photoUrl: undefined });
 
   // visualViewport
@@ -203,11 +179,24 @@ export default function DetailDialog({
 
   const mainImage = effectiveDetail.image ?? item?.detail?.image;
   const imagesArray = effectiveDetail.images ?? item?.detail?.images;
-  const images = imagesArray && Array.isArray(imagesArray) && imagesArray.length > 0
-    ? imagesArray : mainImage ? [mainImage] : [];
-  const baseDisplayImages = mainImage && images.length > 1
-    ? [mainImage, ...images.filter((img) => img !== mainImage)] : images;
-  const displayImages = baseDisplayImages.length > 0 ? baseDisplayImages : (ragImage ? [ragImage] : []);
+  const displayImages = useMemo(() => {
+    const imgs = [];
+    // 1순위: 사용자 업로드/RAG 이미지
+    if (mainImage) imgs.push(mainImage);
+    if (imagesArray?.length) {
+      for (const img of imagesArray) {
+        if (img && !imgs.includes(img)) imgs.push(img);
+      }
+    }
+    // 2순위: ragImage
+    if (ragImage && !imgs.includes(ragImage)) imgs.push(ragImage);
+    // 3순위: Google Places 런타임 사진으로 보충
+    for (const url of placePhotos) {
+      if (imgs.length >= 3) break;
+      if (url && !imgs.includes(url)) imgs.push(url);
+    }
+    return imgs.slice(0, 3);
+  }, [mainImage, imagesArray, ragImage, placePhotos]);
 
   const directionsUrl = effectiveDetail.placeId
     ? `https://www.google.com/maps/dir/?api=1&destination=place_id:${effectiveDetail.placeId}&destination_place_id=${effectiveDetail.placeId}`
@@ -218,27 +207,22 @@ export default function DetailDialog({
   const effectiveTimetable = (effectiveDetail.timetable?.trains?.length ? effectiveDetail.timetable : null)
     ?? (item?.detail?.timetable?.trains?.length ? item.detail.timetable : null);
   const hasTimetable = !!effectiveTimetable?.trains?.length;
-  const hasTip = !!effectiveDetail.tip;
   const hasHighlights = effectiveDetail.highlights && effectiveDetail.highlights.length > 0;
   const hasExtraText = !!(item?.desc || item?.sub);
-  const hasPrice = !!effectiveDetail.price;
-  const hasHours = !!effectiveDetail.hours;
   const hasCoords = effectiveDetail.lat != null && effectiveDetail.lon != null;
   const showNearby = hasCoords && itemType !== "flight" && !isMove;
 
   /* ── 칩 네비게이션 ── */
   const chipItems = useMemo(() => {
     const chips = [];
-    // 정보 (부가정보, 주소, 가격, 영업시간, 메모 통합)
+    // 정보 (영업시간·주소·가격·부가정보·메모·포인트 통합)
     chips.push({ value: 'info', label: '정보' });
-    // 포인트
-    if (hasHighlights || isCustom) chips.push({ value: 'points', label: '포인트' });
     // 시간표 (교통만)
     if (isMove || hasTimetable) chips.push({ value: 'timetable', label: '시간표' });
     // 주변
     if (showNearby) chips.push({ value: 'nearby', label: '주변' });
     return chips;
-  }, [hasHighlights, isMove, hasTimetable, showNearby, isCustom]);
+  }, [isMove, hasTimetable, showNearby]);
 
   const [activeChip, setActiveChip] = useState(() => {
     if (isMove && (hasTimetable || true)) return 'timetable';
@@ -284,6 +268,22 @@ export default function DetailDialog({
     }).catch(() => { if (!cancelled) setRagImage(null); });
     return () => { cancelled = true; };
   }, [effectiveDetail?.name, effectiveDetail?.address, item?.desc, mainImage, imagesArray, overlayDetail, onSaveField, item, effectiveDetail, detail]);
+
+  // placeId가 있으면 Google Places에서 최대 3장 사진 fetch
+  useEffect(() => {
+    const pid = effectiveDetail?.placeId;
+    if (!pid) { setPlacePhotos([]); return; }
+    let cancelled = false;
+    setPhotosLoading(true);
+    getPlacePhotos(pid, 3).then((urls) => {
+      if (!cancelled) setPlacePhotos(urls);
+    }).catch(() => {
+      if (!cancelled) setPlacePhotos([]);
+    }).finally(() => {
+      if (!cancelled) setPhotosLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [effectiveDetail?.placeId]);
 
   useEffect(() => {
     if (!showNearby) return;
@@ -403,7 +403,33 @@ export default function DetailDialog({
     }
     if (fieldUpdates.timetable !== undefined) updated.detail = { ...updated.detail, timetable: fieldUpdates.timetable };
     updated.detail.name = updated.desc;
-    onSaveField(displayIdx, si, ii, updated);
+
+    const editKind = fieldUpdates.address !== undefined || fieldUpdates.lat !== undefined || fieldUpdates.placeId !== undefined
+      ? 'address'
+      : fieldUpdates.time !== undefined
+        ? 'time'
+        : fieldUpdates.desc !== undefined
+          ? 'desc'
+          : fieldUpdates.tip !== undefined
+            ? 'tip'
+            : fieldUpdates.price !== undefined
+              ? 'price'
+              : fieldUpdates.hours !== undefined
+                ? 'hours'
+                : fieldUpdates.highlights !== undefined
+                  ? 'highlights'
+                  : fieldUpdates.image !== undefined || fieldUpdates.images !== undefined
+                    ? 'image'
+                    : fieldUpdates.timetable !== undefined
+                      ? 'timetable'
+                      : fieldUpdates.sub !== undefined
+                        ? 'sub'
+                        : fieldUpdates.type !== undefined
+                          ? 'type'
+                          : (fieldUpdates.moveFrom !== undefined || fieldUpdates.moveTo !== undefined)
+                            ? 'move'
+                            : null;
+    onSaveField(displayIdx, si, ii, updated, editKind);
   }, [onSaveField, item, effectiveDetail, detail]);
 
   /* ── 인라인 수정 핸들러 ── */
@@ -479,172 +505,92 @@ export default function DetailDialog({
     saveField(updates);
   };
 
-  const px = "var(--spacing-sp200)";
+  const px = SPACING.xxl; // 20px 가로 패딩
 
   /* ── 콘텐츠 렌더 (칩별) ── */
-  const renderInfoTab = () => (
-    <>
-      {/* 시간 (부가정보 위) */}
-      {(canEditTime || item?.time) && (
-        canEditTime ? (
-          <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
-            <TappableRow label="시간" value={item?.time} placeholder="시간 선택" onClick={() => setShowTimePicker(true)} />
-          </div>
-        ) : (
-          <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `${SPACING.lg} 0` }}>
-              <div style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-surface-variant2)', marginBottom: SPACING.xs }}>시간</div>
-              <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface)', fontVariantNumeric: 'tabular-nums' }}>{item?.time}</span>
+  const showPoints = hasHighlights || (canEditInline && isCustom);
+  const infoRows = [
+    { icon: 'clock', label: '영업시간', value: effectiveDetail.hours, placeholder: '영업시간 입력', onClick: () => openTextEdit('hours', '영업시간', effectiveDetail.hours) },
+    { icon: 'pin', label: '주소', value: effectiveDetail.address, placeholder: '장소 검색', onClick: () => setShowAddressSearchDialog(true), miniMap: true },
+    { icon: 'pricetag', label: '가격', value: effectiveDetail.price, placeholder: '가격 입력', onClick: () => openTextEdit('price', '가격', effectiveDetail.price) },
+    { icon: 'info', label: '부가정보', value: item?.sub, placeholder: '부가정보 입력', onClick: () => openTextEdit('sub', '부가정보', item?.sub) },
+    { icon: 'bulb', label: '메모', value: effectiveDetail.tip, placeholder: '메모를 입력하세요', onClick: () => openTextEdit('tip', '메모', effectiveDetail.tip, true), multiline: true },
+    ...(showPoints ? [{
+      icon: 'flag',
+      label: '포인트',
+      value: hasHighlights ? effectiveDetail.highlights.join('\n') : '',
+      placeholder: '포인트를 입력하세요 (줄바꿈으로 구분)',
+      onClick: () => openTextEdit('highlights', '포인트', hasHighlights ? effectiveDetail.highlights.join('\n') : '', true),
+      multiline: true,
+    }] : []),
+  ];
+
+  const renderInfoTab = () => {
+    const visibleRows = canEditInline ? infoRows : infoRows.filter(r => !!r.value);
+
+    return (
+      <>
+        {visibleRows.map((row, i) => (
+          <div
+            key={row.label}
+            role={canEditInline ? 'button' : undefined}
+            tabIndex={canEditInline ? 0 : undefined}
+            onClick={canEditInline ? row.onClick : undefined}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: SPACING.lg,
+              padding: `${SPACING.lg} 0`,
+              borderBottom: i < visibleRows.length - 1 ? '1px solid var(--color-outline-variant)' : 'none',
+              cursor: canEditInline ? 'pointer' : 'default',
+              background: 'transparent',
+            }}
+          >
+            <Icon name={row.icon} size={20} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0, marginTop: 2 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 'var(--typo-caption-1-bold-size)',
+                fontWeight: 600,
+                color: 'var(--color-on-surface-variant2)',
+                marginBottom: SPACING.xs,
+              }}>{row.label}</div>
+              <div style={{
+                fontSize: 'var(--typo-label-1-n---regular-size)',
+                lineHeight: 'var(--typo-label-1-n---regular-line-height)',
+                color: row.value ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
+                whiteSpace: row.multiline ? 'pre-line' : 'normal',
+                wordBreak: 'break-word',
+              }}>
+                {row.value || (canEditInline ? row.placeholder : '')}
+              </div>
             </div>
-          </div>
-        )
-      )}
-
-      {/* 부가정보 */}
-      {canEditInline ? (
-        <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
-          <TappableRow label="부가정보" value={item?.sub} placeholder="부가정보 입력" onClick={() => openTextEdit('sub', '부가정보', item?.sub)} />
-        </div>
-      ) : hasExtraText && (
-        <SectionWrap label="부가정보" px="0">
-          <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface-variant)', whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
-            {[item?.desc, item?.sub].filter(Boolean).join('\n')}
-          </p>
-        </SectionWrap>
-      )}
-
-      {/* 주소 — 수정 시 장소 검색 센터 다이얼로그 */}
-      {canEditInline ? (
-        <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
-          <TappableRow label="주소" value={effectiveDetail.address} placeholder="장소 검색" onClick={() => setShowAddressSearchDialog(true)} />
-        </div>
-      ) : effectiveDetail.address && (
-        <SectionWrap label="주소" px="0">
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.lg, flexWrap: 'wrap' }}>
-            <p style={{ flex: 1, minWidth: 0, margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface-variant)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {effectiveDetail.address}
-            </p>
-            {directionsUrl && (
-              <Button variant="primary" size="sm" iconLeft="navigation" onClick={() => setShowDirectionsConfirm(true)} style={{ flexShrink: 0 }}>길찾기</Button>
+            {row.miniMap && hasCoords && (
+              <div
+                key={`minimap-${effectiveDetail.lat}-${effectiveDetail.lon}`}
+                style={{ width: 80, height: 80, borderRadius: RADIUS.md, overflow: 'hidden', flexShrink: 0 }}
+              >
+                <MapContainer
+                  center={[effectiveDetail.lat, effectiveDetail.lon]}
+                  zoom={15}
+                  style={{ height: '100%', width: '100%' }}
+                  zoomControl={false}
+                  attributionControl={false}
+                  dragging={false}
+                  scrollWheelZoom={false}
+                  doubleClickZoom={false}
+                  touchZoom={false}
+                >
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <Marker position={[effectiveDetail.lat, effectiveDetail.lon]} icon={createAddressPinIcon()} />
+                </MapContainer>
+              </div>
             )}
           </div>
-        </SectionWrap>
-      )}
-
-      {/* 가격 */}
-      {(canEditInline || hasPrice) && (
-        canEditInline ? (
-          <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
-            <TappableRow label="가격" value={effectiveDetail.price} placeholder="가격 입력" onClick={() => openTextEdit('price', '가격', effectiveDetail.price)} />
-          </div>
-        ) : (
-          <SectionWrap label="가격" px="0">
-            <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant)' }}>{effectiveDetail.price}</p>
-          </SectionWrap>
-        )
-      )}
-
-      {/* 영업시간 */}
-      {(canEditInline || hasHours) && (
-        canEditInline ? (
-          <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
-            <TappableRow label="영업시간" value={effectiveDetail.hours} placeholder="영업시간 입력" onClick={() => openTextEdit('hours', '영업시간', effectiveDetail.hours)} />
-          </div>
-        ) : (
-          <SectionWrap label="영업시간" px="0">
-            <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant)' }}>{effectiveDetail.hours}</p>
-          </SectionWrap>
-        )
-      )}
-
-      {/* 길찾기 (주소가 있는 경우 뷰 모드에서 아래에도 표시) */}
-      {!canEditInline && !effectiveDetail.address && directionsUrl && (
-        <div style={{ paddingTop: SPACING.xl }}>
-          <Button variant="primary" size="sm" iconLeft="navigation" onClick={() => setShowDirectionsConfirm(true)}>길찾기</Button>
-        </div>
-      )}
-
-      {/* ── 메모 (정보 탭에 통합) ── */}
-      {canEditInline ? (
-        <div style={{ padding: `${SPACING.lg} 0`, borderBottom: '1px solid var(--color-outline-variant)' }}>
-          <TappableRow label="메모" value={effectiveDetail.tip} placeholder="메모를 입력하세요" onClick={() => openTextEdit('tip', '메모', effectiveDetail.tip, true)} />
-        </div>
-      ) : hasTip && (
-        <SectionWrap label="메모" px="0">
-          <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface-variant)', whiteSpace: 'pre-line' }}>
-            {effectiveDetail.tip}
-          </p>
-        </SectionWrap>
-      )}
-    </>
-  );
-
-  const renderPointsTab = () => (
-    <>
-      {canEditInline ? (
-        <TappableRow
-          label="포인트"
-          value={hasHighlights ? effectiveDetail.highlights.join('\n') : ''}
-          placeholder="포인트를 입력하세요 (줄바꿈으로 구분)"
-          onClick={() => openTextEdit('highlights', '포인트', hasHighlights ? effectiveDetail.highlights.join('\n') : '', true)}
-        />
-      ) : hasHighlights ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.md }}>
-          {effectiveDetail.highlights.map((h, i) => {
-            const isNote = h.startsWith("[");
-            return (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: SPACING.lg,
-                  padding: `${SPACING.lg} ${SPACING.xl}`,
-                  borderRadius: RADIUS.lg,
-                  background: isNote ? 'var(--color-surface-container-lowest)' : 'var(--color-primary-container)',
-                  border: `1px solid ${isNote ? 'var(--color-outline-variant)' : 'var(--color-primary)'}`,
-                  borderLeftWidth: 4,
-                  borderLeftColor: isNote ? 'var(--color-outline-variant)' : accentColor,
-                }}
-              >
-                <span
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: RADIUS.full,
-                    background: isNote ? 'var(--color-outline-variant)' : accentColor,
-                    color: isNote ? 'var(--color-on-surface-variant2)' : 'var(--color-on-primary)',
-                    fontSize: 'var(--typo-caption-2-bold-size)',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  {i + 1}
-                </span>
-                <span
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    fontSize: 'var(--typo-label-2-regular-size)',
-                    lineHeight: 1.45,
-                    color: isNote ? 'var(--color-on-surface-variant)' : 'var(--color-on-surface)',
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {h}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p style={{ padding: `${SPACING.xxxl} 0`, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>포인트 없음</p>
-      )}
-    </>
-  );
+        ))}
+        {visibleRows.length === 0 && (
+          <p style={{ padding: `${SPACING.xxxl} 0`, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>정보 없음</p>
+        )}
+      </>
+    );
+  };
 
   const renderTimetableTab = () => (
     <>
@@ -732,7 +678,6 @@ export default function DetailDialog({
   const renderActiveContent = () => {
     switch (activeChip) {
       case 'info': return renderInfoTab();
-      case 'points': return renderPointsTab();
       case 'timetable': return renderTimetableTab();
       case 'nearby': return renderNearbyTab();
       default: return renderInfoTab();
@@ -758,52 +703,106 @@ export default function DetailDialog({
     }}>
       {/* ══ 고정 헤더 ══ */}
       <div style={{ flexShrink: 0 }}>
-        {/* 상단 바: 이름 + 유형·시간 뱃지 + 닫기 */}
+        {/* 상단 헤더: 이름 + 평점 + 카테고리 + 팁 */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: SPACING.md,
-          padding: `${SPACING.md} ${px}`,
-          borderBottom: '1px solid var(--color-outline-variant)',
+          padding: `${SPACING.lg} ${px} ${SPACING.md}`,
+          borderBottom: displayImages.length > 0 ? 'none' : '1px solid var(--color-outline-variant)',
         }}>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: SPACING.md, overflow: 'hidden' }}>
-            <h3 style={{ margin: 0, minWidth: 0, flexShrink: 1, fontSize: 'var(--typo-body-1-n---bold-size)', fontWeight: 'var(--typo-body-1-n---bold-weight)', color: 'var(--color-on-surface)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {canEditInline ? (
-                <span onClick={() => openTextEdit('desc', '이름', item?.desc)} style={{ cursor: 'pointer' }}>
-                  {effectiveDetail.name || '이름 입력'}
-                </span>
-              ) : effectiveDetail.name}
-            </h3>
-            <span style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'nowrap', flexShrink: 0, gap: SPACING.sm }}>
-              {(effectiveDetail.categories && effectiveDetail.categories.length > 0
-                ? effectiveDetail.categories
-                : effectiveDetail.category ? [effectiveDetail.category] : []
-              ).map((cat) => (<CategoryBadge key={cat} category={cat} />))}
+          {/* 라인 1: 장소명(좌측) + 시간뱃지 + 더보기 + 닫기 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.sm }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: SPACING.sm }}>
+              <h3 style={{
+                margin: 0, flex: '0 1 auto', minWidth: 0,
+                fontSize: 'var(--typo-heading-3-bold-size)',
+                fontWeight: 'var(--typo-heading-3-bold-weight)',
+                color: 'var(--color-on-surface)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {canEditInline ? (
+                  <span onClick={() => openTextEdit('desc', '이름', item?.desc)} style={{ cursor: 'pointer' }}>
+                    {effectiveDetail.name || '이름 입력'}
+                  </span>
+                ) : effectiveDetail.name}
+              </h3>
               {item?.time && (
-                <button
-                  type="button"
-                  onClick={canEditTime ? () => setShowTimePicker(true) : undefined}
-                  style={{
-                    padding: '2px 8px',
-                    border: `1px solid ${typeConfig.border}`,
-                    background: typeConfig.bg,
+              <button
+                type="button"
+                onClick={canEditTime ? () => setShowTimePicker(true) : undefined}
+                style={(() => {
+                  const c = getCategoryColor('정보');
+                  return {
+                    padding: '4px 10px',
+                    border: `1px solid ${c.border}`,
+                    background: c.bg,
                     borderRadius: 'var(--radius-sm)',
-                    fontSize: 'var(--typo-caption-3-bold-size)',
-                    fontWeight: 'var(--typo-caption-3-bold-weight)',
-                    lineHeight: 'var(--typo-caption-3-bold-line-height)',
-                    color: typeConfig.text,
+                    fontSize: 'var(--typo-caption-2-bold-size)',
+                    fontWeight: 'var(--typo-caption-2-bold-weight)',
+                    lineHeight: 1,
+                    color: c.color,
                     cursor: canEditTime ? 'pointer' : 'default',
                     fontFamily: 'inherit',
                     whiteSpace: 'nowrap',
-                  }}
-                >
-                  {item.time}
-                </button>
+                    flexShrink: 0,
+                  };
+                })()}
+              >
+                {item.time}
+              </button>
               )}
-            </span>
+            </div>
+            {!overlayDetail && ((onMoveToDay && moveDayOptions.length > 1) || (canEditInline && tripId)) && (
+              <Button variant="ghost-neutral" size="sm" iconOnly="moreHorizontal" onClick={() => setShowMoreSheet(true)} title="더보기" style={{ flexShrink: 0 }} />
+            )}
+            <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
           </div>
-          {!overlayDetail && onMoveToDay && moveDayOptions.length > 1 && (
-            <Button variant="ghost-neutral" size="sm" iconOnly="moreHorizontal" onClick={() => setShowMoreSheet(true)} style={{ flexShrink: 0 }} title="더보기" />
+
+          {/* 라인 2: 평점 + 카테고리 (단순 텍스트) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, marginBottom: item?.sub ? SPACING.sm : 0, flexWrap: 'wrap' }}>
+            {effectiveDetail.rating != null ? (
+              <>
+                <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
+                  {'⭐'} {Number(effectiveDetail.rating).toFixed(1)}
+                </span>
+                {effectiveDetail.reviewCount != null && (
+                  <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant2)' }}>
+                    ({effectiveDetail.reviewCount})
+                  </span>
+                )}
+                <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 1, color: 'var(--color-on-surface-variant2)' }}>·</span>
+              </>
+            ) : (
+              <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
+                평점 없음
+              </span>
+            )}
+            {(effectiveDetail.categories?.length > 0
+              ? effectiveDetail.categories
+              : effectiveDetail.category ? [effectiveDetail.category] : []
+            ).map((cat, i) => (
+              <span key={cat} style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1 }}>
+                {(i > 0 || effectiveDetail.rating == null) && (
+                  <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant2)', marginRight: SPACING.sm }}>·</span>
+                )}
+                <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>{cat}</span>
+              </span>
+            ))}
+          </div>
+
+          {/* 라인 3: 부가정보 (있을 때만) */}
+          {item?.sub && (
+            <p style={{
+              margin: 0,
+              fontSize: 'var(--typo-label-1-n---regular-size)',
+              fontWeight: 'var(--typo-label-1-n---regular-weight)',
+              lineHeight: 1,
+              color: 'var(--color-on-surface-variant)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {item.sub}
+            </p>
           )}
-          <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
         </div>
 
         {/* 교통이면: 출발지 → 도착지 (예상 소요시간 표시) */}
@@ -820,7 +819,6 @@ export default function DetailDialog({
                 display: 'flex', alignItems: 'center', gap: SPACING.md,
                 padding: `${SPACING.md} ${px}`,
                 background: 'var(--color-surface-container-lowest)',
-                borderBottom: '1px solid var(--color-outline-variant)',
               }}
             >
               <Icon name="navigation" size={14} style={{ color: typeConfig.text, flexShrink: 0 }} />
@@ -836,195 +834,83 @@ export default function DetailDialog({
           );
         })()}
 
-        {/* 이미지 — 있으면 표시, 없으면 플레이스홀더 (수정 가능 시 이미지 위에 수정/삭제 아이콘 버튼) */}
-        {displayImages.length >= 1 && (
-          <div style={{ flexShrink: 0, paddingTop: SPACING.lg, position: 'relative' }}>
-            <input
-              ref={imageFileRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleAddImage(file);
-                e.target.value = '';
-              }}
-            />
-            {displayImages.length === 1 && (
+        {/* 이미지 업로드용 hidden input (항상 마운트) */}
+        <input
+          ref={imageFileRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleAddImage(file);
+            e.target.value = '';
+          }}
+        />
+
+        {/* 이미지 캐러셀 — 있을 때만 표시, 없으면 영역 자체 제거 */}
+        {displayImages.length > 0 && (
+          <div style={{ flexShrink: 0, position: 'relative', padding: `${SPACING.sm} ${px} 0` }}>
+            {/* 1장이면 풀 와이드, 2장 이상이면 캐러셀 */}
+            {displayImages.length === 1 ? (
               <div
                 onClick={(e) => { if (!imageUploading && !e.target.closest('button')) setViewImage(displayImages[0]); }}
                 style={{
-                  position: 'relative',
-                  flexShrink: 0,
-                  width: '100%',
-                  maxHeight: '40vh',
-                  aspectRatio: '16/7',
-                  overflow: 'hidden',
-                  cursor: imageUploading ? 'default' : 'zoom-in',
+                  width: '100%', maxHeight: '40vh', aspectRatio: '16/9',
+                  borderRadius: RADIUS.md,
+                  overflow: 'hidden', cursor: imageUploading ? 'default' : 'zoom-in',
                   background: COLOR.surfaceLowest,
                 }}
               >
-                {canEditInline && tripId && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: SPACING.sm,
-                      right: SPACING.sm,
-                      zIndex: 2,
-                      display: 'flex',
-                      gap: SPACING.md,
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      iconOnly="edit"
-                      onClick={handleReplaceImage}
-                      disabled={imageUploading}
-                      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', width: 36, height: 36, border: 'none' }}
-                    />
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      iconOnly="trash"
-                      onClick={handleRemoveImage}
-                      disabled={imageUploading}
-                      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', width: 36, height: 36, border: 'none' }}
-                    />
-                  </div>
-                )}
-                <img src={displayImages[0]} alt={effectiveDetail.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
-                {imageUploading && (
-                  <>
-                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                    <div style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: 'rgba(0,0,0,0.25)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <div style={{
-                        width: 28, height: 28,
-                        border: '3px solid rgba(255,255,255,0.4)',
-                        borderTopColor: 'white',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite',
-                      }} />
-                    </div>
-                  </>
-                )}
+                <img src={displayImages[0]} alt={effectiveDetail.name}
+                  style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
               </div>
-            )}
-            {displayImages.length > 1 && (
-              <div style={{ flexShrink: 0, overflowX: 'auto', overflowY: 'hidden', display: 'flex', gap: SPACING.ms, padding: `0 ${px}`, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', position: 'relative' }}>
-                {canEditInline && tripId && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: SPACING.sm,
-                      right: SPACING.sm,
-                      zIndex: 2,
-                      display: 'flex',
-                      gap: SPACING.md,
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      iconOnly="edit"
-                      onClick={handleReplaceImage}
-                      disabled={imageUploading}
-                      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', width: 36, height: 36, border: 'none' }}
-                    />
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      iconOnly="trash"
-                      onClick={handleRemoveImage}
-                      disabled={imageUploading}
-                      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', width: 36, height: 36, border: 'none' }}
-                    />
-                  </div>
-                )}
+            ) : (
+              <div style={{
+                overflowX: 'auto', overflowY: 'hidden',
+                display: 'flex', gap: SPACING.md,
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+              }}>
                 {displayImages.map((img, i) => (
-                  <div key={i} onClick={() => setViewImage(img)} style={{ flexShrink: 0, width: '75%', maxHeight: '40vh', aspectRatio: '16/9', scrollSnapAlign: 'start', borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest }}>
-                    <img src={img} alt={`${effectiveDetail.name} ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <div key={i} onClick={() => setViewImage(img)} style={{
+                    flexShrink: 0, width: '90%', maxHeight: '40vh', aspectRatio: '16/9',
+                    scrollSnapAlign: 'start', borderRadius: RADIUS.md,
+                    overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest,
+                  }}>
+                    <img src={img} alt={`${effectiveDetail.name} ${i + 1}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   </div>
                 ))}
-                {imageUploading && (
-                  <>
-                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                    <div style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: 'rgba(0,0,0,0.25)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <div style={{
-                        width: 28, height: 28,
-                        border: '3px solid rgba(255,255,255,0.4)',
-                        borderTopColor: 'white',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite',
-                      }} />
-                    </div>
-                  </>
-                )}
               </div>
             )}
-          </div>
-        )}
-        {displayImages.length === 0 && (
-          <div style={{ flexShrink: 0, padding: `${SPACING.xl} ${px} 0` }}>
-            {canEditInline && tripId ? (
-              <ImagePicker
-                value=""
-                onChange={handleAddImage}
-                onRemove={undefined}
-                placeholder="이미지 추가"
-                aspect="cover"
-                uploading={imageUploading}
-                disabled={!!overlayDetail}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  aspectRatio: '16/7',
-                  borderRadius: RADIUS.md,
-                  border: `2px dashed var(--color-outline-variant)`,
-                  background: 'var(--color-surface-container-lowest)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: SPACING.sm,
-                }}
-              >
-                <Icon name="file" size={32} style={{ opacity: 0.3 }} />
-                <span style={{ fontSize: 'var(--typo-caption-2-size)', color: 'var(--color-on-surface-variant2)' }}>
-                  이미지 없음
-                </span>
-              </div>
+            {imageUploading && (
+              <>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                <div style={{
+                  position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <div style={{
+                    width: 28, height: 28,
+                    border: '3px solid rgba(255,255,255,0.4)',
+                    borderTopColor: 'white', borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                  }} />
+                </div>
+              </>
             )}
           </div>
         )}
 
         {/* 칩 네비게이션 — 2개 이상일 때만 */}
         {!overlayDetail && chipItems.length > 1 && (
-          <div style={{ padding: `${SPACING.xl} ${px} ${SPACING.md}`, borderBottom: '1px solid var(--color-outline-variant)', overflowX: 'auto' }}>
+          <div style={{ padding: `${SPACING.lg} ${px} ${SPACING.sm}`, overflowX: 'auto' }}>
             <ChipSelector
               items={chipItems}
               value={activeChip}
               onChange={setActiveChip}
               variant="pill"
-              size="sm"
+              size="ms"
               style={{ gap: SPACING.md, flexWrap: 'nowrap' }}
             />
           </div>
@@ -1042,7 +928,7 @@ export default function DetailDialog({
         style={{
           flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
           WebkitOverflowScrolling: 'touch', touchAction: 'pan-y',
-          padding: `0 ${px} ${SPACING.xl}`,
+          padding: `${overlayDetail ? 0 : SPACING.sm} ${px} ${SPACING.xl}`,
         }}
       >
         {overlayDetail ? (
@@ -1062,7 +948,7 @@ export default function DetailDialog({
             )}
             {effectiveDetail.highlights?.length > 0 && (
               <SectionWrap label="포인트" px="0">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.md }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
                   {effectiveDetail.highlights.map((h, i) => (
                     <div
                       key={i}
@@ -1164,20 +1050,70 @@ export default function DetailDialog({
       {showMoreSheet && (
         <BottomSheet onClose={() => setShowMoreSheet(false)} maxHeight="auto" zIndex={3100} title="">
           <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}` }}>
-            <button
-              type="button"
-              onClick={() => { setShowMoreSheet(false); setShowMoveSheet(true); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: SPACING.md,
-                width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
-                border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
-                color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
-                fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
-              }}
-            >
-              <Icon name="pin" size={20} style={{ opacity: 0.7 }} />
-              다른 Day로 이동
-            </button>
+            {onMoveToDay && moveDayOptions.length > 1 && (
+              <button
+                type="button"
+                onClick={() => { setShowMoreSheet(false); setShowMoveSheet(true); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: SPACING.md,
+                  width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+                  border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
+                  color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
+                  fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <Icon name="pin" size={20} style={{ opacity: 0.7 }} />
+                다른 Day로 이동
+              </button>
+            )}
+            {canEditInline && tripId && displayImages.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => { setShowMoreSheet(false); handleReplaceImage(); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: SPACING.md,
+                    width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+                    border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
+                    color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
+                    fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <Icon name="edit" size={20} style={{ opacity: 0.7 }} />
+                  이미지 변경
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowMoreSheet(false); handleRemoveImage(); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: SPACING.md,
+                    width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+                    border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
+                    color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
+                    fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <Icon name="trash" size={20} style={{ opacity: 0.7 }} />
+                  이미지 삭제
+                </button>
+              </>
+            )}
+            {canEditInline && tripId && displayImages.length === 0 && (
+              <button
+                type="button"
+                onClick={() => { setShowMoreSheet(false); imageFileRef.current?.click(); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: SPACING.md,
+                  width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+                  border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
+                  color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
+                  fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <Icon name="file" size={20} style={{ opacity: 0.7 }} />
+                이미지 추가
+              </button>
+            )}
           </div>
         </BottomSheet>
       )}
@@ -1230,6 +1166,78 @@ export default function DetailDialog({
                   </button>
                 );
               })}
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* ══ 이미지 관리 다이얼로그 ══ */}
+      {showImageManageDialog && (
+        <BottomSheet onClose={() => setShowImageManageDialog(false)} maxHeight="70vh" zIndex={3100} title="이미지 관리">
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}` }}>
+            {/* 썸네일 그리드 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: SPACING.md,
+              marginBottom: SPACING.xl,
+            }}>
+              {displayImages.map((img, i) => {
+                const isPlacePhoto = placePhotos.includes(img);
+                return (
+                  <div key={i} style={{ position: 'relative', aspectRatio: '1/1', borderRadius: RADIUS.md, overflow: 'hidden', background: COLOR.surfaceLowest }}>
+                    <img
+                      src={img}
+                      alt={`${effectiveDetail.name} ${i + 1}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
+                      onClick={() => setViewImage(img)}
+                    />
+                    {!isPlacePhoto && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (img === mainImage) {
+                            saveField({ image: '', _imageRemovedByUser: true });
+                          } else if (imagesArray?.includes(img)) {
+                            saveField({ images: imagesArray.filter(x => x !== img) });
+                          } else if (img === ragImage) {
+                            setRagImage(null);
+                            saveField({ _imageRemovedByUser: true });
+                          }
+                          const remaining = displayImages.filter(x => x !== img && !placePhotos.includes(x));
+                          if (remaining.length === 0) setShowImageManageDialog(false);
+                        }}
+                        style={{
+                          position: 'absolute', bottom: 4, right: 4,
+                          width: 28, height: 28, borderRadius: '50%',
+                          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+                          border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        <Icon name="trash" size={14} style={{ color: '#fff' }} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* 이미지 추가 버튼 */}
+            <button
+              type="button"
+              onClick={() => imageFileRef.current?.click()}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: SPACING.md,
+                width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+                border: '1px dashed var(--color-outline-variant)', borderRadius: RADIUS.md,
+                background: 'transparent', cursor: 'pointer',
+                color: 'var(--color-on-surface-variant)', fontSize: 'var(--typo-label-2-medium-size)',
+                fontWeight: 'var(--typo-label-2-medium-weight)',
+              }}
+            >
+              <Icon name="plus" size={18} style={{ opacity: 0.7 }} />
+              이미지 추가
+            </button>
           </div>
         </BottomSheet>
       )}

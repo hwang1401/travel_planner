@@ -961,7 +961,10 @@ export default function TravelPlanner() {
       return { ...prev, ...(newItem.detail || {}), timetable: newItem.detail?.timetable, _item: newItem };
     });
     const isEdit = itemIdx !== undefined && itemIdx !== null;
-    setToast({ message: isEdit ? "일정이 수정되었습니다" : "일정이 추가되었습니다", icon: isEdit ? "edit" : "check" });
+    const editToastMsg = opts.editKind
+      ? { address: '주소가 변경되었습니다', time: '시간이 변경되었습니다', desc: '이름이 변경되었습니다', tip: '메모가 변경되었습니다', price: '가격이 변경되었습니다', hours: '영업시간이 변경되었습니다', highlights: '포인트가 변경되었습니다', image: '이미지가 변경되었습니다', timetable: '시간표가 변경되었습니다', sub: '부가정보가 변경되었습니다', type: '유형이 변경되었습니다', move: '구간이 변경되었습니다' }[opts.editKind]
+      : null;
+    setToast({ message: isEdit ? (editToastMsg ?? '일정이 수정되었습니다') : '일정이 추가되었습니다', icon: isEdit ? 'edit' : 'check' });
     // 일정 추가 직후에만: 새 지역이 있으면 "여행지에 추가할까요?" 시트 (직접 추가·AI·붙여넣기 공통)
     if (!isEdit && !isLegacy && tripId && Array.isArray(tripMeta?.destinations)) {
       const itemRegions = getRegionsFromItems([newItem]);
@@ -1073,9 +1076,9 @@ export default function TravelPlanner() {
   }, [performDeleteItem]);
 
   /* DetailDialog 인라인 수정: 필드 단위 저장 (displayIdx → origIdx 변환) */
-  const handleSaveFieldFromDetail = useCallback((displayIdx, sectionIdx, itemIdx, updatedItem) => {
+  const handleSaveFieldFromDetail = useCallback((displayIdx, sectionIdx, itemIdx, updatedItem, editKind) => {
     const dayIdx = toOrigIdx(displayIdx);
-    handleSaveItem(updatedItem, dayIdx, sectionIdx, itemIdx, { skipDuplicateCheck: true });
+    handleSaveItem(updatedItem, dayIdx, sectionIdx, itemIdx, { skipDuplicateCheck: true, editKind });
     // activeDetail도 갱신
     setActiveDetail((prev) => {
       if (!prev) return prev;

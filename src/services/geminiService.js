@@ -635,6 +635,8 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
           item.detail.lat = match.lat;
           item.detail.lon = match.lon;
         }
+        if (match.rating != null) item.detail.rating = match.rating;
+        if (match.review_count != null) item.detail.reviewCount = match.review_count;
       } else {
         // RAG 미매칭이면 Gemini가 넣은 주소는 신뢰 불가 → 전부 제거
         if (item.detail?.address) {
@@ -789,6 +791,8 @@ function injectRAGData(days, ragPlaces) {
             item.detail.lat = match.lat;
             item.detail.lon = match.lon;
           }
+          if (match.rating != null) item.detail.rating = match.rating;
+          if (match.review_count != null) item.detail.reviewCount = match.review_count;
         } else {
           // RAG 미매칭이면 Gemini가 넣은 주소는 신뢰 불가 → 전부 제거
           if (item.detail?.address) {

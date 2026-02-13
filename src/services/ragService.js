@@ -272,7 +272,7 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
     }
     if (regions.length === 0) return result;
 
-    const selectCols = 'id, region, name_ko, type, description, tags, price_range, opening_hours, image_url, google_place_id, address, lat, lon';
+    const selectCols = 'id, region, name_ko, type, description, tags, price_range, opening_hours, image_url, google_place_id, address, lat, lon, rating, review_count';
     const tags = extractTagsFromPreferences(preferences || '');
     const confidenceOr = 'confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null';
 
