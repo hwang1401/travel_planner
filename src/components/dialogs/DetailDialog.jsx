@@ -121,10 +121,11 @@ export default function DetailDialog({
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const nearbyCacheRef = useRef({});
   const nearbyScrollRef = useRef(null);
+  const carouselScrollRef = useRef(null);
   const contentScrollRef = useRef(null);
   const effectiveDetail = overlayDetail || detail;
   const accentColor = dayColor || COLOR.primary;
-  const swipeStart = useRef({ x: 0, y: 0, pointerId: null, fromNearbyScroll: false });
+  const swipeStart = useRef({ x: 0, y: 0, pointerId: null, fromNearbyScroll: false, fromCarousel: false });
   const curIdx = typeof currentDetailIndex === "number" ? currentDetailIndex : 0;
   const total = allDetailPayloads?.length ?? 0;
 
@@ -326,6 +327,7 @@ export default function DetailDialog({
   const handleSwipeEnd = useCallback((endX, endY) => {
     if (overlayDetail) return;
     if (swipeStart.current.fromNearbyScroll) return;
+    if (swipeStart.current.fromCarousel) return;
     const { x: startX, y: startY } = swipeStart.current;
     const dx = endX - startX;
     const dy = endY - startY;
@@ -349,6 +351,7 @@ export default function DetailDialog({
     const t = e.touches[0];
     handleStart(t.clientX, t.clientY, null);
     swipeStart.current.fromNearbyScroll = nearbyScrollRef.current?.contains(e.target) ?? false;
+    swipeStart.current.fromCarousel = carouselScrollRef.current?.contains(e.target) ?? false;
   }, [handleStart]);
   const onTouchEnd = useCallback((e) => {
     if (!e.changedTouches?.[0]) return;
@@ -359,6 +362,7 @@ export default function DetailDialog({
     if (e.pointerType !== "mouse") return;
     handleStart(e.clientX, e.clientY, e.pointerId);
     swipeStart.current.fromNearbyScroll = nearbyScrollRef.current?.contains(e.target) ?? false;
+    swipeStart.current.fromCarousel = carouselScrollRef.current?.contains(e.target) ?? false;
   }, [handleStart]);
   const onPointerUp = useCallback((e) => {
     if (e.pointerType !== "mouse") return;
@@ -896,6 +900,13 @@ export default function DetailDialog({
               </div>
             ) : (
               <div
+                ref={carouselScrollRef}
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerMove={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
                 style={{
                   width: '100%',
                   minWidth: 0,
@@ -907,6 +918,7 @@ export default function DetailDialog({
                   WebkitOverflowScrolling: 'touch',
                   touchAction: 'pan-x',
                   overscrollBehavior: 'contain',
+                  paddingBottom: SPACING.sm,
                 }}
               >
                 {displayImages.map((img, i) => (
@@ -1219,6 +1231,7 @@ export default function DetailDialog({
                 gap: SPACING.md,
               }}>
               {displayImages.map((img, i) => {
+                // Google Places API로 런타임에 가져온 URL — 우리 DB에 없어 삭제/교체 저장 불가. 탭 시 확대만.
                 const isPlacePhoto = placePhotos.includes(img);
                 const isUserImage = !isPlacePhoto;
                 const isSelected = selectedForDelete.has(img);
