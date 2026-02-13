@@ -23,7 +23,8 @@ export default function ImageViewer({ src, alt, onClose }) {
       <Button variant="ghost-neutral" size="lg" iconOnly="close" onClick={onClose}
         style={{
           position: "absolute", top: "calc(16px + env(safe-area-inset-top, 0px))", right: "calc(16px + env(safe-area-inset-right, 0px))", zIndex: 1,
-          background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)",
+          background: "rgba(255,255,255,0.95)", color: "var(--color-on-surface)",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
           width: "40px", height: "40px",
         }} />
       <img

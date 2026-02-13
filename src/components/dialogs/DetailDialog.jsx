@@ -136,6 +136,9 @@ export default function DetailDialog({
   const [singleStationPicker, setSingleStationPicker] = useState(null); // { mode: 'from'|'to' }
   const [showAddressSearchDialog, setShowAddressSearchDialog] = useState(false);
   const [showImageManageDialog, setShowImageManageDialog] = useState(false);
+  const [imageToReplace, setImageToReplace] = useState(null); // url when replacing one image
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedForDelete, setSelectedForDelete] = useState(() => new Set());
   const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined, photoUrl: undefined });
 
   // visualViewport
@@ -486,6 +489,28 @@ export default function DetailDialog({
     setRagImage(null);
   }, [onSaveField, saveField]);
 
+  const handleReplaceImageWithFile = useCallback(async (file, oldUrl) => {
+    if (!tripId || !onSaveField || !oldUrl) return;
+    setImageUploading(true);
+    try {
+      const path = generateImagePath(tripId, 'items');
+      const newUrl = await uploadImage(file, path);
+      if (oldUrl === mainImage) {
+        saveField({ image: newUrl });
+      } else if (imagesArray?.includes(oldUrl)) {
+        saveField({ images: imagesArray.map((u) => (u === oldUrl ? newUrl : u)) });
+      } else if (oldUrl === ragImage) {
+        setRagImage(null);
+        saveField({ image: newUrl });
+      }
+    } catch (err) {
+      console.error('[DetailDialog] Replace image error:', err);
+    } finally {
+      setImageUploading(false);
+      setImageToReplace(null);
+    }
+  }, [tripId, onSaveField, saveField, mainImage, imagesArray, ragImage]);
+
   const handleSingleStationSelect = (station) => {
     const from = singleStationPicker.mode === 'from' ? station : (item?.moveFrom || '');
     const to = singleStationPicker.mode === 'to' ? station : (item?.moveTo || '');
@@ -706,7 +731,6 @@ export default function DetailDialog({
         {/* 상단 헤더: 이름 + 평점 + 카테고리 + 팁 */}
         <div style={{
           padding: `${SPACING.lg} ${px} ${SPACING.md}`,
-          borderBottom: displayImages.length > 0 ? 'none' : '1px solid var(--color-outline-variant)',
         }}>
           {/* 라인 1: 장소명(좌측) + 시간뱃지 + 더보기 + 닫기 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.sm }}>
@@ -842,7 +866,13 @@ export default function DetailDialog({
           style={{ display: 'none' }}
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) handleAddImage(file);
+            if (file) {
+              if (imageToReplace) {
+                handleReplaceImageWithFile(file, imageToReplace);
+              } else {
+                handleAddImage(file);
+              }
+            }
             e.target.value = '';
           }}
         />
@@ -865,12 +895,20 @@ export default function DetailDialog({
                   style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
               </div>
             ) : (
-              <div style={{
-                overflowX: 'auto', overflowY: 'hidden',
-                display: 'flex', gap: SPACING.md,
-                scrollSnapType: 'x mandatory',
-                WebkitOverflowScrolling: 'touch',
-              }}>
+              <div
+                style={{
+                  width: '100%',
+                  minWidth: 0,
+                  overflowX: 'auto',
+                  overflowY: 'hidden',
+                  display: 'flex',
+                  gap: SPACING.md,
+                  scrollSnapType: 'x mandatory',
+                  WebkitOverflowScrolling: 'touch',
+                  touchAction: 'pan-x',
+                  overscrollBehavior: 'contain',
+                }}
+              >
                 {displayImages.map((img, i) => (
                   <div key={i} onClick={() => setViewImage(img)} style={{
                     flexShrink: 0, width: '90%', maxHeight: '40vh', aspectRatio: '16/9',
@@ -983,7 +1021,7 @@ export default function DetailDialog({
       {!overlayDetail && allDetailPayloads && allDetailPayloads.length > 1 && (
         <div style={{
           flexShrink: 0,
-          padding: `${SPACING.md} ${px} var(--safe-area-bottom, 0px) ${px}`,
+          padding: `${SPACING.md} ${px} 0 ${px}`,
           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: SPACING.xs,
           background: 'var(--color-surface)',
         }}>
@@ -1024,7 +1062,7 @@ export default function DetailDialog({
 
       {/* ══ 하단 고정 액션: overlay일 때 일정추가 ══ */}
       {overlayDetail && onAddToSchedule && overlayPlace && (
-        <div style={{ flexShrink: 0, padding: `${SPACING.md} ${px} var(--safe-area-bottom, 0px) ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
+        <div style={{ flexShrink: 0, padding: `${SPACING.md} ${px} 0 ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
           <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => onAddToSchedule(overlayPlace)}>일정추가</Button>
         </div>
       )}
@@ -1033,7 +1071,7 @@ export default function DetailDialog({
       {!overlayDetail && (directionsUrl || (isCustom && onDelete)) && (
         <div style={{
           flexShrink: 0,
-          padding: `${SPACING.md} ${px} var(--safe-area-bottom, 0px) ${px}`,
+          padding: `${SPACING.md} ${px} 0 ${px}`,
           display: 'flex', gap: SPACING.md,
           borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)',
         }}>
@@ -1066,39 +1104,23 @@ export default function DetailDialog({
                 다른 Day로 이동
               </button>
             )}
-            {canEditInline && tripId && displayImages.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => { setShowMoreSheet(false); handleReplaceImage(); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: SPACING.md,
-                    width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
-                    border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
-                    color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
-                    fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
-                  }}
-                >
-                  <Icon name="edit" size={20} style={{ opacity: 0.7 }} />
-                  이미지 변경
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowMoreSheet(false); handleRemoveImage(); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: SPACING.md,
-                    width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
-                    border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
-                    color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
-                    fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
-                  }}
-                >
-                  <Icon name="trash" size={20} style={{ opacity: 0.7 }} />
-                  이미지 삭제
-                </button>
-              </>
+            {canEditInline && tripId && !overlayDetail && displayImages.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setShowMoreSheet(false); setShowImageManageDialog(true); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: SPACING.md,
+                  width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+                  border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
+                  color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
+                  fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <Icon name="file" size={20} style={{ opacity: 0.7 }} />
+                이미지 수정
+              </button>
             )}
-            {canEditInline && tripId && displayImages.length === 0 && (
+            {canEditInline && tripId && !overlayDetail && displayImages.length === 0 && (
               <button
                 type="button"
                 onClick={() => { setShowMoreSheet(false); imageFileRef.current?.click(); }}
@@ -1172,75 +1194,198 @@ export default function DetailDialog({
 
       {/* ══ 이미지 관리 다이얼로그 ══ */}
       {showImageManageDialog && (
-        <BottomSheet onClose={() => setShowImageManageDialog(false)} maxHeight="70vh" zIndex={3100} title="이미지 관리">
-          <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}` }}>
-            {/* 썸네일 그리드 */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: SPACING.md,
-              marginBottom: SPACING.xl,
-            }}>
+        <BottomSheet
+          onClose={() => {
+            setShowImageManageDialog(false);
+            setDeleteMode(false);
+            setSelectedForDelete(new Set());
+          }}
+          maxHeight="70vh"
+          zIndex={3100}
+          title="이미지 관리"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {/* 썸네일 그리드 — 스크롤 영역 */}
+            <div
+              style={{
+                maxHeight: '45vh',
+                overflow: 'auto',
+                padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xl}`,
+              }}
+            >
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: SPACING.md,
+              }}>
               {displayImages.map((img, i) => {
                 const isPlacePhoto = placePhotos.includes(img);
+                const isUserImage = !isPlacePhoto;
+                const isSelected = selectedForDelete.has(img);
                 return (
-                  <div key={i} style={{ position: 'relative', aspectRatio: '1/1', borderRadius: RADIUS.md, overflow: 'hidden', background: COLOR.surfaceLowest }}>
-                    <img
-                      src={img}
-                      alt={`${effectiveDetail.name} ${i + 1}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
-                      onClick={() => setViewImage(img)}
-                    />
-                    {!isPlacePhoto && (
+                  <div
+                    key={i}
+                    style={{
+                      position: 'relative',
+                      aspectRatio: '1/1',
+                      borderRadius: RADIUS.md,
+                      overflow: 'hidden',
+                      background: COLOR.surfaceLowest,
+                      outline: deleteMode && isUserImage && isSelected ? '3px solid var(--color-primary)' : 'none',
+                      outlineOffset: 2,
+                    }}
+                  >
+                    {deleteMode && isUserImage ? (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (img === mainImage) {
-                            saveField({ image: '', _imageRemovedByUser: true });
-                          } else if (imagesArray?.includes(img)) {
-                            saveField({ images: imagesArray.filter(x => x !== img) });
-                          } else if (img === ragImage) {
-                            setRagImage(null);
-                            saveField({ _imageRemovedByUser: true });
-                          }
-                          const remaining = displayImages.filter(x => x !== img && !placePhotos.includes(x));
-                          if (remaining.length === 0) setShowImageManageDialog(false);
+                          setSelectedForDelete((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(img)) next.delete(img);
+                            else next.add(img);
+                            return next;
+                          });
                         }}
                         style={{
-                          position: 'absolute', bottom: 4, right: 4,
-                          width: 28, height: 28, borderRadius: '50%',
-                          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
-                          border: 'none', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'flex-end',
+                          padding: SPACING.sm,
                         }}
                       >
-                        <Icon name="trash" size={14} style={{ color: '#fff' }} />
+                        <span style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          border: '2px solid #fff',
+                          background: isSelected ? 'var(--color-primary)' : 'rgba(0,0,0,0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                        }}>
+                          {isSelected && <span style={{ color: '#fff', fontSize: 14, lineHeight: 1 }}>✓</span>}
+                        </span>
                       </button>
+                    ) : null}
+                    <img
+                      src={img}
+                      alt={`${effectiveDetail.name} ${i + 1}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                        cursor: deleteMode && isUserImage ? 'default' : isUserImage ? 'pointer' : 'zoom-in',
+                        pointerEvents: deleteMode && isUserImage ? 'none' : 'auto',
+                      }}
+                      onClick={(e) => {
+                        if (deleteMode && isUserImage) return;
+                        e.stopPropagation();
+                        if (isPlacePhoto) {
+                          setViewImage(img);
+                        } else {
+                          setImageToReplace(img);
+                          imageFileRef.current?.click();
+                        }
+                      }}
+                    />
+                    {!deleteMode && isPlacePhoto && (
+                      <span style={{
+                        position: 'absolute', bottom: 4, left: 4,
+                        fontSize: 'var(--typo-caption-3-size)', color: 'rgba(255,255,255,0.9)',
+                        background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: RADIUS.xs,
+                      }}>
+                        Google
+                      </span>
                     )}
                   </div>
                 );
               })}
+              </div>
             </div>
-            {/* 이미지 추가 버튼 */}
-            <button
-              type="button"
-              onClick={() => imageFileRef.current?.click()}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: SPACING.md,
-                width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
-                border: '1px dashed var(--color-outline-variant)', borderRadius: RADIUS.md,
-                background: 'transparent', cursor: 'pointer',
-                color: 'var(--color-on-surface-variant)', fontSize: 'var(--typo-label-2-medium-size)',
-                fontWeight: 'var(--typo-label-2-medium-weight)',
-              }}
-            >
-              <Icon name="plus" size={18} style={{ opacity: 0.7 }} />
-              이미지 추가
-            </button>
+            {/* 하단: 이미지 삭제 / 이미지 추가 */}
+            <div style={{
+              flexShrink: 0,
+              display: 'flex',
+              gap: SPACING.md,
+              padding: SPACING.md,
+              borderTop: '1px solid var(--color-outline-variant)',
+              background: 'var(--color-surface)',
+            }}>
+              {deleteMode ? (
+                <>
+                  <Button
+                    variant="ghost-neutral"
+                    size="md"
+                    onClick={() => {
+                      setDeleteMode(false);
+                      setSelectedForDelete(new Set());
+                    }}
+                    style={{ flex: 1 }}
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    variant="ghost-danger"
+                    size="md"
+                    iconLeft="trash"
+                    disabled={selectedForDelete.size === 0 || imageUploading}
+                    onClick={() => {
+                      const toRemove = selectedForDelete;
+                      const newImage = mainImage && !toRemove.has(mainImage) ? mainImage : '';
+                      const newImages = imagesArray ? imagesArray.filter((x) => !toRemove.has(x)) : [];
+                      if (toRemove.has(ragImage)) setRagImage(null);
+                      saveField({ image: newImage, images: newImages, _imageRemovedByUser: toRemove.size > 0 });
+                      setSelectedForDelete(new Set());
+                      setDeleteMode(false);
+                      const userCount = displayImages.filter((u) => !placePhotos.includes(u)).length;
+                      if (userCount <= toRemove.size) setShowImageManageDialog(false);
+                    }}
+                    style={{ flex: 1 }}
+                  >
+                    삭제 ({selectedForDelete.size}개)
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost-danger"
+                    size="md"
+                    iconLeft="trash"
+                    onClick={() => setDeleteMode(true)}
+                    style={{ flex: 1 }}
+                  >
+                    이미지 삭제
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    iconLeft="plus"
+                    disabled={imageUploading}
+                    onClick={() => {
+                      setImageToReplace(null);
+                      imageFileRef.current?.click();
+                    }}
+                    style={{ flex: 1 }}
+                  >
+                    이미지 추가
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </BottomSheet>
       )}
+
     </div>
   );
 
