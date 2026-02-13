@@ -140,7 +140,7 @@ export default function DetailDialog({
   const [imageToReplace, setImageToReplace] = useState(null); // url when replacing one image
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState(() => new Set());
-  const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined, photoUrl: undefined });
+  const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined, photoUrl: undefined, rating: undefined, reviewCount: undefined, hours: undefined, priceLevel: undefined });
 
   // visualViewport
   const [viewportRect, setViewportRect] = useState(null);
@@ -243,7 +243,7 @@ export default function DetailDialog({
   /* ── 주변 추천 로딩 ── */
   useEffect(() => { setOverlayDetail(null); setOverlayPlace(null); }, [detail]);
 
-  /* ── RAG 이미지 자동 로드 및 적용 (주소/이름 매칭, 이미지 없을 때만) ── */
+  /* ── RAG 이미지 자동 로드 (표시 전용, 저장하지 않음) ── */
   /* 사용자가 의도적으로 이미지 삭제한 경우(_imageRemovedByUser) RAG로 덮어쓰지 않음 */
   useEffect(() => {
     if (overlayDetail) { setRagImage(null); return; }
@@ -260,18 +260,9 @@ export default function DetailDialog({
         return;
       }
       setRagImage(place.image_url);
-      if (onSaveField && item) {
-        const di = effectiveDetail._di ?? detail._di;
-        const si = effectiveDetail._si ?? detail._si;
-        const ii = effectiveDetail._ii ?? detail._ii;
-        const updated = { ...item };
-        if (!updated.detail) updated.detail = { name: updated.desc, category: catMap[updated.type] || '관광' };
-        updated.detail = { ...updated.detail, image: place.image_url, name: updated.desc };
-        onSaveField(di, si, ii, updated);
-      }
     }).catch(() => { if (!cancelled) setRagImage(null); });
     return () => { cancelled = true; };
-  }, [effectiveDetail?.name, effectiveDetail?.address, item?.desc, mainImage, imagesArray, overlayDetail, onSaveField, item, effectiveDetail, detail]);
+  }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?._imageRemovedByUser, item?.desc, mainImage, imagesArray, overlayDetail]);
 
   // placeId가 있으면 Google Places에서 최대 3장 사진 fetch
   useEffect(() => {
@@ -318,6 +309,10 @@ export default function DetailDialog({
         lon: effectiveDetail.lon,
         placeId: effectiveDetail.placeId,
         photoUrl: undefined,
+        rating: effectiveDetail.rating,
+        reviewCount: effectiveDetail.reviewCount,
+        hours: effectiveDetail.hours,
+        priceLevel: effectiveDetail.priceLevel,
       });
     }
   }, [showAddressSearchDialog, effectiveDetail.address, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.placeId]);
@@ -409,6 +404,9 @@ export default function DetailDialog({
       updated.detail = { ...updated.detail, _imageRemovedByUser: fieldUpdates._imageRemovedByUser };
     }
     if (fieldUpdates.timetable !== undefined) updated.detail = { ...updated.detail, timetable: fieldUpdates.timetable };
+    if (fieldUpdates.rating !== undefined) updated.detail = { ...updated.detail, rating: fieldUpdates.rating };
+    if (fieldUpdates.reviewCount !== undefined) updated.detail = { ...updated.detail, reviewCount: fieldUpdates.reviewCount };
+    if (fieldUpdates.priceLevel !== undefined) updated.detail = { ...updated.detail, priceLevel: fieldUpdates.priceLevel };
     updated.detail.name = updated.desc;
 
     const editKind = fieldUpdates.address !== undefined || fieldUpdates.lat !== undefined || fieldUpdates.placeId !== undefined
@@ -1439,6 +1437,10 @@ export default function DetailDialog({
                 fields.image = null;
                 fields._imageRemovedByUser = false;
               }
+              if (addressSearchPending.rating != null) fields.rating = addressSearchPending.rating;
+              if (addressSearchPending.reviewCount != null) fields.reviewCount = addressSearchPending.reviewCount;
+              if (addressSearchPending.hours) fields.hours = addressSearchPending.hours;
+              if (addressSearchPending.priceLevel != null) fields.priceLevel = addressSearchPending.priceLevel;
               saveField(fields);
             }
             setShowAddressSearchDialog(false);
@@ -1476,8 +1478,13 @@ export default function DetailDialog({
           )}
           <AddressSearch
             value={addressSearchPending.address}
-            onChange={(address, lat, lon, photoUrl, placeId) => {
-              setAddressSearchPending({ address: address || '', lat: lat ?? undefined, lon: lon ?? undefined, placeId: placeId ?? undefined, photoUrl: photoUrl ?? undefined });
+            onChange={(address, lat, lon, photoUrl, placeId, extras) => {
+              setAddressSearchPending({
+                address: address || '', lat: lat ?? undefined, lon: lon ?? undefined,
+                placeId: placeId ?? undefined, photoUrl: photoUrl ?? undefined,
+                rating: extras?.rating ?? undefined, reviewCount: extras?.reviewCount ?? undefined,
+                hours: extras?.hours ?? undefined, priceLevel: extras?.priceLevel ?? undefined,
+              });
             }}
             placeholder="장소명, 주소를 검색하세요"
             size="lg"
@@ -1500,6 +1507,10 @@ export default function DetailDialog({
                 fields.image = null;
                 fields._imageRemovedByUser = false;
               }
+              if (addressSearchPending.rating != null) fields.rating = addressSearchPending.rating;
+              if (addressSearchPending.reviewCount != null) fields.reviewCount = addressSearchPending.reviewCount;
+              if (addressSearchPending.hours) fields.hours = addressSearchPending.hours;
+              if (addressSearchPending.priceLevel != null) fields.priceLevel = addressSearchPending.priceLevel;
               saveField(fields);
               setShowAddressSearchDialog(false);
             }}>확인</Button>

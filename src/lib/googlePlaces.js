@@ -86,7 +86,7 @@ export async function getPlaceDetails(placeId) {
     try {
       const place = new google.maps.places.Place({ id: placeId });
       await place.fetchFields({
-        fields: ['displayName', 'formattedAddress', 'location', 'photos'],
+        fields: ['displayName', 'formattedAddress', 'location', 'photos', 'rating', 'userRatingCount', 'currentOpeningHours', 'priceLevel'],
       });
 
       const loc = place.location;
@@ -106,6 +106,10 @@ export async function getPlaceDetails(placeId) {
         name: place.displayName || place.formattedAddress || '',
         photoUrl: photoUrl || undefined,
         placeId,
+        rating: place.rating ?? null,
+        reviewCount: place.userRatingCount ?? null,
+        hours: place.currentOpeningHours?.weekdayDescriptions?.join('; ') || null,
+        priceLevel: place.priceLevel ?? null,
       };
     } catch (e) {
       console.warn('[Places] Place.fetchFields failed, trying legacy', e);
@@ -118,7 +122,7 @@ export async function getPlaceDetails(placeId) {
       const div = document.createElement('div');
       const service = new google.maps.places.PlacesService(div);
       service.getDetails(
-        { placeId, fields: ['geometry', 'formatted_address', 'name', 'photos'] },
+        { placeId, fields: ['geometry', 'formatted_address', 'name', 'photos', 'rating', 'user_ratings_total', 'opening_hours', 'price_level'] },
         (place, status) => {
           if (status !== google.maps.places.PlacesServiceStatus.OK || !place) {
             resolve(null);
@@ -133,6 +137,10 @@ export async function getPlaceDetails(placeId) {
             name: place.name || place.formatted_address || '',
             photoUrl: photoUrl || undefined,
             placeId,
+            rating: place.rating ?? null,
+            reviewCount: place.user_ratings_total ?? null,
+            hours: place.opening_hours?.weekday_text?.join('; ') || null,
+            priceLevel: place.price_level ?? null,
           });
         }
       );

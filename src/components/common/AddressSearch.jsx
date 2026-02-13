@@ -108,7 +108,10 @@ export default function AddressSearch({
       const details = await getPlaceDetails(result.placeId);
       if (details) {
         const addr = details.formatted_address || details.name;
-        if (onChange) onChange(addr, details.lat, details.lon, details.photoUrl, details.placeId);
+        if (onChange) onChange(addr, details.lat, details.lon, details.photoUrl, details.placeId, {
+          rating: details.rating, reviewCount: details.reviewCount,
+          hours: details.hours, priceLevel: details.priceLevel,
+        });
         setQuery('');
       } else {
         if (onChange) onChange(result.name, null, null, undefined, result.placeId);
