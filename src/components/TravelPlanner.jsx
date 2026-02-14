@@ -301,6 +301,8 @@ export default function TravelPlanner() {
   const dirtyDaysRef = useRef(new Set());    // 수정된 day 원본 인덱스
   const dirtyMetaRef = useRef(false);         // _dayOrder, _extraDays 구조, _dayOverrides 수정 여부
   const dirtyGenRef = useRef(0);              // 세대 카운터 (저장 완료 시 조기 클리어 방지)
+  const lastReceivedRtVersionRef = useRef(0); // 마지막 수신 realtime 버전 (순서 역전 방지용)
+  const clearDirtyTimerRef = useRef(null);    // dirty 추적 지연 해제 타이머
 
   /* ── Presence: who is online ── */
   const presenceUser = useMemo(() => {
@@ -385,31 +387,46 @@ export default function TravelPlanner() {
   const clearDirtyTracking = useCallback(() => {
     dirtyDaysRef.current = new Set();
     dirtyMetaRef.current = false;
+    if (clearDirtyTimerRef.current) {
+      clearTimeout(clearDirtyTimerRef.current);
+      clearDirtyTimerRef.current = null;
+    }
   }, []);
+
+  /** 저장 완료 후 dirty 추적을 일정 시간 유지한 뒤 해제 (다른 사용자 realtime이 도착할 여유) */
+  const scheduleClearDirtyTracking = useCallback((saveGen) => {
+    if (clearDirtyTimerRef.current) clearTimeout(clearDirtyTimerRef.current);
+    clearDirtyTimerRef.current = setTimeout(() => {
+      clearDirtyTimerRef.current = null;
+      if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+    }, 3000);
+  }, [clearDirtyTracking]);
 
   /* ── Setup debounced save for Supabase trips ── */
   useEffect(() => {
     if (isLegacy || !tripId) return;
     const ds = createDebouncedSave(tripId, 800, (version) => {
       lastSavedVersionRef.current = version;
-      clearDirtyTracking();
+      // 저장 완료 시점의 dirtyGen을 캡처하여 지연 해제 예약
+      scheduleClearDirtyTracking(dirtyGenRef.current);
     });
     debouncedSaveRef.current = ds;
     return () => { ds.cancel(); };
-  }, [tripId, isLegacy, clearDirtyTracking]);
+  }, [tripId, isLegacy, scheduleClearDirtyTracking]);
 
   /* ── Realtime subscription for Supabase trips ── */
   useEffect(() => {
     if (isLegacy || !tripId) return;
 
     const unsubscribe = subscribeToSchedule(tripId, (payload) => {
-      // 절대 본인 저장분을 realtime으로 덮어쓰지 않음 (순서 지연 시 이전 데이터로 롤백 방지)
+      // 절대 본인 저장분을 realtime으로 덮어쓰지 않음
       if (payload.updatedBy === user?.id) return;
-      // 최근 저장 직후 5초간 realtime 무시 (동시성·이벤트 순서 이슈 방어)
-      if (Date.now() - lastSaveTimestampRef.current < 5000) return;
-      // 본인 저장보다 오래된 버전의 Realtime 무시 (지연 도착한 예전 이벤트가 저장을 덮어쓰는 것 방지)
+
       const rtVersion = payload.version ?? 0;
-      if (rtVersion > 0 && rtVersion <= lastSavedVersionRef.current) return;
+
+      // 이미 수신한 버전 이하의 이벤트는 무시 (순서 역전 방어)
+      if (rtVersion > 0 && rtVersion <= lastReceivedRtVersionRef.current) return;
+      if (rtVersion > 0) lastReceivedRtVersionRef.current = rtVersion;
 
       const rtData = payload.data || {};
       if (!rtData._standalone) {
@@ -449,6 +466,13 @@ export default function TravelPlanner() {
   const updateCustomData = useCallback((updater) => {
     setCustomData((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
+      // _extraDays 참조가 바뀌었으면 자동으로 meta dirty 표시
+      // (standalone 여행에서 아이템 이동/삭제/수정 시 _extraDays 내부를 수정하는데
+      //  markMetaDirty()를 빠뜨리기 쉬움 → 여기서 자동 감지)
+      if (next._extraDays !== prev._extraDays) {
+        dirtyMetaRef.current = true;
+        dirtyGenRef.current++;
+      }
       persistSchedule(next);
       return next;
     });
@@ -762,7 +786,7 @@ export default function TravelPlanner() {
       saveSchedule(tripId, nextSnapshot)
         .then((version) => {
           if (version > 0) lastSavedVersionRef.current = version;
-          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+          if (dirtyGenRef.current === saveGen) scheduleClearDirtyTracking(saveGen);
         })
         .catch((err) => {
           console.error("[TravelPlanner] AddDay save failed:", err);
@@ -862,7 +886,7 @@ export default function TravelPlanner() {
           saveSchedule(tripId, nextSnapshot)
             .then((version) => {
               if (version > 0) lastSavedVersionRef.current = version;
-              if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+              if (dirtyGenRef.current === saveGen) scheduleClearDirtyTracking(saveGen);
             })
             .catch((err) => {
               console.error("[TravelPlanner] DeleteDay save failed:", err);
@@ -923,7 +947,7 @@ export default function TravelPlanner() {
       saveSchedule(tripId, nextSnapshot)
         .then((version) => {
           if (version > 0) lastSavedVersionRef.current = version;
-          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+          if (dirtyGenRef.current === saveGen) scheduleClearDirtyTracking(saveGen);
         })
         .catch((err) => {
           console.error("[TravelPlanner] Reorder save failed:", err);
@@ -1052,7 +1076,7 @@ export default function TravelPlanner() {
       saveSchedule(tripId, nextSnapshot)
         .then((version) => {
           if (version > 0) lastSavedVersionRef.current = version;
-          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+          if (dirtyGenRef.current === saveGen) scheduleClearDirtyTracking(saveGen);
           if (process.env.NODE_ENV === 'development') {
             console.debug('[TravelPlanner] Schedule saved', { dayIdx, sectionIdx, itemIdx });
           }
@@ -1169,7 +1193,7 @@ export default function TravelPlanner() {
       saveSchedule(tripId, nextSnapshot)
         .then((version) => {
           if (version > 0) lastSavedVersionRef.current = version;
-          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+          if (dirtyGenRef.current === saveGen) scheduleClearDirtyTracking(saveGen);
         })
         .catch((err) => {
           console.error("[TravelPlanner] Delete save failed:", err);
@@ -1325,9 +1349,8 @@ export default function TravelPlanner() {
       const itemToAdd = { ...item, _custom: true };
       delete itemToAdd._extra; // merge 시 자동으로 붙여줌
       if (!itemToAdd._id) itemToAdd._id = crypto.randomUUID();
-      if (!next[targetDayIdx]) next[targetDayIdx] = {};
-      if (!next[targetDayIdx].extraItems) next[targetDayIdx].extraItems = [];
-      next[targetDayIdx].extraItems = [...next[targetDayIdx].extraItems, itemToAdd];
+      next[targetDayIdx] = next[targetDayIdx] ? { ...next[targetDayIdx] } : {};
+      next[targetDayIdx].extraItems = [...(next[targetDayIdx].extraItems || []), itemToAdd];
 
       nextSnapshot = next;
       return next;
@@ -1341,7 +1364,7 @@ export default function TravelPlanner() {
       saveSchedule(tripId, nextSnapshot)
         .then((version) => {
           if (version > 0) lastSavedVersionRef.current = version;
-          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+          if (dirtyGenRef.current === saveGen) scheduleClearDirtyTracking(saveGen);
         })
         .catch((err) => {
           console.error("[TravelPlanner] MoveToDay save failed:", err);
@@ -1521,7 +1544,7 @@ export default function TravelPlanner() {
       saveSchedule(tripId, bulkDeleteNextRef.current)
         .then((version) => {
           if (version > 0) lastSavedVersionRef.current = version;
-          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+          if (dirtyGenRef.current === saveGen) scheduleClearDirtyTracking(saveGen);
         })
         .catch((err) => {
           console.error("[TravelPlanner] 일괄 삭제 직후 저장 실패:", err);
@@ -1612,7 +1635,7 @@ export default function TravelPlanner() {
       saveSchedule(tripId, nextSnapshot)
         .then((version) => {
           if (version > 0) lastSavedVersionRef.current = version;
-          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+          if (dirtyGenRef.current === saveGen) scheduleClearDirtyTracking(saveGen);
         })
         .catch((err) => {
           console.error("[TravelPlanner] BulkImport save failed:", err);

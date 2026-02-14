@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { SPACING, RADIUS } from '../../styles/tokens';
 
 const ROW_HEIGHT = 44;
@@ -239,7 +240,9 @@ export default function TimePickerDialog({ open, value, onConfirm, onClose, minu
     zIndex: 1,
   };
 
-  return (
+  if (!open) return null;
+
+  const dialog = (
     <div
       style={{
         position: 'fixed',
@@ -378,4 +381,6 @@ export default function TimePickerDialog({ open, value, onConfirm, onClose, minu
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 }

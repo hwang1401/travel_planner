@@ -43,26 +43,37 @@ export async function saveSchedule(tripId, scheduleData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { data, error } = await supabase
-    .from('trip_schedules')
-    .upsert({
-      trip_id: tripId,
-      data: scheduleData,
-      updated_at: new Date().toISOString(),
-      updated_by: user.id,
-      // Increment version via raw SQL or let DB handle it
-    }, {
-      onConflict: 'trip_id',
-    })
-    .select('version')
-    .single();
+  // RPC 함수로 원자적 upsert + version 증가 (fix-schedule-version.sql 배포 필요)
+  const { data: rpcVersion, error: rpcError } = await supabase.rpc(
+    'save_trip_schedule',
+    { p_trip_id: tripId, p_data: scheduleData, p_updated_by: user.id }
+  );
 
-  if (error) {
-    console.error('[ScheduleService] saveSchedule error:', error);
-    throw error;
+  if (!rpcError) return rpcVersion || 1;
+
+  // RPC 미배포 시 fallback: 기존 upsert (version 증가 안 됨)
+  if (rpcError.code === '42883') {
+    console.warn('[ScheduleService] save_trip_schedule RPC not found, using fallback upsert');
+    const { data, error } = await supabase
+      .from('trip_schedules')
+      .upsert({
+        trip_id: tripId,
+        data: scheduleData,
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+      }, { onConflict: 'trip_id' })
+      .select('version')
+      .single();
+
+    if (error) {
+      console.error('[ScheduleService] saveSchedule fallback error:', error);
+      throw error;
+    }
+    return data?.version || 1;
   }
 
-  return data?.version || 1;
+  console.error('[ScheduleService] saveSchedule RPC error:', rpcError);
+  throw rpcError;
 }
 
 /**
