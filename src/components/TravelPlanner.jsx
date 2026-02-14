@@ -1000,6 +1000,7 @@ export default function TravelPlanner() {
       deleteUndoRef.current = { snapshot: prev, tripId: tripId || null };
 
       const next = { ...prev };
+      let deleted = false;
 
       // 1) extraItems에서 삭제 (_id 우선, time+desc fallback)
       if (next[dayIdx]?.extraItems && target) {
@@ -1008,15 +1009,17 @@ export default function TravelPlanner() {
         if (idx >= 0) {
           next[dayIdx].extraItems = [...next[dayIdx].extraItems];
           next[dayIdx].extraItems.splice(idx, 1);
+          deleted = true;
         }
         if (next[dayIdx].extraItems?.length === 0) delete next[dayIdx].extraItems;
       }
 
-      // 2) sections overlay에서 삭제
-      if (next[dayIdx]?.sections) {
+      // 2) sections overlay에서 삭제 — extraItems에서 이미 삭제했으면 스킵
+      if (!deleted && next[dayIdx]?.sections) {
         next[dayIdx] = next[dayIdx] === prev[dayIdx] ? { ...next[dayIdx] } : next[dayIdx];
         const secKeys = Object.keys(next[dayIdx].sections || {});
         for (const sk of secKeys) {
+          if (deleted) break;
           const sec = next[dayIdx].sections[sk];
           if (!sec?.items) continue;
           const idx = target ? findItemIndex(sec.items, target) : -1;
@@ -1024,20 +1027,22 @@ export default function TravelPlanner() {
             next[dayIdx].sections = next[dayIdx].sections === prev[dayIdx]?.sections ? { ...next[dayIdx].sections } : next[dayIdx].sections;
             next[dayIdx].sections[sk] = { ...sec, items: [...sec.items] };
             next[dayIdx].sections[sk].items.splice(idx, 1);
+            deleted = true;
           }
         }
       }
 
-      // 3) _extraDays에서도 삭제 (standalone 여행)
-      if (baseLen === 0 && next._extraDays?.[dayIdx]) {
+      // 3) _extraDays에서도 삭제 (standalone 여행) — 위에서 이미 삭제했으면 스킵
+      if (!deleted && baseLen === 0 && next._extraDays?.[dayIdx]) {
         const ed = next._extraDays[dayIdx];
         const edSections = ed.sections || [];
         let edChanged = false;
         const newEdSections = edSections.map((sec) => {
-          if (!sec?.items) return sec;
+          if (deleted || !sec?.items) return sec;
           const idx = target ? findItemIndex(sec.items, target) : -1;
           if (idx >= 0) {
             edChanged = true;
+            deleted = true;
             const newItems = [...sec.items];
             newItems.splice(idx, 1);
             return { ...sec, items: newItems };
@@ -1128,15 +1133,15 @@ export default function TravelPlanner() {
     });
   }, [handleSaveItem, toOrigIdx, editTarget?.item]);
 
-  /* 정보 다이얼로그에서 삭제 시: 다이얼로그 닫고 확인 후 삭제 */
+  /* 정보 다이얼로그에서 삭제 시: 확인 다이얼로그를 DetailDialog 위에 표시 → 확인 후 삭제+닫기 */
   const handleDeleteFromDetail = useCallback((d) => {
     if (!d?._item?._custom) return;
-    setActiveDetail(null);
     setConfirmDialog({
       title: "일정 삭제",
       message: "이 일정을 삭제하시겠습니까?",
       confirmLabel: "삭제",
       onConfirm: () => {
+        setActiveDetail(null);
         performDeleteItem(toOrigIdx(d._di ?? selectedDay), d._si, d._ii, d._item);
         setConfirmDialog(null);
       },
@@ -1755,13 +1760,11 @@ export default function TravelPlanner() {
                     <div style={{ display: "flex", gap: "var(--spacing-sp80)", flexShrink: 0, alignItems: "center" }}>
                       {!bulkDeleteMode ? (
                         <>
-                          <Button variant="neutral" size="sm" iconLeft="trash"
+                          <Button variant="neutral" size="sm" iconOnly="trash"
                             onClick={() => { setBulkDeleteMode(true); setSelectedBulkKeys(new Set()); }}
                             style={{ borderRadius: "16px" }}
                             title="일괄 삭제"
-                            aria-label="일괄 삭제">
-                            일괄 삭제
-                          </Button>
+                            aria-label="일괄 삭제" />
                           <Button variant="primary" size="sm" iconLeft="plus"
                             onClick={() => setShowAddSheet(true)}
                             style={{ borderRadius: "16px" }}>

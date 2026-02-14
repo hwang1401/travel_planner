@@ -229,6 +229,12 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
   const [storageImageUrl, setStorageImageUrl] = useState(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState(null);
 
+  // Place extras from getPlaceDetails
+  const [placeRating, setPlaceRating] = useState(null);
+  const [placeReviewCount, setPlaceReviewCount] = useState(null);
+  const [placeHours, setPlaceHours] = useState(null);
+  const [placePriceLevel, setPlacePriceLevel] = useState(null);
+
   // Map state
   const [flyTarget, setFlyTarget] = useState(null);
   const [mapReady, setMapReady] = useState(false);
@@ -341,8 +347,12 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
           if (details.name) setDesc(details.name);
           if (details.formatted_address) setAddress(details.formatted_address);
           if (details.lat != null) { setLat(details.lat); setLon(details.lon); setFlyTarget({ coords: [details.lat, details.lon], ts: Date.now() }); }
-          // Store placeId for later use (navigation URLs)
+          // Store placeId & extras for later use
           if (details.placeId) setSelectedPlaceId(details.placeId);
+          setPlaceRating(details.rating ?? null);
+          setPlaceReviewCount(details.reviewCount ?? null);
+          setPlaceHours(details.hours ?? null);
+          setPlacePriceLevel(details.priceLevel ?? null);
           if (details.photoUrl) {
             setSearchResults((prev) => {
               const next = [...prev];
@@ -439,6 +449,10 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
             ? { image: searchResults[selectedResultIdx ?? 0].photoUrl }
             : {}),
         ...(selectedPlaceId ? { placeId: selectedPlaceId } : {}),
+        ...(placeRating != null ? { rating: placeRating } : {}),
+        ...(placeReviewCount != null ? { reviewCount: placeReviewCount } : {}),
+        ...(placeHours ? { hours: placeHours } : {}),
+        ...(placePriceLevel != null ? { priceLevel: placePriceLevel } : {}),
         ...(timetable ? { timetable } : {}),
         ...(finalHighlights ? { highlights: finalHighlights } : {}),
       },

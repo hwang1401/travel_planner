@@ -63,8 +63,8 @@
 :root {
   --z-fab: 100;
   --z-dialog: 1000;
-  --z-confirm: 2000;
-  --z-toast: 3000;
+  --z-confirm: 5000;
+  --z-toast: 6000;
   --z-viewer: 10000; /* 이미지 확대 시 모든 모달 위에 표시 */
 }
 

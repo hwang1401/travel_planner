@@ -86,7 +86,7 @@ export async function getPlaceDetails(placeId) {
     try {
       const place = new google.maps.places.Place({ id: placeId });
       await place.fetchFields({
-        fields: ['displayName', 'formattedAddress', 'location', 'photos', 'rating', 'userRatingCount', 'currentOpeningHours', 'priceLevel'],
+        fields: ['displayName', 'formattedAddress', 'location', 'photos', 'rating', 'userRatingCount', 'openingHours', 'priceLevel'],
       });
 
       const loc = place.location;
@@ -108,7 +108,7 @@ export async function getPlaceDetails(placeId) {
         placeId,
         rating: place.rating ?? null,
         reviewCount: place.userRatingCount ?? null,
-        hours: place.currentOpeningHours?.weekdayDescriptions?.join('; ') || null,
+        hours: place.regularOpeningHours?.weekdayDescriptions?.join('; ') || null,
         priceLevel: place.priceLevel ?? null,
       };
     } catch (e) {

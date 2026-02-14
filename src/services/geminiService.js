@@ -831,34 +831,36 @@ const MAX_UNMATCHED_PLACES_TO_ENQUEUE = 20;
 async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
   if (!Array.isArray(days) || days.length === 0) return;
 
-  // 1. 수집 로직 (기존과 동일)
-  const collected = [];
+  // 1. 수집: 미매칭(새 장소) 우선, 여유분에 불완전 RAG 장소 추가
+  const unmatched = [];
+  const incomplete = [];
   const seenDesc = new Set();
   let regionHint = '';
   for (const day of days) {
     if (!regionHint && day.label) regionHint = String(day.label).trim();
-    const sections = day.sections || [];
-    for (const sec of sections) {
+    for (const sec of day.sections || []) {
       for (const item of sec.items || []) {
         const type = item.type;
         if (!PLACE_TYPES_FOR_VERIFICATION.includes(type)) continue;
         const desc = (item.desc || '').trim();
-        if (!desc) continue;
-        if (findRAGMatch(item, ragPlaces || [])) continue;
-        if (seenDesc.has(desc)) continue;
+        if (!desc || seenDesc.has(desc)) continue;
+        const ragMatch = findRAGMatch(item, ragPlaces || []);
+        if (ragMatch && ragMatch.image_url && ragMatch.rating != null && ragMatch.google_place_id) continue;
         seenDesc.add(desc);
-        collected.push({
-          desc,
-          type,
-          address: item.detail?.address || '',
-          region: regionHint || ''
-        });
-        if (collected.length >= MAX_UNMATCHED_PLACES_TO_ENQUEUE) break;
+        const entry = { desc, type, address: item.detail?.address || '', region: regionHint || '' };
+        if (ragMatch) {
+          incomplete.push(entry);
+        } else {
+          unmatched.push(entry);
+        }
       }
-      if (collected.length >= MAX_UNMATCHED_PLACES_TO_ENQUEUE) break;
     }
-    if (collected.length >= MAX_UNMATCHED_PLACES_TO_ENQUEUE) break;
   }
+  // 미매칭 우선, 남은 슬롯에 불완전 RAG 장소 채우기
+  const collected = [
+    ...unmatched.slice(0, MAX_UNMATCHED_PLACES_TO_ENQUEUE),
+    ...incomplete.slice(0, Math.max(0, MAX_UNMATCHED_PLACES_TO_ENQUEUE - unmatched.length)),
+  ];
 
   if (collected.length === 0) return;
 
@@ -909,6 +911,8 @@ async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
           if (verified.lon != null) item.detail.lon = verified.lon;
           if (verified.image_url) item.detail.image = verified.image_url;
           if (verified.placeId) item.detail.placeId = verified.placeId;
+          if (verified.rating != null) item.detail.rating = verified.rating;
+          if (verified.reviewCount != null) item.detail.reviewCount = verified.reviewCount;
         }
       }
     }

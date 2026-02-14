@@ -349,7 +349,7 @@ Deno.serve(async (req) => {
 
   const processOne = async (
     place: { desc: string; type: string; address?: string; region?: string }
-  ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; placeId: string | null } }> => {
+  ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; placeId: string | null; rating: number | null; reviewCount: number | null } }> => {
     // ── 0. DB 먼저 조회: 이미 등록된 장소면 Text Search 스킵 ──
     const regionKey = place.region
       ? (LABEL_TO_REGION[place.region] || place.region.toLowerCase())
@@ -365,7 +365,7 @@ Deno.serve(async (req) => {
     if (possibleRegions.length > 0) {
       const { data: cached } = await supabase
         .from("rag_places")
-        .select("id, confidence, address, lat, lon, image_url, google_place_id")
+        .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count")
         .eq("name_ko", place.desc)
         .in("region", possibleRegions)
         .maybeSingle();
@@ -380,6 +380,8 @@ Deno.serve(async (req) => {
             lon: cached.lon || null,
             image_url: cached.image_url || null,
             placeId: cached.google_place_id,
+            rating: cached.rating ?? null,
+            reviewCount: cached.review_count ?? null,
           },
         };
       }
@@ -418,7 +420,7 @@ Deno.serve(async (req) => {
     // ── 2. google_place_id로 기존 데이터 조회 (Text Search 결과 기반) ──
     const { data: existing } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, google_place_id")
+      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count")
       .eq("google_place_id", result.id)
       .maybeSingle();
 
@@ -431,7 +433,9 @@ Deno.serve(async (req) => {
           lat: existing.lat || result.location?.latitude || null,
           lon: existing.lon || result.location?.longitude || null,
           image_url: existing.image_url || null,
-          placeId: existing.google_place_id || result.id
+          placeId: existing.google_place_id || result.id,
+          rating: existing.rating ?? result.rating ?? null,
+          reviewCount: existing.review_count ?? result.userRatingCount ?? null,
         }
       };
     }
@@ -439,7 +443,7 @@ Deno.serve(async (req) => {
     // region+name_ko 기준 verified 데이터가 있으면 덮어쓰지 않음
     const { data: existingByName } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, google_place_id")
+      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count")
       .eq("region", region)
       .eq("name_ko", place.desc)
       .maybeSingle();
@@ -453,6 +457,8 @@ Deno.serve(async (req) => {
           lon: existingByName.lon || result.location?.longitude || null,
           image_url: existingByName.image_url || null,
           placeId: existingByName.google_place_id || result.id,
+          rating: existingByName.rating ?? result.rating ?? null,
+          reviewCount: existingByName.review_count ?? result.userRatingCount ?? null,
         },
       };
     }
@@ -491,7 +497,9 @@ Deno.serve(async (req) => {
         lat: result.location?.latitude || null,
         lon: result.location?.longitude || null,
         image_url: null,
-        placeId: result.id
+        placeId: result.id,
+        rating: result.rating ?? null,
+        reviewCount: result.userRatingCount ?? null,
       }
     };
 
@@ -523,7 +531,9 @@ Deno.serve(async (req) => {
         lat: result.location?.latitude || null,
         lon: result.location?.longitude || null,
         image_url: imageUrl,
-        placeId: result.id
+        placeId: result.id,
+        rating: result.rating ?? null,
+        reviewCount: result.userRatingCount ?? null,
       }
     };
   };
@@ -536,6 +546,8 @@ Deno.serve(async (req) => {
     lon: number | null;
     image_url: string | null;
     placeId: string | null;
+    rating: number | null;
+    reviewCount: number | null;
   }> = [];
 
   for (const place of toProcess) {

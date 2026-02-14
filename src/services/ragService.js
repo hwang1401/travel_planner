@@ -507,3 +507,29 @@ export function getRegionCodesFromDestinations(destinations) {
 export function getRegionDisplayName(region) {
   return REGION_DISPLAY_NAMES[region] || region;
 }
+
+/**
+ * Google Places 사진을 rag_places에 캐시 (Edge Function 경유).
+ * 서버에서 Google Places API로 사진 다운로드 → Storage 업로드 → rag_places.image_url 업데이트.
+ * trip_schedules 쓰기 없음. fire-and-forget으로 호출.
+ * @param {string} placeId - Google Place ID
+ */
+export async function cachePhotoToRAG(placeId) {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!baseUrl || !anonKey) return;
+
+  const url = `${baseUrl.replace(/\/$/, '')}/functions/v1/cache-place-photo`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ placeId }),
+  });
+
+  if (!res.ok) {
+    console.warn('[ragService] cache-place-photo HTTP error:', res.status);
+  }
+}

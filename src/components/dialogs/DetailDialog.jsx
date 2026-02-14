@@ -18,7 +18,7 @@ import { uploadImage, generateImagePath } from '../../services/imageService';
 import AddressSearch from '../common/AddressSearch';
 import AddressToStationPicker from './AddressToStationPicker';
 import { FromToStationField } from '../common/FromToStationField';
-import { getNearbyPlaces, getPlaceByNameOrAddress } from '../../services/ragService';
+import { getNearbyPlaces, getPlaceByNameOrAddress, cachePhotoToRAG } from '../../services/ragService';
 import { getPlacePhotos } from '../../lib/googlePlaces';
 import { COLOR, SPACING, RADIUS, TYPE_CONFIG, TYPE_LABELS, getCategoryColor } from '../../styles/tokens';
 import { TIMETABLE_DB, findBestTrain, matchByFromTo, findRoutesByStations } from '../../data/timetable';
@@ -286,7 +286,7 @@ export default function DetailDialog({
     }
     if (ragImage && !imgs.includes(ragImage)) imgs.push(ragImage);
     // placePhotos는 사용자/RAG 이미지가 하나도 없을 때만 보충
-    if (imgs.length === 0) {
+    if (imgs.length === 0 && !effectiveDetail._imageRemovedByUser) {
       for (const url of placePhotos) {
         if (imgs.length >= 3) break;
         if (url && !imgs.includes(url)) imgs.push(url);
@@ -356,21 +356,33 @@ export default function DetailDialog({
     return () => { cancelled = true; };
   }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?._imageRemovedByUser, item?.desc, mainImage, imagesArray, overlayDetail]);
 
-  // placeId가 있으면 Google Places에서 최대 3장 사진 fetch
+  // placeId가 있으면 Google Places에서 최대 3장 사진 fetch (가드 조건으로 불필요한 API 호출 방지)
   useEffect(() => {
+    if (overlayDetail) return;
     const pid = effectiveDetail?.placeId;
     if (!pid) { setPlacePhotos([]); return; }
+    if (effectiveDetail._imageRemovedByUser) return;
+    const hasImage = mainImage || (imagesArray && imagesArray.length > 0);
+    if (hasImage) return;
+    if (ragImage) return;
+
     let cancelled = false;
     setPhotosLoading(true);
-    getPlacePhotos(pid, 3).then((urls) => {
+    getPlacePhotos(pid, 3).then(async (urls) => {
+      if (cancelled || !urls.length) return;
       if (!cancelled) setPlacePhotos(urls);
+      try {
+        await cachePhotoToRAG(pid);
+      } catch (e) {
+        console.warn('[DetailDialog] cachePhotoToRAG failed:', e);
+      }
     }).catch(() => {
       if (!cancelled) setPlacePhotos([]);
     }).finally(() => {
       if (!cancelled) setPhotosLoading(false);
     });
     return () => { cancelled = true; };
-  }, [effectiveDetail?.placeId]);
+  }, [effectiveDetail?.placeId, effectiveDetail?._imageRemovedByUser, mainImage, imagesArray, overlayDetail, ragImage]);
 
   useEffect(() => {
     if (!showNearby) return;

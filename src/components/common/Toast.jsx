@@ -3,18 +3,19 @@ import Icon from './Icon';
 import { SPACING } from '../../styles/tokens';
 
 /* ── Toast Notification Component ── */
-export default function Toast({ message, icon, duration = 1500, onDone, actionLabel, onAction }) {
+export default function Toast({ message, icon, duration, onDone, actionLabel, onAction }) {
   const [visible, setVisible] = useState(true);
   const [exiting, setExiting] = useState(false);
+  const d = duration ?? (actionLabel && onAction ? 2500 : 1500);
 
   useEffect(() => {
-    const exitTimer = setTimeout(() => setExiting(true), duration - 300);
+    const exitTimer = setTimeout(() => setExiting(true), d - 300);
     const doneTimer = setTimeout(() => {
       setVisible(false);
       onDone?.();
-    }, duration);
+    }, d);
     return () => { clearTimeout(exitTimer); clearTimeout(doneTimer); };
-  }, [duration, onDone]);
+  }, [d, onDone]);
 
   if (!visible) return null;
 
