@@ -381,12 +381,17 @@ export default function TravelPlanner() {
     }
   }, [tripId, isLegacy]);
 
+  /* ── Dirty Day 추적 헬퍼 (debounced save 콜백에서 사용하므로 위에 정의) ── */
+  const clearDirtyTracking = useCallback(() => {
+    dirtyDaysRef.current = new Set();
+    dirtyMetaRef.current = false;
+  }, []);
+
   /* ── Setup debounced save for Supabase trips ── */
   useEffect(() => {
     if (isLegacy || !tripId) return;
     const ds = createDebouncedSave(tripId, 800, (version) => {
       lastSavedVersionRef.current = version;
-      // 디바운스 저장은 가장 마지막 데이터를 저장하므로 항상 클리어 가능
       clearDirtyTracking();
     });
     debouncedSaveRef.current = ds;
@@ -458,11 +463,6 @@ export default function TravelPlanner() {
   const markMetaDirty = useCallback(() => {
     dirtyMetaRef.current = true;
     dirtyGenRef.current++;
-  }, []);
-
-  const clearDirtyTracking = useCallback(() => {
-    dirtyDaysRef.current = new Set();
-    dirtyMetaRef.current = false;
   }, []);
 
   /* ── 삭제 복구: 직전 스냅샷으로 state 복원 후 재저장 ── */
