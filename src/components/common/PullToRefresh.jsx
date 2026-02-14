@@ -27,6 +27,7 @@ export default function PullToRefresh({ children, onRefresh, disabled }) {
     const scrollTop = el.scrollTop;
     const currentY = e.touches[0].clientY;
     const deltaY = currentY - startY.current;
+    // 당겨서 새로고침: 맨 위에서만 아래로 당길 때만 preventDefault (위로 스크롤은 절대 막지 않음)
     if (scrollTop <= 0 && deltaY > 0) {
       const pull = Math.min(deltaY * RESISTANCE, PULL_THRESHOLD * 1.5);
       setPullY(pull);

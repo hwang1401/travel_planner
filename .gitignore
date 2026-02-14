@@ -12,3 +12,8 @@ scripts/output/
 
 # Timetable pipeline: downloaded PDFs and parsed data
 scripts/collect-timetable/output/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/

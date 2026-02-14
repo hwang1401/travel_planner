@@ -17,7 +17,13 @@
     "rag-seed:all": "node scripts/rag-seed.js --all",
     "rag-seed:tier1": "node scripts/rag-seed.js --tier 1",
     "rag-seed:tier2": "node scripts/rag-seed.js --tier 2",
-    "rag-seed:tier3": "node scripts/rag-seed.js --tier 3"
+    "rag-seed:tier3": "node scripts/rag-seed.js --tier 3",
+    "test:e2e": "npx playwright test",
+    "test:e2e:phase1": "npx playwright test tests/phase1-basic-flow.spec.js",
+    "test:e2e:phase2": "npx playwright test tests/phase2-batch-detail-edge.spec.js",
+    "test:e2e:phase3": "npx playwright test tests/phase3-concurrent.spec.js",
+    "test:e2e:phase4": "npx playwright test tests/phase4-data-integrity.spec.js",
+    "test:e2e:phase5": "npx playwright test tests/phase5-stress.spec.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",

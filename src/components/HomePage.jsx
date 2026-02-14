@@ -325,11 +325,16 @@ export default function HomePage() {
 
   return (
     <div style={{
-      width: '100%', minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      width: '100%',
+      height: '100vh',
+      minHeight: 0,
+      display: 'flex',
+      flexDirection: 'column',
       background: 'var(--color-surface)',
       paddingTop: 'env(safe-area-inset-top, 0px)',
+      overflow: 'hidden',
     }}>
-      {/* 전체 스크롤 + 당겨서 새로고침 (헤더 포함 한 영역) */}
+      {/* 전체 스크롤 + 당겨서 새로고침 (헤더 포함 한 영역) — 뷰포트 내부 스크롤로 앱에서 위로 스크롤 정상 동작 */}
       <PullToRefresh onRefresh={fetchTrips} disabled={loading}>
         <>
           {/* Header */}
