@@ -44,7 +44,7 @@ function snapScrollTop(el, maxIndex) {
  * 휠 타임 피커 다이얼로그. 화면 중앙 팝업. 웹(마우스 휠) + 모바일(터치) 모두 지원.
  * value "HH:mm", onConfirm(value), onClose. minuteStep 5 | 15 | 30.
  */
-export default function TimePickerDialog({ open, value, onConfirm, onClose, minuteStep = 5, zIndex = 2000 }) {
+export default function TimePickerDialog({ open, value, onConfirm, onClose, minuteStep = 5, zIndex = 10000 }) {
   const [hourIndex, setHourIndex] = useState(12);
   const [minuteIndex, setMinuteIndex] = useState(0);
   const hourRef = useRef(null);
@@ -65,12 +65,16 @@ export default function TimePickerDialog({ open, value, onConfirm, onClose, minu
 
   useEffect(() => {
     if (!open) return;
-    syncFromValue();
+    const { hour, minute } = parseValue(value);
+    const chosenMinute = minuteOptions.find((m) => m >= minute) ?? minuteOptions[minuteOptions.length - 1];
+    const minuteIdx = minuteOptions.indexOf(chosenMinute);
+    setHourIndex(hour);
+    setMinuteIndex(minuteIdx);
     requestAnimationFrame(() => {
-      if (hourRef.current) hourRef.current.scrollTop = hourIndex * ROW_HEIGHT;
-      if (minuteRef.current) minuteRef.current.scrollTop = minuteIndex * ROW_HEIGHT;
+      if (hourRef.current) hourRef.current.scrollTop = hour * ROW_HEIGHT;
+      if (minuteRef.current) minuteRef.current.scrollTop = minuteIdx * ROW_HEIGHT;
     });
-  }, [open, syncFromValue]);
+  }, [open, value, minuteOptions]);
 
   const scheduleSnapHour = useCallback(() => {
     if (hourSnapRef.current) clearTimeout(hourSnapRef.current);

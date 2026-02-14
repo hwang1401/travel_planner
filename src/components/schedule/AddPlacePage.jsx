@@ -461,13 +461,19 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
     onClose();
   };
 
-  const handleSingleStationSelect = (station) => {
-    const from = singleStationPicker.mode === 'from' ? station : moveFrom;
-    const to = singleStationPicker.mode === 'to' ? station : moveTo;
+  const handleSingleStationSelect = (value) => {
+    const isAddress = value && typeof value === 'object' && value.type === 'address';
+    const displayName = isAddress ? value.address : value;
+    const from = singleStationPicker.mode === 'from' ? displayName : moveFrom;
+    const to = singleStationPicker.mode === 'to' ? displayName : moveTo;
     setSingleStationPicker(null);
     setMoveFrom(from);
     setMoveTo(to);
     if (!desc.trim()) setDesc(`${from} → ${to}`);
+    if (isAddress) {
+      setLoadedTimetable(null);
+      return;
+    }
     const routes = findRoutesByStations(from, to);
     const route = routes[0] || null;
     if (route) {

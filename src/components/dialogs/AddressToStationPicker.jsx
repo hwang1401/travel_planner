@@ -5,7 +5,7 @@
  * mode='to': 도착지 (fixedStation 있으면 해당 출발지에서 갈 수 있는 역만)
  * fixedStation 없으면 전체 역 노출
  *
- * onSelect(station) — 선택된 역명
+ * onSelect(value) — value는 역 선택 시 역명(string), 주소 선택 시 { type: 'address', address, lat, lon }
  */
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -13,7 +13,6 @@ import Icon from '../common/Icon';
 import Button from '../common/Button';
 import AddressSearch from '../common/AddressSearch';
 import { getStationsByRegion, findRoutesByStations } from '../../data/timetable';
-import { findNearestStation } from '../../data/stationCoords';
 import { SPACING } from '../../styles/tokens';
 
 const VIEW_ADDRESS = 'address';
@@ -23,7 +22,6 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
   const [view, setView] = useState(VIEW_ADDRESS);
   const [addressError, setAddressError] = useState(null);
   const [stationQuery, setStationQuery] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const regionGroups = useMemo(() => getStationsByRegion(), []);
   const allStations = useMemo(
@@ -57,32 +55,13 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
       setAddressError('위치를 확인할 수 없습니다. 역에서 직접 선택해 주세요.');
       return;
     }
-    setLoading(true);
-    const nearest = findNearestStation(lat, lon, 50);
-    setLoading(false);
-    if (!nearest) {
-      setAddressError('50km 이내 가까운 역이 없습니다. 역에서 직접 선택해 주세요.');
-      return;
-    }
-    if (!allStations.has(nearest.station)) {
-      setAddressError(`${nearest.station} (약 ${Math.round(nearest.km)}km) — 등록된 역이 아닙니다. 역에서 직접 선택해 주세요.`);
-      return;
-    }
-    if (fixedStation) {
-      const hasRoute = mode === 'from'
-        ? findRoutesByStations(nearest.station, fixedStation).length > 0
-        : findRoutesByStations(fixedStation, nearest.station).length > 0;
-      if (!hasRoute) {
-        setAddressError(`${nearest.station} (약 ${Math.round(nearest.km)}km) — 해당 구간 시간표가 없습니다. 역에서 직접 선택해 주세요.`);
-        return;
-      }
-    }
-    onSelect(nearest.station);
+    // 주소로 선택 시: 역 여부와 관계없이 순수 주소를 그대로 전달
+    onSelect({ type: 'address', address: address || '', lat, lon });
     onClose();
   };
 
   const handleStationPick = (station) => {
-    onSelect(station);
+    onSelect(station); // 역 선택 시 역명(string) 그대로 전달
     onClose();
   };
 
@@ -128,9 +107,6 @@ export default function AddressToStationPicker({ onClose, onSelect, mode, fixedS
               inlineResults
               size="lg"
             />
-            {loading && (
-              <p style={{ margin: `${SPACING.md} 0 0`, fontSize: 'var(--typo-caption-2-size)', color: 'var(--color-on-surface-variant2)' }}>가까운 역 검색 중…</p>
-            )}
             {addressError && (
               <p style={{ margin: `${SPACING.md} 0 0`, fontSize: 'var(--typo-caption-2-size)', color: 'var(--color-error)' }}>{addressError}</p>
             )}

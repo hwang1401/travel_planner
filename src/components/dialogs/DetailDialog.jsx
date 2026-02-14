@@ -629,13 +629,20 @@ export default function DetailDialog({
     }
   }, [tripId, onSaveField, saveField, displayImages, ragImage]);
 
-  const handleSingleStationSelect = (station) => {
-    const from = singleStationPicker.mode === 'from' ? station : (item?.moveFrom || '');
-    const to = singleStationPicker.mode === 'to' ? station : (item?.moveTo || '');
+  const handleSingleStationSelect = (value) => {
+    const isAddress = value && typeof value === 'object' && value.type === 'address';
+    const displayName = isAddress ? value.address : value;
+    const from = singleStationPicker.mode === 'from' ? displayName : (item?.moveFrom || '');
+    const to = singleStationPicker.mode === 'to' ? displayName : (item?.moveTo || '');
     setSingleStationPicker(null);
+    const updates = { moveFrom: from, moveTo: to, desc: `${from} → ${to}` };
+    if (isAddress) {
+      updates.timetable = null;
+      saveField(updates);
+      return;
+    }
     const routes = findRoutesByStations(from, to);
     const route = routes[0] || null;
-    const updates = { moveFrom: from, moveTo: to, desc: `${from} → ${to}` };
     if (route) {
       const bestIdx = findBestTrain(route.trains, item?.time || '');
       updates.timetable = {
