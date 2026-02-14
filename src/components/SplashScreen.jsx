@@ -15,7 +15,7 @@ export default function SplashScreen() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--color-primary)',
+        background: 'var(--color-primary, #8b7bff)',
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingBottom: 'var(--safe-area-bottom, 0px)',
       }}

@@ -68,16 +68,21 @@ export function AuthProvider({ children }) {
       }
     );
 
-    /* 2. Then check for existing session */
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-      console.log('[Auth] Initial session:', !!session);
-      if (session?.user) {
-        setUser(session.user);
-        loadProfile(session.user.id);
-      }
-      setLoading(false);
-    });
+    /* 2. Then check for existing session (항상 loading 해제 — 실패 시에도 로그인 화면 표시) */
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (!mounted) return;
+        console.log('[Auth] Initial session:', !!session);
+        if (session?.user) {
+          setUser(session.user);
+          loadProfile(session.user.id);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.warn('[Auth] getSession failed:', err?.message);
+        if (mounted) setLoading(false);
+      });
 
     return () => {
       mounted = false;

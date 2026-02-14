@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, 'output');
@@ -57,11 +57,26 @@ function excelToHHMM(v) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function parseRoute(wb, route) {
-  const sheet = wb.Sheets[route.sheet];
-  if (!sheet) return [];
+/** ExcelJS 워크시트를 2차원 배열로 변환 (header: 1 스타일) */
+function sheetToData(worksheet) {
+  const data = [];
+  const maxCol = 80;
+  worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    const rowData = [];
+    for (let c = 1; c <= maxCol; c++) {
+      const cell = row.getCell(c);
+      rowData.push(cell.value);
+    }
+    data.push(rowData);
+  });
+  return data;
+}
 
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+function parseRoute(wb, route) {
+  const worksheet = wb.getWorksheet(route.sheet);
+  if (!worksheet) return [];
+
+  const data = sheetToData(worksheet);
   let depRow = -1, arrRow = -1;
 
   for (let i = 3; i < data.length; i++) {
@@ -123,8 +138,10 @@ export async function collectFukuokaSubway(opts = {}) {
   await ensureExcel('fukuoka_kukohakozaki.xlsx', `${BASE}/kukohakozaki_timetable.xlsx`);
   await ensureExcel('fukuoka_nanakuma.xlsx', `${BASE}/nanakuma_timetable.xlsx`);
 
-  const wbKuko = XLSX.readFile(path.join(OUTPUT_DIR, 'fukuoka_kukohakozaki.xlsx'));
-  const wbNana = XLSX.readFile(path.join(OUTPUT_DIR, 'fukuoka_nanakuma.xlsx'));
+  const wbKuko = new ExcelJS.Workbook();
+  const wbNana = new ExcelJS.Workbook();
+  await wbKuko.xlsx.readFile(path.join(OUTPUT_DIR, 'fukuoka_kukohakozaki.xlsx'));
+  await wbNana.xlsx.readFile(path.join(OUTPUT_DIR, 'fukuoka_nanakuma.xlsx'));
 
   for (const route of ROUTES) {
     const wb = route.workbook === 'nanakuma' ? wbNana : wbKuko;
