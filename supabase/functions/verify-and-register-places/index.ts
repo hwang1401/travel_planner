@@ -284,6 +284,80 @@ async function downloadPhoto(photoName: string, apiKey: string, maxWidth = 800):
   return res.arrayBuffer();
 }
 
+/**
+ * DB 캐시 히트 시 rating/image_url이 NULL이면 Google Places에서 보완 → rag_places 업데이트.
+ * 한 번 채워놓으면 다음부터 완전한 캐시 히트.
+ */
+async function enrichCachedPlace(
+  row: { id: string; google_place_id: string | null; rating: number | null; review_count: number | null; image_url: string | null; region?: string | null },
+  apiKey: string,
+  supabase: ReturnType<typeof createClient>,
+  bucket: string,
+): Promise<{ rating: number | null; reviewCount: number | null; image_url: string | null }> {
+  const needsRating = row.rating == null;
+  const needsImage = !row.image_url;
+  if ((!needsRating && !needsImage) || !row.google_place_id) {
+    return { rating: row.rating, reviewCount: row.review_count, image_url: row.image_url };
+  }
+
+  const updates: Record<string, unknown> = {};
+  let rating = row.rating;
+  let reviewCount = row.review_count;
+  let imageUrl = row.image_url;
+
+  try {
+    const fields: string[] = [];
+    if (needsRating) fields.push("rating", "userRatingCount");
+    if (needsImage) fields.push("photos");
+
+    const url = `https://places.googleapis.com/v1/places/${row.google_place_id}`;
+    const res = await fetch(url, {
+      headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fields.join(",") },
+    });
+    if (!res.ok) return { rating, reviewCount, image_url: imageUrl };
+
+    const data = (await res.json()) as {
+      rating?: number; userRatingCount?: number;
+      photos?: Array<{ name: string; widthPx?: number; heightPx?: number }>;
+    };
+
+    if (needsRating && data.rating != null) { rating = data.rating; updates.rating = rating; }
+    if (needsRating && data.userRatingCount != null) { reviewCount = data.userRatingCount; updates.review_count = reviewCount; }
+
+    if (needsImage && data.photos?.length) {
+      let best = data.photos[0];
+      let bestPx = (best.widthPx ?? 0) * (best.heightPx ?? 0);
+      for (let i = 1; i < data.photos.length; i++) {
+        const p = data.photos[i];
+        const px = (p.widthPx ?? 0) * (p.heightPx ?? 0);
+        if (px > bestPx) { best = p; bestPx = px; }
+      }
+      try {
+        const buf = await downloadPhoto(best.name, apiKey);
+        const storagePath = `rag/${row.region || "unknown"}/${row.google_place_id}.jpg`;
+        const { error: upErr } = await supabase.storage
+          .from(bucket)
+          .upload(storagePath, buf, { contentType: "image/jpeg", upsert: true });
+        if (!upErr) {
+          const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(storagePath);
+          imageUrl = urlData.publicUrl;
+          updates.image_url = imageUrl;
+        }
+      } catch (e) {
+        console.warn("[verify-and-register] enrich photo skip:", (e as Error).message);
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await supabase.from("rag_places").update(updates).eq("id", row.id);
+    }
+  } catch (e) {
+    console.warn("[verify-and-register] enrich failed:", (e as Error).message);
+  }
+
+  return { rating, reviewCount, image_url: imageUrl };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -365,12 +439,13 @@ Deno.serve(async (req) => {
     if (possibleRegions.length > 0) {
       const { data: cached } = await supabase
         .from("rag_places")
-        .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count")
+        .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region")
         .eq("name_ko", place.desc)
         .in("region", possibleRegions)
         .maybeSingle();
 
       if (cached && cached.google_place_id) {
+        const enriched = await enrichCachedPlace(cached, apiKey, supabase, BUCKET);
         return {
           ok: true,
           data: {
@@ -378,10 +453,10 @@ Deno.serve(async (req) => {
             address: cached.address || null,
             lat: cached.lat || null,
             lon: cached.lon || null,
-            image_url: cached.image_url || null,
+            image_url: enriched.image_url,
             placeId: cached.google_place_id,
-            rating: cached.rating ?? null,
-            reviewCount: cached.review_count ?? null,
+            rating: enriched.rating,
+            reviewCount: enriched.reviewCount,
           },
         };
       }
@@ -420,11 +495,12 @@ Deno.serve(async (req) => {
     // ── 2. google_place_id로 기존 데이터 조회 (Text Search 결과 기반) ──
     const { data: existing } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count")
+      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region")
       .eq("google_place_id", result.id)
       .maybeSingle();
 
     if (existing) {
+      const enriched = await enrichCachedPlace(existing, apiKey, supabase, BUCKET);
       return {
         ok: true,
         data: {
@@ -432,10 +508,10 @@ Deno.serve(async (req) => {
           address: existing.address || result.formattedAddress,
           lat: existing.lat || result.location?.latitude || null,
           lon: existing.lon || result.location?.longitude || null,
-          image_url: existing.image_url || null,
+          image_url: enriched.image_url,
           placeId: existing.google_place_id || result.id,
-          rating: existing.rating ?? result.rating ?? null,
-          reviewCount: existing.review_count ?? result.userRatingCount ?? null,
+          rating: enriched.rating ?? result.rating ?? null,
+          reviewCount: enriched.reviewCount ?? result.userRatingCount ?? null,
         }
       };
     }
@@ -443,11 +519,12 @@ Deno.serve(async (req) => {
     // region+name_ko 기준 verified 데이터가 있으면 덮어쓰지 않음
     const { data: existingByName } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count")
+      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region")
       .eq("region", region)
       .eq("name_ko", place.desc)
       .maybeSingle();
     if (existingByName?.confidence === "verified") {
+      const enriched = await enrichCachedPlace(existingByName, apiKey, supabase, BUCKET);
       return {
         ok: true,
         data: {
@@ -455,10 +532,10 @@ Deno.serve(async (req) => {
           address: existingByName.address || result.formattedAddress,
           lat: existingByName.lat || result.location?.latitude || null,
           lon: existingByName.lon || result.location?.longitude || null,
-          image_url: existingByName.image_url || null,
+          image_url: enriched.image_url,
           placeId: existingByName.google_place_id || result.id,
-          rating: existingByName.rating ?? result.rating ?? null,
-          reviewCount: existingByName.review_count ?? result.userRatingCount ?? null,
+          rating: enriched.rating ?? result.rating ?? null,
+          reviewCount: enriched.reviewCount ?? result.userRatingCount ?? null,
         },
       };
     }
