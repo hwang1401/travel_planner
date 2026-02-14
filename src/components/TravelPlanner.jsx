@@ -198,6 +198,41 @@ function sanitizeScheduleData(data) {
   return next;
 }
 
+/**
+ * Day 단위 병합: 로컬에서 수정한 Day(dirty)는 보존, 나머지는 remote로 갱신.
+ * 동시 편집 시 다른 사용자의 변경을 수신하면서 로컬 미저장 변경을 보호.
+ */
+function mergeDayLevel(local, remote, dirtyDays, dirtyMeta) {
+  // Day 수가 다르고 dirty day가 있으면 인덱스 불일치 위험 → 로컬 유지
+  const localExtraLen = local._extraDays?.length || 0;
+  const remoteExtraLen = remote._extraDays?.length || 0;
+  if (dirtyDays.size > 0 && localExtraLen !== remoteExtraLen && !dirtyMeta) {
+    return local;
+  }
+
+  const merged = { ...remote }; // remote 기반으로 시작
+
+  // 1) dirty한 numeric day key는 로컬 값 유지
+  for (const dayIdx of dirtyDays) {
+    if (local[dayIdx] !== undefined) {
+      merged[dayIdx] = local[dayIdx];
+    }
+  }
+
+  // 2) meta key: dirtyMeta이면 로컬 유지, 아니면 remote 유지 (이미 spread됨)
+  if (dirtyMeta) {
+    merged._dayOrder = local._dayOrder;
+    merged._extraDays = local._extraDays;
+    merged._dayOverrides = local._dayOverrides;
+    merged._standalone = local._standalone;
+    // undefined인 키는 정리
+    if (merged._dayOrder === undefined) delete merged._dayOrder;
+    if (merged._dayOverrides === undefined) delete merged._dayOverrides;
+  }
+
+  return merged;
+}
+
 export default function TravelPlanner() {
   const navigate = useNavigate();
   const { tripId } = useParams();
@@ -262,6 +297,10 @@ export default function TravelPlanner() {
   const bulkDeleteNextRef = useRef(null);
   /* 삭제 복구용: 삭제 직전 스냅샷 (복구 시 이 상태로 재저장) */
   const deleteUndoRef = useRef(null);
+  /* ── Dirty Day 추적: 동시 편집 시 Day 단위 병합에 사용 ── */
+  const dirtyDaysRef = useRef(new Set());    // 수정된 day 원본 인덱스
+  const dirtyMetaRef = useRef(false);         // _dayOrder, _extraDays 구조, _dayOverrides 수정 여부
+  const dirtyGenRef = useRef(0);              // 세대 카운터 (저장 완료 시 조기 클리어 방지)
 
   /* ── Presence: who is online ── */
   const presenceUser = useMemo(() => {
@@ -345,10 +384,14 @@ export default function TravelPlanner() {
   /* ── Setup debounced save for Supabase trips ── */
   useEffect(() => {
     if (isLegacy || !tripId) return;
-    const ds = createDebouncedSave(tripId, 800);
+    const ds = createDebouncedSave(tripId, 800, (version) => {
+      lastSavedVersionRef.current = version;
+      // 디바운스 저장은 가장 마지막 데이터를 저장하므로 항상 클리어 가능
+      clearDirtyTracking();
+    });
     debouncedSaveRef.current = ds;
     return () => { ds.cancel(); };
-  }, [tripId, isLegacy]);
+  }, [tripId, isLegacy, clearDirtyTracking]);
 
   /* ── Realtime subscription for Supabase trips ── */
   useEffect(() => {
@@ -370,7 +413,18 @@ export default function TravelPlanner() {
         );
         if (!hasLegacySections) rtData._standalone = true;
       }
-      setCustomData(sanitizeScheduleData(ensureItemIds(rtData)));
+      const sanitizedRemote = sanitizeScheduleData(ensureItemIds(rtData));
+
+      // 로컬에 수정사항 없으면 기존처럼 전체 교체 (fast path)
+      if (dirtyDaysRef.current.size === 0 && !dirtyMetaRef.current) {
+        setCustomData(sanitizedRemote);
+        return;
+      }
+
+      // Day 단위 병합: dirty day는 로컬 유지, 나머지는 remote 수용
+      setCustomData((localData) =>
+        mergeDayLevel(localData, sanitizedRemote, dirtyDaysRef.current, dirtyMetaRef.current)
+      );
     });
 
     return unsubscribe;
@@ -395,21 +449,42 @@ export default function TravelPlanner() {
     });
   }, [persistSchedule]);
 
+  /* ── Dirty Day 추적 헬퍼 ── */
+  const markDayDirty = useCallback((origDayIdx) => {
+    dirtyDaysRef.current = new Set(dirtyDaysRef.current).add(origDayIdx);
+    dirtyGenRef.current++;
+  }, []);
+
+  const markMetaDirty = useCallback(() => {
+    dirtyMetaRef.current = true;
+    dirtyGenRef.current++;
+  }, []);
+
+  const clearDirtyTracking = useCallback(() => {
+    dirtyDaysRef.current = new Set();
+    dirtyMetaRef.current = false;
+  }, []);
+
   /* ── 삭제 복구: 직전 스냅샷으로 state 복원 후 재저장 ── */
   const handleDeleteUndo = useCallback(() => {
     const payload = deleteUndoRef.current;
     if (!payload) return;
     const { snapshot, tripId: payloadTripId } = payload;
     deleteUndoRef.current = null;
+    clearDirtyTracking();
 
     updateCustomData(() => snapshot);
     if (payloadTripId) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(payloadTripId, snapshot).catch((err) => {
-        console.error("[TravelPlanner] Undo save failed:", err);
-        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
-      });
+      saveSchedule(payloadTripId, snapshot)
+        .then((version) => {
+          if (version > 0) lastSavedVersionRef.current = version;
+        })
+        .catch((err) => {
+          console.error("[TravelPlanner] Undo save failed:", err);
+          setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+        });
     }
     setToast({ message: "복구했어요", icon: "check" });
   }, [updateCustomData]);
@@ -514,8 +589,8 @@ export default function TravelPlanner() {
   /* ── Detail payloads for current day (for modal prev/next) ── */
   const allDetailPayloads = useMemo(() => {
     return currentDayItems.map(({ item, si, ii, section }) => {
-      // section._isExtra인 경우만 -1, item._extra인 경우는 실제 si 유지 (AI 생성 아이템은 sections에 있음)
-      const effectiveSi = (section._isExtra && !item._extra) ? -1 : si;
+      // _extra 아이템은 extraItems에 저장되므로 sectionIdx를 -1로 설정
+      const effectiveSi = item._extra ? -1 : si;
       const resolvedLoc = getItemCoords(item, selectedDay);
       const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
       const enrichedItem = resolvedAddress && !item.detail?.address
@@ -653,6 +728,7 @@ export default function TravelPlanner() {
     const displayLabel = labelTrimmed || `Day ${nextDayNum}`;
 
     let nextSnapshot = null;
+    markMetaDirty();
     updateCustomData((prev) => {
       const next = { ...prev };
       const existingExtra = next._extraDays || [];
@@ -682,10 +758,16 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, nextSnapshot).catch((err) => {
-        console.error("[TravelPlanner] AddDay save failed:", err);
-        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
-      });
+      const saveGen = dirtyGenRef.current;
+      saveSchedule(tripId, nextSnapshot)
+        .then((version) => {
+          if (version > 0) lastSavedVersionRef.current = version;
+          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+        })
+        .catch((err) => {
+          console.error("[TravelPlanner] AddDay save failed:", err);
+          setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+        });
     }
 
     setShowAddDay(false);
@@ -695,6 +777,7 @@ export default function TravelPlanner() {
   }, [DAYS, baseLen, customData._extraDays?.length, updateCustomData, tripId, isLegacy]);
 
   const handleEditDayLabel = useCallback((dayIdx, newLabel) => {
+    markMetaDirty();
     updateCustomData((prev) => {
       const next = { ...prev };
       if (dayIdx < baseLen) {
@@ -725,6 +808,7 @@ export default function TravelPlanner() {
       confirmLabel: "삭제",
       onConfirm: () => {
         let nextSnapshot = null;
+        markMetaDirty();
         updateCustomData((prev) => {
           deleteUndoRef.current = { snapshot: prev, tripId: tripId || null };
 
@@ -774,10 +858,16 @@ export default function TravelPlanner() {
         if (tripId && !isLegacy && nextSnapshot) {
           lastSaveTimestampRef.current = Date.now();
           debouncedSaveRef.current?.cancel?.();
-          saveSchedule(tripId, nextSnapshot).catch((err) => {
-            console.error("[TravelPlanner] DeleteDay save failed:", err);
-            setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
-          });
+          const saveGen = dirtyGenRef.current;
+          saveSchedule(tripId, nextSnapshot)
+            .then((version) => {
+              if (version > 0) lastSavedVersionRef.current = version;
+              if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+            })
+            .catch((err) => {
+              console.error("[TravelPlanner] DeleteDay save failed:", err);
+              setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+            });
         }
 
         setSelectedDay((prev) => Math.max(0, prev - 1));
@@ -818,6 +908,7 @@ export default function TravelPlanner() {
   const handleReorderConfirm = useCallback(() => {
     const newOrder = reorderList.map((item) => item.origIdx);
     let nextSnapshot = null;
+    markMetaDirty();
     updateCustomData((prev) => {
       const result = { ...prev, _dayOrder: newOrder };
       nextSnapshot = result;
@@ -828,10 +919,16 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, nextSnapshot).catch((err) => {
-        console.error("[TravelPlanner] Reorder save failed:", err);
-        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
-      });
+      const saveGen = dirtyGenRef.current;
+      saveSchedule(tripId, nextSnapshot)
+        .then((version) => {
+          if (version > 0) lastSavedVersionRef.current = version;
+          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+        })
+        .catch((err) => {
+          console.error("[TravelPlanner] Reorder save failed:", err);
+          setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+        });
     }
 
     setShowReorder(false);
@@ -865,6 +962,7 @@ export default function TravelPlanner() {
     }
 
     let nextSnapshot = null;
+    markDayDirty(dayIdx);
 
     updateCustomData((prev) => {
       const computeNext = (p) => {
@@ -950,9 +1048,11 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
+      const saveGen = dirtyGenRef.current;
       saveSchedule(tripId, nextSnapshot)
         .then((version) => {
           if (version > 0) lastSavedVersionRef.current = version;
+          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
           if (process.env.NODE_ENV === 'development') {
             console.debug('[TravelPlanner] Schedule saved', { dayIdx, sectionIdx, itemIdx });
           }
@@ -995,6 +1095,7 @@ export default function TravelPlanner() {
     const target = itemRef ?? editTarget?.item;
 
     let nextSnapshot = null;
+    markDayDirty(dayIdx);
 
     updateCustomData((prev) => {
       deleteUndoRef.current = { snapshot: prev, tripId: tripId || null };
@@ -1064,10 +1165,16 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, nextSnapshot).catch((err) => {
-        console.error("[TravelPlanner] Delete save failed:", err);
-        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
-      });
+      const saveGen = dirtyGenRef.current;
+      saveSchedule(tripId, nextSnapshot)
+        .then((version) => {
+          if (version > 0) lastSavedVersionRef.current = version;
+          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+        })
+        .catch((err) => {
+          console.error("[TravelPlanner] Delete save failed:", err);
+          setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+        });
     }
 
     setEditTarget(null);
@@ -1159,10 +1266,12 @@ export default function TravelPlanner() {
     const mergedSource = DAYS.find((_, i) => toOrigIdx(i) === sourceDayIdx);
     const mergedTarget = DAYS.find((_, i) => toOrigIdx(i) === targetDayIdx);
 
+    let nextSnapshot = null;
+    markDayDirty(sourceDayIdx);
+    markDayDirty(targetDayIdx);
+
     updateCustomData((prev) => {
       const next = { ...prev };
-      const si = detailPayload._si;
-      const ii = detailPayload._ii;
 
       // ── Source: identity 기반 삭제 (extraItems + overlay + _extraDays) ──
       // 1) extraItems에서 삭제
@@ -1219,14 +1328,32 @@ export default function TravelPlanner() {
       if (!next[targetDayIdx]) next[targetDayIdx] = {};
       if (!next[targetDayIdx].extraItems) next[targetDayIdx].extraItems = [];
       next[targetDayIdx].extraItems = [...next[targetDayIdx].extraItems, itemToAdd];
+
+      nextSnapshot = next;
       return next;
     });
+
+    // 즉시 저장 (debounce 대신) — 동시 편집 시 데이터 유실 방지
+    if (tripId && !isLegacy && nextSnapshot) {
+      lastSaveTimestampRef.current = Date.now();
+      debouncedSaveRef.current?.cancel?.();
+      const saveGen = dirtyGenRef.current;
+      saveSchedule(tripId, nextSnapshot)
+        .then((version) => {
+          if (version > 0) lastSavedVersionRef.current = version;
+          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+        })
+        .catch((err) => {
+          console.error("[TravelPlanner] MoveToDay save failed:", err);
+          setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+        });
+    }
 
     setActiveDetail(null);
     const targetLabel = mergedTarget?.label || `Day ${mergedTarget?.day ?? targetDisplayIdx + 1}`;
     setToast({ message: `${targetLabel}(으)로 이동했어요`, icon: "check" });
     setSelectedDay(targetDisplayIdx);
-  }, [updateCustomData, DAYS, toOrigIdx, selectedDay, baseLen]);
+  }, [updateCustomData, DAYS, toOrigIdx, selectedDay, baseLen, tripId, isLegacy]);
 
   /* ── 롱프레스 선택 모드 ── */
   const longPressMode = longPressSelection.size > 0;
@@ -1260,8 +1387,8 @@ export default function TravelPlanner() {
       confirmLabel: "삭제",
       onConfirm: () => {
         for (const { item, si, ii, section } of items) {
-          // section._isExtra인 경우만 -1, item._extra인 경우는 실제 si 유지
-          const effectiveSi = (section._isExtra && !item._extra) ? -1 : si;
+          // _extra 아이템은 extraItems에 저장되므로 sectionIdx를 -1로 설정
+          const effectiveSi = item._extra ? -1 : si;
           performDeleteItem(toOrigIdx(selectedDay), effectiveSi, ii, item);
         }
         setLongPressSelection(new Set());
@@ -1277,8 +1404,8 @@ export default function TravelPlanner() {
       return longPressSelection.has(key);
     });
     for (const { item, si, ii, section } of items) {
-      // section._isExtra인 경우만 -1, item._extra인 경우는 실제 si 유지
-      const effectiveSi = (section._isExtra && !item._extra) ? -1 : si;
+      // _extra 아이템은 extraItems에 저장되므로 sectionIdx를 -1로 설정
+      const effectiveSi = item._extra ? -1 : si;
       handleMoveToDay({
         _item: item,
         _si: effectiveSi,
@@ -1313,6 +1440,7 @@ export default function TravelPlanner() {
   const runBulkDeleteWithPayload = useCallback((payload) => {
     if (!payload) return;
     const { keys, entries, dayIdx } = payload;
+    markDayDirty(dayIdx);
 
     updateCustomData((prev) => {
       deleteUndoRef.current = { snapshot: prev, tripId: tripId || null };
@@ -1389,10 +1517,16 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && bulkDeleteNextRef.current) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, bulkDeleteNextRef.current).catch((err) => {
-        console.error("[TravelPlanner] 일괄 삭제 직후 저장 실패:", err);
-        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
-      });
+      const saveGen = dirtyGenRef.current;
+      saveSchedule(tripId, bulkDeleteNextRef.current)
+        .then((version) => {
+          if (version > 0) lastSavedVersionRef.current = version;
+          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+        })
+        .catch((err) => {
+          console.error("[TravelPlanner] 일괄 삭제 직후 저장 실패:", err);
+          setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+        });
       bulkDeleteNextRef.current = null;
     }
 
@@ -1436,6 +1570,7 @@ export default function TravelPlanner() {
   const applyBulkImport = useCallback((items, mode, dayIdx) => {
     if (!items || items.length === 0) return;
     let nextSnapshot = null;
+    markDayDirty(dayIdx);
 
     if (mode === "replace") {
       updateCustomData((prev) => {
@@ -1473,10 +1608,16 @@ export default function TravelPlanner() {
     if (tripId && !isLegacy && nextSnapshot) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current?.cancel?.();
-      saveSchedule(tripId, nextSnapshot).catch((err) => {
-        console.error("[TravelPlanner] BulkImport save failed:", err);
-        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
-      });
+      const saveGen = dirtyGenRef.current;
+      saveSchedule(tripId, nextSnapshot)
+        .then((version) => {
+          if (version > 0) lastSavedVersionRef.current = version;
+          if (dirtyGenRef.current === saveGen) clearDirtyTracking();
+        })
+        .catch((err) => {
+          console.error("[TravelPlanner] BulkImport save failed:", err);
+          setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+        });
     }
 
     if (!isLegacy && tripId && Array.isArray(tripMeta?.destinations)) {
@@ -1896,8 +2037,8 @@ export default function TravelPlanner() {
               )}
               {allItems.map((entry, flatIdx) => {
                 const { item, si, ii, section } = entry;
-                // section._isExtra인 경우만 -1, item._extra인 경우는 실제 si 유지
-                const effectiveSi = (section._isExtra && !item._extra) ? -1 : si;
+                // _extra 아이템은 extraItems에 저장되므로 sectionIdx를 -1로 설정
+                const effectiveSi = item._extra ? -1 : si;
                 const resolvedLoc = getItemCoords(item, selectedDay);
                 const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
                 const enrichedItem = resolvedAddress && !item.detail?.address

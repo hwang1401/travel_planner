@@ -108,7 +108,7 @@ export function subscribeToSchedule(tripId, onUpdate) {
  * @param {number} delayMs - debounce delay (default 800ms)
  * @returns {{ save: (data) => void, flush: () => Promise, cancel: () => void }}
  */
-export function createDebouncedSave(tripId, delayMs = 800) {
+export function createDebouncedSave(tripId, delayMs = 800, onVersionUpdate) {
   let timeoutId = null;
   let pendingData = null;
   let savePromise = null;
@@ -123,7 +123,8 @@ export function createDebouncedSave(tripId, delayMs = 800) {
       pendingData = null;
       savePromise = saveSchedule(tripId, dataToSave);
       try {
-        await savePromise;
+        const version = await savePromise;
+        if (onVersionUpdate && version > 0) onVersionUpdate(version);
       } catch (err) {
         console.error('[ScheduleService] Debounced save failed:', err);
       }
