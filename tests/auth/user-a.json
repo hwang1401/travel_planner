@@ -1,0 +1,195 @@
+{
+  "cookies": [
+    {
+      "name": "_maldive_oauth_webapp_session_key",
+      "value": "6075e5d3fb3b888bc503698fef8a26d0",
+      "domain": "accounts.kakao.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__T_",
+      "value": "1",
+      "domain": ".accounts.kakao.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__T_SECURE",
+      "value": "1",
+      "domain": ".accounts.kakao.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "TUID",
+      "value": "w-rN2LP2cpNlou_260215011421954",
+      "domain": ".tiara.kakao.com",
+      "path": "/",
+      "expires": 1805645684.063671,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "TSID",
+      "value": "w-rN2LP2cpNlou_260215011421954",
+      "domain": ".tiara.kakao.com",
+      "path": "/",
+      "expires": 1771087484.063727,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "UUID",
+      "value": "ye5LPWPSdEBXE1Gtq8DnPvyWKJRqjMwKK5sMcby9L2Uf4T.nOmObYA00",
+      "domain": ".tiara.kakao.com",
+      "path": "/",
+      "expires": 1805645684.063762,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_SUID",
+      "value": "w-PnXlSR948JIx_260215623977060",
+      "domain": ".tiara.kakao.com",
+      "path": "/",
+      "expires": 1771087484.063775,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_ISUID",
+      "value": "w-xlzm5pfOQrXb_260215706424481",
+      "domain": ".tiara.kakao.com",
+      "path": "/",
+      "expires": 1771087484.063784,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_T_ANO",
+      "value": "chAk9TLdbYNfmPyXkn3JXgAqJEAK2sCYcd7DH9sbCgwPKiUcyo2sUrZRMNlA0+Y6t3IGh7WrgOuLSDwN3akBanzYYhQs8ZHR9ZBdemwpDLkWN7z19C2hAWA2dIVRCU9ryWp85e/KRwHjCZ+4qJAOL+qG8PgE664LmK34MejnhW7LKZU1TZKeEAe66730Y+GnrKoZR28lbEg7Xt81vjHHkIlTPHg0TgG4qHdTDOEpUcIhyGSCn7PRjfc0eXleU14unIzJC5QGL3kKzLP8KGH300U1xbiYa9ZP4bcGhNyo7DfiJio4NXYDQxbp/uHQC+V/1Ac8SsUcDEmx1rxTxCOszw==",
+      "domain": ".kakao.com",
+      "path": "/",
+      "expires": 1805645684.063793,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_kau",
+      "value": "7eb3e2fff4a326148c7cde246107bd1210132e9dcc1fff4d436b9a30552fd78034b31aa76f74a90fbbcefb171662e92497c16e72a9a5f47041d31d227f65b74f44539e9a57ac632598f21b6774bac38ddd04657c75a00585bafbf6a10f27c09a0c686178d2657318b07608b53ecae70db7525659b65e1a088efc7349113439343734303334313631313236373337323733313137353236323531393530364f4124e5f2bc31930ecc992e914c66",
+      "domain": ".kakao.com",
+      "path": "/",
+      "expires": 1802621703.717928,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_kawlt",
+      "value": "0-1qMotGQmJaGo1YV_H7XDuiTDb7ch0LY2L3MxwLQanYqnHeca01H-faCrivzEpQu2kNf72dhiHgflAX6mYWv0XehJZFp7PnHOcO8TWmBB_eZ4Kt8FVa020McZh0JqJx",
+      "domain": ".kakao.com",
+      "path": "/",
+      "expires": 1773688503.717999,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_kawltea",
+      "value": "1771161303",
+      "domain": ".kakao.com",
+      "path": "/",
+      "expires": 1773688503.718019,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_karmt",
+      "value": "vjA8Qd8LBe1K9jojmrW6liy3L4hI3LkVKoAZ9A8nTUFFukDUESvc5t24hHSX8TiW",
+      "domain": ".kakao.com",
+      "path": "/",
+      "expires": 1773688503.718032,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_karmtea",
+      "value": "1773688503",
+      "domain": ".kakao.com",
+      "path": "/",
+      "expires": 1773688503.718047,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_kahai",
+      "value": "b24e3a13b3825b48bf05660e7592d31238fd50564adfef04fbfaab62d9961e07",
+      "domain": ".kakao.com",
+      "path": "/",
+      "expires": 1773688503.71806,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_kaslt",
+      "value": "tG5qNSCoQdcvg0lPaYXQoXG/b8jX5b2znm0LDnm0FQuu7kDp/1LGXStmbLcsWpOEhvRTo4bJ0lXOHc3RYpOcQg==",
+      "domain": ".kakao.com",
+      "path": "/",
+      "expires": 1773688503.718073,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_karb",
+      "value": "TKN-mURKH4a94QUe_1771085703709",
+      "domain": ".kakao.com",
+      "path": "/",
+      "expires": 1778861703.718086,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "JSESSIONID",
+      "value": "D3C10BD207E3231B2A22F5B02A384727",
+      "domain": "kauth.kakao.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "sb-rjjfcnstdzwiwpblrxtz-auth-token",
+          "value": "{\"provider_token\":\"FQu6970bE_wBE-21Jonu2qV8VS_dXHtHAAAAAQoXFp8AAAGcXO8y7xKZRqbpl2cW\",\"provider_refresh_token\":\"l3x4fSu4Un5mXRlwjts0JSj3PWAwZGtDAAAAAgoXFp8AAAGcXO8y6BKZRqbpl2cW\",\"access_token\":\"eyJhbGciOiJFUzI1NiIsImtpZCI6ImZkNmE4NjE3LThiYTUtNDNkMy04NmFlLThhNzQyYTM2N2M1ZCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL3JqamZjbnN0ZHp3aXdwYmxyeHR6LnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJjMzRiNzVjZi00NWExLTQxZTMtODRkYy1hNDMwODkzNjRjYWEiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzcxMDg5MzA2LCJpYXQiOjE3NzEwODU3MDYsImVtYWlsIjoiaHdhbmcxNDAxQGdtYWlsLmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoia2FrYW8iLCJwcm92aWRlcnMiOlsia2FrYW8iXX0sInVzZXJfbWV0YWRhdGEiOnsiYXZhdGFyX3VybCI6Imh0dHA6Ly9rLmtha2FvY2RuLm5ldC9kbi9TTXJxci9idHNPY1NMMmZrWi9EVm1pWnRQNGswZE0zaDE2R1k1TTRrL2ltZ182NDB4NjQwLmpwZyIsImVtYWlsIjoiaHdhbmcxNDAxQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmdWxsX25hbWUiOiLtmanshLHruYgiLCJpc3MiOiJodHRwczovL2thcGkua2FrYW8uY29tIiwibmFtZSI6Iu2ZqeyEseu5iCIsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwicHJlZmVycmVkX3VzZXJuYW1lIjoi7Zmp7ISx67mIIiwicHJvdmlkZXJfaWQiOiI0NzM5MTUzMjY0Iiwic3ViIjoiNDczOTE1MzI2NCIsInVzZXJfbmFtZSI6Iu2ZqeyEseu5iCJ9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6Im9hdXRoIiwidGltZXN0YW1wIjoxNzcxMDg1NzA2fV0sInNlc3Npb25faWQiOiJhMWE5NDJjZC0wNjAwLTRlMTgtYTM2NS1iYjdlZWJhMTJjNDciLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.je1n9pI5aANBEkcw2VtyeZUKvz5P6U2cRp0849xgqCYC971Vw8W1TSPoj1po5YWw963TCEn60mG3ntjrw7xaXQ\",\"expires_in\":3600,\"expires_at\":1771089306,\"refresh_token\":\"bgfnckhvznry\",\"token_type\":\"bearer\",\"user\":{\"id\":\"c34b75cf-45a1-41e3-84dc-a43089364caa\",\"aud\":\"authenticated\",\"role\":\"authenticated\",\"email\":\"hwang1401@gmail.com\",\"email_confirmed_at\":\"2026-02-07T14:36:47.43365Z\",\"phone\":\"\",\"confirmed_at\":\"2026-02-07T14:36:47.43365Z\",\"last_sign_in_at\":\"2026-02-14T16:15:06.881428Z\",\"app_metadata\":{\"provider\":\"kakao\",\"providers\":[\"kakao\"]},\"user_metadata\":{\"avatar_url\":\"http://k.kakaocdn.net/dn/SMrqr/btsOcSL2fkZ/DVmiZtP4k0dM3h16GY5M4k/img_640x640.jpg\",\"email\":\"hwang1401@gmail.com\",\"email_verified\":true,\"full_name\":\"황성빈\",\"iss\":\"https://kapi.kakao.com\",\"name\":\"황성빈\",\"phone_verified\":false,\"preferred_username\":\"황성빈\",\"provider_id\":\"4739153264\",\"sub\":\"4739153264\",\"user_name\":\"황성빈\"},\"identities\":[{\"identity_id\":\"60d2631a-8658-49a0-8c04-eeaac288ecb6\",\"id\":\"4739153264\",\"user_id\":\"c34b75cf-45a1-41e3-84dc-a43089364caa\",\"identity_data\":{\"avatar_url\":\"http://k.kakaocdn.net/dn/SMrqr/btsOcSL2fkZ/DVmiZtP4k0dM3h16GY5M4k/img_640x640.jpg\",\"email\":\"hwang1401@gmail.com\",\"email_verified\":true,\"full_name\":\"황성빈\",\"iss\":\"https://kapi.kakao.com\",\"name\":\"황성빈\",\"phone_verified\":false,\"preferred_username\":\"황성빈\",\"provider_id\":\"4739153264\",\"sub\":\"4739153264\",\"user_name\":\"황성빈\"},\"provider\":\"kakao\",\"last_sign_in_at\":\"2026-02-07T14:36:47.429434Z\",\"created_at\":\"2026-02-07T14:36:47.429491Z\",\"updated_at\":\"2026-02-14T16:15:06.870192Z\",\"email\":\"hwang1401@gmail.com\"}],\"created_at\":\"2026-02-07T14:36:47.412913Z\",\"updated_at\":\"2026-02-14T16:15:06.890953Z\",\"is_anonymous\":false}}"
+        }
+      ]
+    }
+  ]
+}

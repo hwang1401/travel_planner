@@ -164,9 +164,11 @@ export function mergeData(base, custom) {
     });
   }
 
-  // Apply day reorder if present
+  // Apply day reorder if present (MD-3: out-of-range 인덱스 검증 추가)
   if (custom._dayOrder && custom._dayOrder.length === merged.length) {
-    return custom._dayOrder.map((origIdx) => merged[origIdx]);
+    if (custom._dayOrder.every((idx) => idx >= 0 && idx < merged.length)) {
+      return custom._dayOrder.map((origIdx) => merged[origIdx]);
+    }
   }
   return merged;
 }
