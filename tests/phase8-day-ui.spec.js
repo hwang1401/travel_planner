@@ -90,6 +90,8 @@ test.describe('Phase 8: Day 관리 & UI 인터랙션', () => {
     await editDayLabel(page, '오사카 탐방');
     await expectToast(page, '날짜 이름이 변경되었습니다', 5_000);
     await expect(page.locator('h2:has-text("오사카 탐방")')).toBeVisible({ timeout: 3_000 });
+    // DB 저장 완료 대기
+    await page.waitForTimeout(2_000);
   });
 
   /* ═══ [2.2] Day 이름 수정 취소 (ESC) ═══ */
@@ -99,6 +101,15 @@ test.describe('Phase 8: Day 관리 & UI 인터랙션', () => {
     await selectDay(page, 0);
     await page.waitForTimeout(500);
 
+    // Self-sufficient setup: 이름이 "오사카 탐방"인지 확인, 아니면 직접 설정
+    const currentLabel = page.locator('h2:has-text("오사카 탐방")');
+    if (!await currentLabel.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await editDayLabel(page, '오사카 탐방');
+      await page.waitForTimeout(1_500);
+    }
+    await expect(page.locator('h2:has-text("오사카 탐방")')).toBeVisible({ timeout: 3_000 });
+
+    // ESC 취소 테스트
     const dayLabelBtn = page.locator('button:has(h2)').first();
     await dayLabelBtn.click();
     await page.waitForTimeout(500);
@@ -224,30 +235,25 @@ test.describe('Phase 8: Day 관리 & UI 인터랙션', () => {
     await selectDay(page, 0);
     await page.waitForTimeout(500);
 
-    const beforeCount = await getItemCount(page);
-
     // 롱프레스로 선택 모드 진입
     await longPressItem(page, 'DM 삭제용A');
     await page.waitForTimeout(300);
     await page.locator('text=DM 삭제용B').first().click();
     await page.waitForTimeout(300);
 
-    // 삭제
-    const deleteBtn = page.locator('button:has-text("삭제")').last();
-    if (await deleteBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await deleteBtn.click();
-      await page.waitForTimeout(500);
+    // 선택 모드 툴바의 삭제 버튼
+    const toolbarDeleteBtn = page.locator('button:has-text("삭제")').last();
+    await expect(toolbarDeleteBtn).toBeVisible({ timeout: 3_000 });
+    await toolbarDeleteBtn.click();
+    await page.waitForTimeout(500);
 
-      // 확인 (있으면)
-      const confirmBtn = page.getByRole('button', { name: '삭제', exact: true });
-      if (await confirmBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await confirmBtn.click();
-        await page.waitForTimeout(1_000);
-      }
-    }
+    // 확인 다이얼로그 — "삭제하시겠습니까" 텍스트로 대기
+    await expect(page.locator('text=삭제하시겠습니까').first()).toBeVisible({ timeout: 3_000 });
+    // 다이얼로그 내 "삭제" 버튼 (마지막 삭제 버튼 = 다이얼로그 것)
+    await page.locator('button:has-text("삭제")').last().click();
+    await page.waitForTimeout(1_000);
 
     // 삭제 확인
-    await page.waitForTimeout(500);
     expect(await countText(page, 'DM 삭제용A')).toBe(0);
     expect(await countText(page, 'DM 삭제용B')).toBe(0);
 

@@ -19,6 +19,23 @@ import { SPACING, COLOR, TYPE_CONFIG } from '../../styles/tokens';
 const PLACE_TYPES = ['food', 'spot', 'shop', 'stay'];
 const CAT_ICONS = { food: 'fire', spot: 'pin', shop: 'shopping' };
 
+/** Build chat history for API, enriching AI messages with recommended places/items context */
+function buildChatHistory(chatMessages) {
+  return chatMessages.map((m) => {
+    if (m.role === 'ai') {
+      let text = m.text || '';
+      if (m.places?.length) {
+        text += `\n[추천한 장소: ${m.places.map(p => p.name).join(', ')}]`;
+      }
+      if (m.items?.length) {
+        text += `\n[생성한 일정: ${m.items.slice(0, 8).map(it => `${it.time} ${it.desc}`).join(', ')}]`;
+      }
+      return { role: m.role, text };
+    }
+    return { role: m.role, text: m.text };
+  });
+}
+
 function buildTripScheduleSummary(allDays) {
   if (!Array.isArray(allDays) || allDays.length === 0) return '';
   const lines = [];
@@ -75,7 +92,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
     setChatLoading(true);
     setTimeout(() => chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' }), 0);
 
-    const history = chatMessages.map((m) => ({ role: m.role, text: m.role === 'ai' ? (m.text || '') : m.text }));
+    const history = buildChatHistory(chatMessages);
     const lastAi = [...chatMessages].reverse().find((m) => m.role === 'ai' && m.items?.length);
     const currentItems = lastAi?.items ?? undefined;
     const dayContext = currentDay?.label || '';
@@ -104,7 +121,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
 
   const handleChoiceSelect = useCallback((choiceText) => {
     setChoicesSheet(null);
-    const history = chatMessages.map((m) => ({ role: m.role, text: m.role === 'ai' ? (m.text || '') : m.text }));
+    const history = buildChatHistory(chatMessages);
     setChatMessages((prev) => [...prev, { role: 'user', text: choiceText }]);
     setChatLoading(true);
     const lastAi = [...chatMessages].reverse().find((m) => m.role === 'ai' && m.items?.length);
@@ -139,7 +156,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
     const tripScheduleSummary = buildTripScheduleSummary(allDays || []);
     setChatMessages((prev) => {
       const trimmed = prev.slice(0, -2);
-      const historyForApi = trimmed.map((m) => ({ role: m.role, text: m.role === 'ai' ? (m.text || '') : m.text }));
+      const historyForApi = buildChatHistory(trimmed);
       const lastAi = [...prev].reverse().find((m) => m.role === 'ai' && m.items?.length);
       const currentItems = lastAi?.items ?? undefined;
       setChatLoading(true);

@@ -64,15 +64,30 @@ const TODAY_BY_GETDAY = ['일요일', '월요일', '화요일', '수요일', '�
 /** 영어 시간 텍스트 → 한국어 정규화 */
 function normalizeTimeText(t) {
   if (!t) return t;
-  if (/\bClosed\b/i.test(t)) return '휴무';
-  if (/\bOpen 24 hours\b/i.test(t)) return '24시간 영업';
+  const trimmed = t.trim();
+  if (/^Closed$/i.test(trimmed)) return '휴무';
+  if (/^Open 24 hours$/i.test(trimmed)) return '24시간 영업';
+  if (/^Open$/i.test(trimmed)) return null;
+  if (/^Temporarily closed$/i.test(trimmed)) return '임시 휴업';
+  if (/^Permanently closed$/i.test(trimmed)) return '폐업';
+  let s = t.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
   // AM/PM → 24시간 변환
-  return t.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
+  s = s.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
     let hour = parseInt(h, 10);
     if (ap.toUpperCase() === 'PM' && hour !== 12) hour += 12;
     if (ap.toUpperCase() === 'AM' && hour === 12) hour = 0;
     return `${String(hour).padStart(2, '0')}:${m}`;
   });
+  return s;
+}
+
+/** 영업시간 문자열에 영어 상태만 남아있으면 null 반환 */
+function sanitizeHoursForDisplay(hours) {
+  if (!hours || typeof hours !== 'string') return hours;
+  const t = hours.trim();
+  if (/^(Closed|Open|Open now|Temporarily closed|Permanently closed)$/i.test(t)) return null;
+  if (/^Open\s*[⋅·•]\s*/i.test(t)) return null;
+  return hours.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
 }
 
 function parseHoursToDays(hours) {
@@ -679,7 +694,7 @@ export default function DetailDialog({
 
   /* ── 콘텐츠 렌더 (칩별) ── */
   const infoRows = [
-    { field: 'hours', icon: 'clock', label: isStay ? '체크인·체크아웃' : '영업시간', value: effectiveDetail.hours, placeholder: isStay ? '체크인·체크아웃 입력' : '영업시간 입력', onClick: () => openTextEdit('hours', isStay ? '체크인·체크아웃' : '영업시간', effectiveDetail.hours) },
+    { field: 'hours', icon: 'clock', label: isStay ? '체크인·체크아웃' : '영업시간', value: isStay ? effectiveDetail.hours : sanitizeHoursForDisplay(effectiveDetail.hours), placeholder: isStay ? '체크인·체크아웃 입력' : '영업시간 입력', onClick: () => openTextEdit('hours', isStay ? '체크인·체크아웃' : '영업시간', effectiveDetail.hours) },
     { icon: 'pin', label: '주소', value: effectiveDetail.address, placeholder: '장소 검색', onClick: () => setShowAddressSearchDialog(true), miniMap: true, copyable: true },
     { icon: 'pricetag', label: '가격', value: effectiveDetail.price, placeholder: '가격 입력', onClick: () => openTextEdit('price', '가격', effectiveDetail.price) },
     { icon: 'bulb', label: '메모', value: effectiveDetail.tip, placeholder: '메모를 입력하세요', onClick: () => openTextEdit('tip', '메모', effectiveDetail.tip, true), multiline: true },

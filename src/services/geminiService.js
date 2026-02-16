@@ -64,6 +64,42 @@ function extractText(data) {
 }
 
 /**
+ * Extract function call from Gemini response.
+ * Gemini 2.5 Flash thought parts don't have functionCall, so they are auto-skipped.
+ */
+function extractFunctionCall(data) {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!parts) return null;
+  for (const part of parts) {
+    if (part.functionCall) {
+      return { name: part.functionCall.name, args: part.functionCall.args || {} };
+    }
+  }
+  return null;
+}
+
+/**
+ * Convert a function call response into a normalized result object.
+ */
+function processFunctionCallResponse(fc) {
+  const { name, args } = fc;
+  switch (name) {
+    case 'chat_reply':
+      return { type: 'chat', message: args.message || '', rawPlaces: [], rawItems: [],
+               choices: Array.isArray(args.choices) ? args.choices : [] };
+    case 'recommend_places':
+      return { type: 'recommend', message: args.message || '',
+               rawPlaces: Array.isArray(args.places) ? args.places : [],
+               rawItems: [], choices: Array.isArray(args.choices) ? args.choices : [] };
+    case 'create_itinerary':
+      return { type: 'itinerary', message: args.message || '', rawPlaces: [],
+               rawItems: Array.isArray(args.items) ? args.items : [], choices: [] };
+    default:
+      return { type: 'chat', message: args.message || '', rawPlaces: [], rawItems: [], choices: [] };
+  }
+}
+
+/**
  * Fetch with auto-retry on rate limit and on network failure (Load failed / timeout).
  * onStatus callback for UI updates (e.g. "30초 대기 중...")
  */
@@ -318,7 +354,142 @@ export function formatBookedItemsForPrompt(items) {
 
 /* ─── AI Recommendation Chat ─── */
 
-const RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 대화 파트너입니다.
+/* ── Function Calling Declarations ── */
+
+const FC_TOOLS = [{
+  functionDeclarations: [
+    {
+      name: "chat_reply",
+      description: "일반 대화 응답. 인사, 잡담, 정보 질문 등. '라멘 먹고싶다' 같은 구체적 음식/장소 언급에는 사용하지 마세요 — recommend_places를 쓰세요.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: { type: "string", description: "대화 응답 (해요체)" },
+          choices: { type: "array", items: { type: "string" }, description: "후속 제안 2~4개" }
+        },
+        required: ["message"]
+      }
+    },
+    {
+      name: "recommend_places",
+      description: "장소 추천. '추천해줘', '맛집', 구체적 음식/장소 언급('라멘', '카페') 시 반드시 사용. 이전 질문 답변으로 음식/장소를 말했을 때도 사용.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: { type: "string", description: "추천 메시지. 추천 수 미리 언급 금지." },
+          places: {
+            type: "array",
+            maxItems: 3,
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                category: { type: "string", enum: ["food", "spot", "shop"] },
+                description: { type: "string" },
+                address: { type: "string" },
+                rating: { type: "number" },
+                rag_id: { type: "string" }
+              },
+              required: ["name", "category", "description"]
+            }
+          },
+          choices: { type: "array", items: { type: "string" } }
+        },
+        required: ["message", "places"]
+      }
+    },
+    {
+      name: "create_itinerary",
+      description: "시간표/일정 생성/수정. '일정 짜줘', '타임라인', 부분 수정('OO 말고 XX로') 시 사용. [현재 일정]이 있으면 요청 부분만 바꾸고 나머지 유지.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: { type: "string" },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                time: { type: "string", description: "HH:MM" },
+                type: { type: "string", enum: ["food", "spot", "shop", "move", "flight", "stay", "info"] },
+                desc: { type: "string" },
+                rag_id: { type: "string" },
+                moveFrom: { type: "string" },
+                moveTo: { type: "string" },
+                detail: {
+                  type: "object",
+                  properties: {
+                    address: { type: "string" },
+                    tip: { type: "string" },
+                    lat: { type: "number" },
+                    lon: { type: "number" }
+                  }
+                }
+              },
+              required: ["time", "type", "desc"]
+            }
+          }
+        },
+        required: ["message", "items"]
+      }
+    }
+  ]
+}];
+
+const FC_TOOL_CONFIG = { functionCallingConfig: { mode: "ANY" } };
+
+/* ── FC System Prompt (Function Calling용) ── */
+
+const FC_RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 대화 파트너입니다.
+사용자의 말을 이해하고 적절한 함수를 호출하여 응답하세요.
+
+**함수 선택 가이드:**
+- chat_reply: 인사, 잡담, 정보 질문, 농담, "ㅋㅋ" 등 여행·장소 추천과 무관한 대화
+- recommend_places: "추천해줘", "맛집", "라멘 먹고싶다", "카페 갈래" 등 구체적 음식/장소 언급 or 추천 요청. 이전 질문에 음식/장소로 답했을 때도 사용
+- create_itinerary: "일정 짜줘", "타임라인", "오후 계획", 부분 수정("OO 말고 XX로") 등
+
+**message 작성 규칙:**
+- 존댓말(해요체)로 쓰되, 친구에게 말하듯 편하게 쓰세요
+- 이모지 사용 금지
+- 사용자 말을 그대로 반복하거나 길게 요약하지 마세요. 새로 바뀐 점이나 짧은 코멘트만 1~2문장
+- "N곳 추천해 드릴게요"처럼 추천 수를 미리 언급하지 마세요
+- "참고 장소", "[참고 장소]" 같은 내부 용어 절대 금지
+
+**[참고 장소] 사용 규칙:**
+- [참고 장소] 목록이 있으면 반드시 먼저 사용. food/spot/shop의 최소 70%는 목록에서 선택하고 rag_id 포함
+- 목록에서 고른 장소의 name/desc는 목록의 name_ko를 그대로 사용 (변형 금지)
+- 목록에서 고른 장소의 address는 목록의 주소를 그대로 복사
+- 해당 지역/카테고리에 장소가 없을 때만 직접 추천 (rag_id 생략)
+- 지역이 목록에 없으면 짧게 안내하고 rag_id 없이 채우기. 다른 지역 대신 추천 금지
+
+**대화 맥락 규칙:**
+- 이전에 추천한 장소를 다시 추천하지 마세요
+- 사용자가 이전 추천 중 하나를 선택하면 같은 카테고리 재추천 금지
+- "OO 먹고 갈만한 곳" → 이미 food 정해졌으니 spot/shop 추천
+- "그 근처에서" → 이전에 선택/추천된 장소 근처 추천
+
+**기존 일정 맥락 ([이번 여행 전체 일정 요약]이 주어질 때):**
+- 이미 다른 날에 간 장소 재추천 금지
+- 오늘 일정은 기존 장소 근처·같은 권역으로 이어지게 배치
+
+**부분 수정 규칙 (매우 중요):**
+- [현재 일정]이 주어지면 요청한 부분만 바꾸고 나머지 그대로 유지. 전체 재생성 금지
+- message는 "OO 대신 XX로 바꿔뒀어요."처럼 무엇만 바뀌었는지 짧게만 쓰세요
+
+**일정(create_itinerary) 규칙:**
+- 시간: 장소당 최소 체류(식사 1시간, 관광·쇼핑 1~2시간)와 이동 시간을 현실적으로 배치. 하루 최대 6~7개
+- 동선: [현재 일정]이나 [이번 여행 전체 일정 요약]이 있으면 기존 장소 근처·같은 권역으로 이어지게 배치
+- detail.tip: food/spot/shop 타입은 반드시 포함 (예상 비용, 추천 메뉴, 핵심 포인트)
+- move 타입: moveFrom/moveTo 필수
+- desc에 반드시 구체적 장소명. "근처", "주변" 같은 모호한 표현 금지
+
+**추천(recommend_places) 규칙:**
+- places 최대 3개
+- description은 한 줄로 간결하게
+- 막연한 요청에도 places 채우면서 choices에 세부 선택지 제공. places 없이 chat_reply만 쓰지 마세요
+- 구체적 조건("라멘 먹고싶어") → 바로 해당 조건에 맞는 places 추천`;
+
+const RECOMMEND_SYSTEM_PROMPT_LEGACY = `당신은 친절한 여행 대화 파트너입니다.
 사용자의 말을 이해하고 type을 자동 판단하여 답변하세요.
 
 **type 판단 규칙 (필수):**
@@ -440,7 +611,9 @@ rag_id: [참고 장소] 목록에서 고른 장소는 해당 rag_id를 넣으세
 
 대화·추가 질문 vs 추천/일정 만들기 (맥락에 따라 판단):
 - 여행·일정·장소 추천과 무관한 말(인사, 농담, "바보", "ㅋㅋ" 등)에는 type: "chat"으로 답하세요.
-- 여행 관련 일상 대화("후쿠오카 좋지?", "라멘 먹고 싶다")에도 type: "chat"으로 짧게 공감하세요. choices로 "맛집 추천해줄까?" 같은 제안 가능.
+- 여행 관련 일상 대화("후쿠오카 좋지?", "날씨 어때?")에는 type: "chat"으로 짧게 공감하세요. choices로 "맛집 추천해줄까?" 같은 제안 가능.
+- "라멘 먹고 싶다", "스시 먹을래", "카페 가고 싶어" 같이 구체적 음식/장소를 언급하면 바로 type: "recommend"로 places를 채워서 응답하세요. chat으로 공감만 하지 마세요.
+- 이전 대화에서 음식 종류나 장소를 물었고, 사용자가 "라멘", "스시", "우동" 등으로 답하면, 즉시 해당 조건의 장소를 type: "recommend"로 places에 채워서 응답하세요.
 - "추천해줘", "알려줘", "뭐 먹을까" → type: "recommend"로 places를 채우세요.
 - "일정 짜줘", "타임라인 만들어줘", "오후 계획" → type: "itinerary"로 items를 채우세요.
 
@@ -448,7 +621,8 @@ rag_id: [참고 장소] 목록에서 고른 장소는 해당 rag_id를 넣으세
 - 사용자가 "추천해줘", "뭐 먹을까", "맛집", "볼거리" 등 추천을 요청하면, 반드시 type: "recommend"로 places를 채워서 응답하세요.
 - 구체적 조건이 없는 막연한 요청 (예: "점심 추천좀", "그냥 추천해줘")에는 places를 채우면서 동시에 choices에 "라멘", "스시", "야키니쿠" 같은 세부 선택지를 제공하세요. message에 "어떤 메뉴가 좋으세요?" 같은 가벼운 질문을 넣어도 됩니다.
 - 단, 절대 places 없이 type: "chat"으로만 되묻지 마세요. 추천 요청에는 반드시 places를 함께 포함하세요.
-- 사용자가 "라멘 먹고 싶어"처럼 구체적이면 바로 해당 조건에 맞는 places를 추천하세요.`;
+- 사용자가 "라멘 먹고 싶어"처럼 구체적이면 바로 해당 조건에 맞는 places를 추천하세요.
+- message에서 "N곳 추천해 드릴게요"처럼 추천 수를 미리 언급하지 마세요. "맛있는 곳 추천해 드릴게요"처럼 수를 특정하지 않고 자연스럽게 쓰세요. places 배열의 실제 개수와 message가 불일치하면 사용자가 혼란스러워합니다.`;
 
 /**
  * Get AI schedule recommendations based on natural language input.
@@ -512,126 +686,170 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
   });
 
   try {
-    const reqBody = {
-      system_instruction: { parts: [{ text: RECOMMEND_SYSTEM_PROMPT }] },
-      contents,
-      generationConfig: { temperature: 0.7, maxOutputTokens: 65536, responseMimeType: "application/json" },
-    };
+    const USE_FUNCTION_CALLING = true;
+
+    const reqBody = USE_FUNCTION_CALLING
+      ? {
+          system_instruction: { parts: [{ text: FC_RECOMMEND_SYSTEM_PROMPT }] },
+          contents,
+          generationConfig: { temperature: 0.7, maxOutputTokens: 65536 },
+          tools: FC_TOOLS,
+          toolConfig: FC_TOOL_CONFIG,
+        }
+      : {
+          system_instruction: { parts: [{ text: RECOMMEND_SYSTEM_PROMPT_LEGACY }] },
+          contents,
+          generationConfig: { temperature: 0.7, maxOutputTokens: 65536, responseMimeType: "application/json" },
+        };
 
     const response = await fetchWithRetry(reqBody, { onStatus });
-    if (response._errMsg) return { type: 'chat', message: "", places: [], items: [], error: response._errMsg };
+    if (response._errMsg) return { type: 'chat', message: "", places: [], items: [], error: response._errMsg, choices: [] };
 
     const data = await response.json();
     const finishReason = data?.candidates?.[0]?.finishReason;
-    const text = extractText(data);
 
-    if (!text) {
-      console.error("[GeminiService] Recommend empty. finishReason:", finishReason);
-      return { type: 'chat', message: "", places: [], items: [], error: "AI 응답이 비어있습니다" };
-    }
+    // PRIMARY: Function Calling
+    const fc = extractFunctionCall(data);
+    let message, rawItems, rawPlaces, choices, parsedType;
 
-    // 마크다운 코드블록 제거 (```json ... ``` 또는 ``` ... ``` 또는 앞만 있는 경우)
-    let raw = text.trim();
-    const codeBlock = raw.match(/^```(?:json)?\s*([\s\S]*?)```$/);
-    if (codeBlock) raw = codeBlock[1].trim();
-    else if (raw.startsWith("```")) {
-      raw = raw.replace(/^```(?:json)?\s*\n?/, "").trim();
-      const end = raw.indexOf("```");
-      if (end !== -1) raw = raw.slice(0, end).trim();
-    }
+    if (fc) {
+      // FC 성공
+      if (fc.name === 'recommend_places') {
+        console.log(`[GeminiService] FC: ${fc.name}(places=${fc.args.places?.length}) | input="${userMessage.slice(0, 50)}"`);
+      } else if (fc.name === 'create_itinerary') {
+        console.log(`[GeminiService] FC: ${fc.name}(items=${fc.args.items?.length}) | input="${userMessage.slice(0, 50)}"`);
+      } else {
+        console.log(`[GeminiService] FC: ${fc.name}(chat) | input="${userMessage.slice(0, 50)}"`);
+      }
+      const processed = processFunctionCallResponse(fc);
+      ({ type: parsedType, message, rawPlaces, rawItems, choices } = processed);
+    } else {
+      // FC 실패 → JSON 모드로 재요청
+      console.warn(`[GeminiService] FC fallback | finishReason=${finishReason} | input="${userMessage.slice(0, 50)}"`);
 
-    // rag_id가 따옴표 없이 나오면 파싱 실패 (예: "rag_id": 775b0632 → 숫자에 b 불가) → 문자열로 감쌈
-    raw = raw.replace(/"rag_id"\s*:\s*([a-zA-Z0-9\-]+)/g, '"rag_id": "$1"');
+      const fallbackReqBody = {
+        system_instruction: { parts: [{ text: RECOMMEND_SYSTEM_PROMPT_LEGACY }] },
+        contents,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 65536, responseMimeType: "application/json" },
+      };
+      const fallbackResponse = await fetchWithRetry(fallbackReqBody, { onStatus });
+      if (fallbackResponse._errMsg) {
+        return { type: 'chat', message: "", places: [], items: [], error: fallbackResponse._errMsg, choices: [] };
+      }
 
-    // 첫 번째 완전한 JSON 객체 추출 (중괄호 짝 맞추기)
-    function extractFirstJson(str) {
-      const start = str.indexOf("{");
-      if (start === -1) return null;
-      let depth = 0;
-      let inString = false;
-      let escape = false;
-      let quote = null;
-      for (let i = start; i < str.length; i++) {
-        const c = str[i];
-        if (escape) { escape = false; continue; }
-        if (c === "\\" && inString) { escape = true; continue; }
-        if (!inString) {
-          if (c === '"' || c === "'") { inString = true; quote = c; continue; }
-          if (c === "{") depth++;
-          else if (c === "}") { depth--; if (depth === 0) return str.slice(start, i + 1); }
-          continue;
+      const fallbackData = await fallbackResponse.json();
+      const text = extractText(fallbackData);
+      if (!text) {
+        console.error("[GeminiService] Recommend empty (fallback). finishReason:", fallbackData?.candidates?.[0]?.finishReason);
+        return { type: 'chat', message: "", places: [], items: [], error: "AI 응답이 비어있습니다", choices: [] };
+      }
+
+      // 기존 5단계 JSON 파싱 코드
+      // 마크다운 코드블록 제거
+      let raw = text.trim();
+      const codeBlock = raw.match(/^```(?:json)?\s*([\s\S]*?)```$/);
+      if (codeBlock) raw = codeBlock[1].trim();
+      else if (raw.startsWith("```")) {
+        raw = raw.replace(/^```(?:json)?\s*\n?/, "").trim();
+        const end = raw.indexOf("```");
+        if (end !== -1) raw = raw.slice(0, end).trim();
+      }
+
+      // rag_id가 따옴표 없이 나오면 파싱 실패 → 문자열로 감쌈
+      raw = raw.replace(/"rag_id"\s*:\s*([a-zA-Z0-9\-]+)/g, '"rag_id": "$1"');
+
+      // 첫 번째 완전한 JSON 객체 추출 (중괄호 짝 맞추기)
+      function extractFirstJson(str) {
+        const start = str.indexOf("{");
+        if (start === -1) return null;
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        let quote = null;
+        for (let i = start; i < str.length; i++) {
+          const c = str[i];
+          if (escape) { escape = false; continue; }
+          if (c === "\\" && inString) { escape = true; continue; }
+          if (!inString) {
+            if (c === '"' || c === "'") { inString = true; quote = c; continue; }
+            if (c === "{") depth++;
+            else if (c === "}") { depth--; if (depth === 0) return str.slice(start, i + 1); }
+            continue;
+          }
+          if (c === quote) inString = false;
         }
-        if (c === quote) inString = false;
+        return null;
       }
-      return null;
-    }
 
-    // Trailing comma 제거 (AI가 자주 넣는 불필요한 쉼표)
-    function stripTrailingCommas(s) {
-      let prev = "";
-      while (prev !== s) {
-        prev = s;
-        s = s.replace(/,\s*\]/g, "]").replace(/,\s*\}/g, "}");
-      }
-      return s;
-    }
-
-    // 잘린 JSON 끝 보정: 열린 괄호만큼 ] } 추가
-    function tryCloseTruncated(str) {
-      const trimmed = str.trim();
-      if (trimmed.endsWith("}") && !trimmed.endsWith(",\n")) return trimmed;
-      let depth = 0;
-      let arrayDepth = 0;
-      let inString = false;
-      let escape = false;
-      let q = null;
-      for (let i = trimmed.indexOf("{"); i < trimmed.length; i++) {
-        const c = trimmed[i];
-        if (escape) { escape = false; continue; }
-        if (c === "\\" && inString) { escape = true; continue; }
-        if (!inString) {
-          if (c === '"' || c === "'") { inString = true; q = c; continue; }
-          if (c === "{") depth++;
-          else if (c === "}") depth--;
-          else if (c === "[") arrayDepth++;
-          else if (c === "]") arrayDepth--;
-          continue;
+      // Trailing comma 제거
+      function stripTrailingCommas(s) {
+        let prev = "";
+        while (prev !== s) {
+          prev = s;
+          s = s.replace(/,\s*\]/g, "]").replace(/,\s*\}/g, "}");
         }
-        if (c === q) inString = false;
+        return s;
       }
-      let suffix = "";
-      while (arrayDepth > 0) { suffix += "]"; arrayDepth--; }
-      while (depth > 0) { suffix += "}"; depth--; }
-      return trimmed + suffix;
-    }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      let candidate = extractFirstJson(raw) || raw.match(/\{[\s\S]*\}/)?.[0] || raw;
-      candidate = stripTrailingCommas(candidate);
+      // 잘린 JSON 끝 보정
+      function tryCloseTruncated(str) {
+        const trimmed = str.trim();
+        if (trimmed.endsWith("}") && !trimmed.endsWith(",\n")) return trimmed;
+        let depth = 0;
+        let arrayDepth = 0;
+        let inString = false;
+        let escape = false;
+        let q = null;
+        for (let i = trimmed.indexOf("{"); i < trimmed.length; i++) {
+          const c = trimmed[i];
+          if (escape) { escape = false; continue; }
+          if (c === "\\" && inString) { escape = true; continue; }
+          if (!inString) {
+            if (c === '"' || c === "'") { inString = true; q = c; continue; }
+            if (c === "{") depth++;
+            else if (c === "}") depth--;
+            else if (c === "[") arrayDepth++;
+            else if (c === "]") arrayDepth--;
+            continue;
+          }
+          if (c === q) inString = false;
+        }
+        let suffix = "";
+        while (arrayDepth > 0) { suffix += "]"; arrayDepth--; }
+        while (depth > 0) { suffix += "}"; depth--; }
+        return trimmed + suffix;
+      }
+
+      let parsed;
       try {
-        parsed = JSON.parse(candidate);
+        parsed = JSON.parse(raw);
       } catch {
-        candidate = tryCloseTruncated(candidate);
+        let candidate = extractFirstJson(raw) || raw.match(/\{[\s\S]*\}/)?.[0] || raw;
         candidate = stripTrailingCommas(candidate);
         try {
           parsed = JSON.parse(candidate);
         } catch {
-          /* fall through */
+          candidate = tryCloseTruncated(candidate);
+          candidate = stripTrailingCommas(candidate);
+          try {
+            parsed = JSON.parse(candidate);
+          } catch {
+            /* fall through */
+          }
+        }
+        if (!parsed) {
+          console.warn("[GeminiService] Recommend JSON parse failed (fallback). Raw (first 600 chars):", raw.slice(0, 600));
+          return { type: 'chat', message: "응답을 처리하지 못했어요. 다시 한번 말씀해 주실래요?", places: [], items: [], error: null, choices: [] };
         }
       }
-      if (!parsed) {
-        console.warn("[GeminiService] Recommend JSON parse failed. Raw (first 600 chars):", raw.slice(0, 600));
-        return { type: 'chat', message: "응답을 처리하지 못했어요. 다시 한번 말씀해 주실래요?", places: [], items: [], error: null, choices: [] };
-      }
-    }
 
-    console.log("[GeminiService] Parsed response:", JSON.stringify({ type: parsed.type, placesCount: parsed.places?.length, itemsCount: parsed.items?.length, message: (parsed.message || "").slice(0, 100) }));
-    const message = parsed.message || "";
-    const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
-    const rawPlaces = Array.isArray(parsed.places) ? parsed.places : [];
+      console.log("[GeminiService] Parsed response (fallback):", JSON.stringify({ type: parsed.type, placesCount: parsed.places?.length, itemsCount: parsed.items?.length, message: (parsed.message || "").slice(0, 100) }));
+      message = parsed.message || "";
+      rawItems = Array.isArray(parsed.items) ? parsed.items : [];
+      rawPlaces = Array.isArray(parsed.places) ? parsed.places : [];
+      choices = Array.isArray(parsed.choices) ? parsed.choices : [];
+      parsedType = parsed.type || 'chat';
+    }
 
     const TYPE_CAT2 = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
     const items = rawItems
@@ -751,6 +969,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
           category: cat,
           description: p.description || '',
           ...(p.rating != null ? { rating: p.rating } : {}),
+          ...(p.address ? { address: p.address } : {}),
         };
         if (ragMatch) {
           if (ragMatch.image_url) place.image = ragMatch.image_url;
@@ -769,19 +988,12 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
       await verifyAndApplyRecommendPlaces(places, regionHint);
     }
 
-    // 검증 실패(image 없음) 장소 제거 — 정보 없는 빈 카드 방지
-    const verifiedPlaces = places.filter(p => p.image);
+    // type 판단: FC일 때는 함수 이름이 곧 타입, fallback일 때는 기존 로직
+    const responseType = fc
+      ? parsedType
+      : (items.length > 0 ? 'itinerary' : places.length > 0 ? 'recommend' : (parsedType || 'chat'));
 
-    // type 판단: places/items 실제 데이터 기반 (AI가 type을 틀려도 보정)
-    // 추천 장소가 전부 검증 실패했으면 recommend가 아닌 chat으로 처리
-    const responseType = items.length > 0
-      ? 'itinerary'
-      : verifiedPlaces.length > 0
-        ? 'recommend'
-        : 'chat';
-
-    const choices = Array.isArray(parsed.choices) ? parsed.choices : [];
-    return { type: responseType, message, places: verifiedPlaces, items, error: null, choices };
+    return { type: responseType, message, places, items, error: null, choices };
   } catch (err) {
     console.error("[GeminiService] Recommendation error:", err);
     return { type: 'chat', message: "", places: [], items: [], error: `네트워크 오류: ${err.message}`, choices: [] };
@@ -945,7 +1157,10 @@ async function verifyAndApplyRecommendPlaces(places, regionHint) {
 
   const baseUrl = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!baseUrl || !anonKey) return;
+  if (!baseUrl || !anonKey) {
+    console.warn('[GeminiService] verifyRecommendPlaces: missing Supabase config');
+    return;
+  }
 
   const payload = unverified.map(p => ({
     desc: p.name,
@@ -954,20 +1169,36 @@ async function verifyAndApplyRecommendPlaces(places, regionHint) {
     region: regionHint || '',
   }));
 
+  console.log('[GeminiService] verifyRecommendPlaces: sending', payload.map(p => `${p.desc} (addr: ${p.address || 'none'})`));
+
   try {
     const res = await fetch(`${baseUrl.replace(/\/$/, '')}/functions/v1/verify-and-register-places`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anonKey}` },
       body: JSON.stringify({ places: payload, regionHint }),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.warn('[GeminiService] verifyRecommendPlaces: HTTP', res.status, errText.slice(0, 200));
+      return;
+    }
     const data = await res.json();
     const results = data.results || [];
+
+    console.log('[GeminiService] verifyRecommendPlaces: got', results.length, 'results from', unverified.length, 'places',
+      results.map(r => `${r.desc}: img=${!!r.image_url}, placeId=${!!r.placeId}`));
+
+    if (data.daily_limit_reached) {
+      console.warn('[GeminiService] verifyRecommendPlaces: daily limit reached');
+    }
 
     for (const r of results) {
       const norm = (s) => (s || '').trim().toLowerCase();
       const place = places.find(p => norm(p.name) === norm(r.desc));
-      if (!place) continue;
+      if (!place) {
+        console.warn('[GeminiService] verifyRecommendPlaces: no match for result desc:', r.desc, '— places:', places.map(p => p.name));
+        continue;
+      }
       if (r.image_url) place.image = r.image_url;
       if (r.address) place.address = r.address;
       if (r.placeId) place.placeId = r.placeId;
@@ -975,6 +1206,12 @@ async function verifyAndApplyRecommendPlaces(places, regionHint) {
       if (r.lon != null) place.lon = r.lon;
       if (r.rating != null) place.rating = r.rating;
       if (r.reviewCount != null) place.reviewCount = r.reviewCount;
+    }
+
+    // 검증 후에도 이미지 없는 장소 로깅
+    const stillMissing = places.filter(p => !p.image);
+    if (stillMissing.length > 0) {
+      console.warn('[GeminiService] verifyRecommendPlaces: still missing images:', stillMissing.map(p => p.name));
     }
   } catch (err) {
     console.warn('[GeminiService] verifyRecommendPlaces failed:', err);

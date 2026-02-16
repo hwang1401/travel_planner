@@ -189,24 +189,62 @@ function nameSimilar(a: string, b: string): boolean {
   if (na.length >= 2 && nb.includes(na)) return true;
   if (nb.length >= 2 && na.includes(nb)) return true;
   if (na.length >= 2 && nb.length >= 2 && (na.startsWith(nb) || nb.startsWith(na))) return true;
+
+  // 핵심 단어 매칭: 공통 접미사(점, 본점, 역점 등)를 제거한 후
+  // 양쪽 이름에서 가장 긴 공통 부분이 2자 이상이면 같은 장소로 판단
+  // 예: "이치란 라멘" vs "이치란 캐널시티 하카타점" → "이치란" 공통
+  const suffixes = /(?:본점|역점|역앞점|역전점|하카타점|하카타역점|점)$/;
+  const coreA = na.replace(suffixes, '');
+  const coreB = nb.replace(suffixes, '');
+  if (coreA.length >= 2 && coreB.length >= 2 && (coreA.includes(coreB) || coreB.includes(coreA))) return true;
+
+  // 분할 매칭: 원본 이름을 공백으로 분리하여 핵심 토큰(2자 이상)이 포함되면 매칭
+  // 일반적인 접미사/수식어는 제외
+  const noise = new Set(['라멘', 'ramen', '우동', 'udon', '맛집', '본점', '지점', '점', '역점', '카페', 'cafe', '식당', '레스토랑']);
+  const tokensA = a.split(/[\s·]+/).map(t => normalizeForMatch(t)).filter(t => t.length >= 2 && !noise.has(t));
+  const tokensB = b.split(/[\s·]+/).map(t => normalizeForMatch(t)).filter(t => t.length >= 2 && !noise.has(t));
+  if (tokensA.length > 0 && tokensB.length > 0) {
+    for (const ta of tokensA) {
+      for (const tb of tokensB) {
+        if (ta.length >= 2 && tb.length >= 2 && (ta.includes(tb) || tb.includes(ta))) return true;
+      }
+    }
+  }
+
   return false;
 }
 
-async function searchPlace(
-  textQuery: string,
-  lat: number,
-  lng: number,
-  apiKey: string,
-  languageCode = "ja"
-): Promise<{
+type PlaceResult = {
   id: string | null;
   displayName: string;
   formattedAddress: string | null;
   location: { latitude: number; longitude: number } | null;
   rating: number | null;
   userRatingCount: number | null;
-} | null> {
+};
+
+async function searchPlaces(
+  textQuery: string,
+  lat: number,
+  lng: number,
+  apiKey: string,
+  languageCode = "ja",
+  includedType?: string,
+  maxResultCount = 5
+): Promise<PlaceResult[]> {
   const url = "https://places.googleapis.com/v1/places:searchText";
+  const body: Record<string, unknown> = {
+    textQuery: String(textQuery),
+    languageCode,
+    locationBias: {
+      circle: {
+        center: { latitude: lat, longitude: lng },
+        radius: 50000,
+      },
+    },
+    maxResultCount,
+  };
+  if (includedType) body.includedType = includedType;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -215,19 +253,9 @@ async function searchPlace(
       "X-Goog-FieldMask":
         "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount",
     },
-    body: JSON.stringify({
-      textQuery: String(textQuery),
-      languageCode,
-      locationBias: {
-        circle: {
-          center: { latitude: lat, longitude: lng },
-          radius: 50000,
-        },
-      },
-      maxResultCount: 1,
-    }),
+    body: JSON.stringify(body),
   });
-  if (!res.ok) return null;
+  if (!res.ok) return [];
   const data = (await res.json()) as { places?: Array<{
     id?: string;
     displayName?: { text?: string };
@@ -236,20 +264,34 @@ async function searchPlace(
     rating?: number;
     userRatingCount?: number;
   }> };
-  const first = data?.places?.[0];
-  if (!first) return null;
-  const loc = first.location;
-  return {
-    id: first.id ?? null,
-    displayName: first.displayName?.text ?? "",
-    formattedAddress: first.formattedAddress ?? null,
-    location:
-      loc?.latitude != null && loc?.longitude != null
-        ? { latitude: loc.latitude, longitude: loc.longitude }
-        : null,
-    rating: first.rating ?? null,
-    userRatingCount: first.userRatingCount ?? null,
-  };
+  if (!data?.places) return [];
+  return data.places.map((p) => {
+    const loc = p.location;
+    return {
+      id: p.id ?? null,
+      displayName: p.displayName?.text ?? "",
+      formattedAddress: p.formattedAddress ?? null,
+      location:
+        loc?.latitude != null && loc?.longitude != null
+          ? { latitude: loc.latitude, longitude: loc.longitude }
+          : null,
+      rating: p.rating ?? null,
+      userRatingCount: p.userRatingCount ?? null,
+    };
+  });
+}
+
+/** 단일 결과 반환 (하위 호환) */
+async function searchPlace(
+  textQuery: string,
+  lat: number,
+  lng: number,
+  apiKey: string,
+  languageCode = "ja",
+  includedType?: string
+): Promise<PlaceResult | null> {
+  const results = await searchPlaces(textQuery, lat, lng, apiKey, languageCode, includedType, 1);
+  return results[0] ?? null;
 }
 
 async function getBestPhotoName(placeId: string, apiKey: string): Promise<string | null> {
@@ -464,28 +506,109 @@ Deno.serve(async (req) => {
 
     // ── 1. Text Search (DB에 없을 때만) ──
     const jaCity = regionKey ? REGION_JA_NAMES[regionKey] : null;
-    const query = place.address
-      ? `${place.desc.trim()} ${place.address}`
-      : `${place.desc.trim()} ${jaCity || '日本'}`;
+    const query = `${place.desc.trim()} ${jaCity || '日本'}`;
     const [pLat, pLng] = place.region
       ? getRegionHintCenter(place.region)
       : [lat, lng];
-    const result = await searchPlace(query, pLat, pLng, apiKey);
-    if (!result || !result.id) {
-      console.warn(`[verify-and-register] no result: ${place.desc}`);
-      return { ok: false };
+
+    // 복수 결과(최대 5개)를 가져와서 이름 매칭되는 것을 선택
+    // 1) JA 검색 → nameSimilar 매칭
+    // 2) KO fallback → nameSimilar 매칭
+    // 건물·시설이 아닌 실제 업체가 매칭되도록 함
+    const GOOGLE_TYPE_MAP: Record<string, string> = { food: "restaurant", stay: "lodging" };
+    const googleType = GOOGLE_TYPE_MAP[place.type] || undefined;
+
+    const pickBestMatch = (
+      candidates: PlaceResult[],
+      desc: string
+    ): PlaceResult | null => {
+      // 1차: nameSimilar 매칭 + 리뷰 많은 순 (건물은 리뷰 적음)
+      const matched = candidates
+        .filter((c) => c.id && nameSimilar(desc, c.displayName))
+        .sort((a, b) => (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0));
+      if (matched.length > 0) return matched[0];
+      return null;
+    };
+
+    let finalResult: PlaceResult | null = null;
+
+    // JA + KO 모두 검색하여 이름 매칭되는 후보를 모으고 리뷰 수 기준으로 최선 선택
+    // (건물 2개 리뷰 vs 식당 12000개 리뷰 → 식당이 선택됨)
+    let jaResults = googleType
+      ? await searchPlaces(query, pLat, pLng, apiKey, "ja", googleType)
+      : [];
+    if (jaResults.length === 0) {
+      jaResults = await searchPlaces(query, pLat, pLng, apiKey, "ja");
     }
-    // nameSimilar: 일본어 displayName으로 먼저 비교, 실패 시 한국어로 재검색
-    if (!nameSimilar(place.desc, result.displayName)) {
-      const koResult = await searchPlace(query, pLat, pLng, apiKey, "ko");
-      if (!koResult || !koResult.id || !nameSimilar(place.desc, koResult.displayName)) {
-        console.warn(`[verify-and-register] name mismatch: ${place.desc} vs ${result.displayName}`);
-        return { ok: false };
+
+    let koResults = googleType
+      ? await searchPlaces(query, pLat, pLng, apiKey, "ko", googleType)
+      : [];
+    if (koResults.length === 0) {
+      koResults = await searchPlaces(query, pLat, pLng, apiKey, "ko");
+    }
+
+    // JA/KO 결과 중 id가 같으면 중복 제거 (KO 이름으로 매칭 가능하도록 병합)
+    // koMap: placeId → KO displayName
+    const koNameById = new Map<string, string>();
+    for (const kr of koResults) {
+      if (kr.id) koNameById.set(kr.id, kr.displayName);
+    }
+
+    // 모든 JA 결과에 대해: JA displayName 또는 KO displayName 중 하나라도 매칭이면 후보
+    const allCandidates: PlaceResult[] = [];
+    for (const r of jaResults) {
+      if (!r.id) continue;
+      const koName = koNameById.get(r.id) ?? "";
+      if (nameSimilar(place.desc, r.displayName) || nameSimilar(place.desc, koName)) {
+        allCandidates.push(r);
       }
     }
+    // KO에만 있는 결과도 확인
+    const jaIds = new Set(jaResults.map((r) => r.id));
+    for (const kr of koResults) {
+      if (!kr.id || jaIds.has(kr.id)) continue;
+      if (nameSimilar(place.desc, kr.displayName)) {
+        allCandidates.push(kr);
+      }
+    }
+
+    if (allCandidates.length > 0) {
+      // 리뷰 수 가장 많은 것 선택 (건물은 리뷰 적음, 실제 업체는 많음)
+      allCandidates.sort((a, b) => (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0));
+      finalResult = allCandidates[0];
+    }
+
+    // 이름 매칭 결과가 리뷰 극소(< 10)이면 건물·주차장 등 오매칭 가능성 높음
+    // → 전체 결과 중 가장 인기 있는(리뷰 많은) 결과로 대체
+    if (finalResult && (finalResult.userRatingCount ?? 0) < 10) {
+      const jaIds = new Set(jaResults.map((r) => r.id));
+      const allResults = [...jaResults];
+      for (const kr of koResults) {
+        if (!jaIds.has(kr.id)) allResults.push(kr);
+      }
+      const mostPopular = allResults
+        .filter((r) => r.id)
+        .sort((a, b) => (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0))[0];
+      if (mostPopular && (mostPopular.userRatingCount ?? 0) > 100) {
+        console.log(`[verify-and-register] low-review match (${finalResult.userRatingCount} reviews), preferring popular: ${mostPopular.displayName} (${mostPopular.userRatingCount} reviews)`);
+        finalResult = mostPopular;
+      }
+    }
+
+    // 매칭 후보가 없으면 JA 첫 번째 결과라도 사용 (기존 호환)
+    if (!finalResult) {
+      const fallback = jaResults[0] ?? null;
+      if (!fallback || !fallback.id) {
+        console.warn(`[verify-and-register] no result: ${place.desc}`);
+        return { ok: false };
+      }
+      console.warn(`[verify-and-register] name mismatch, using first result: ${place.desc} vs ${fallback.displayName}`);
+      finalResult = fallback;
+    }
     const region =
-      result.location != null
-        ? findRegionByCoords(result.location.latitude, result.location.longitude)
+      finalResult.location != null
+        ? findRegionByCoords(finalResult.location.latitude, finalResult.location.longitude)
         : null;
     if (!region) {
       console.warn(`[verify-and-register] no region for coords: ${place.desc}`);
@@ -496,7 +619,7 @@ Deno.serve(async (req) => {
     const { data: existing } = await supabase
       .from("rag_places")
       .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region")
-      .eq("google_place_id", result.id)
+      .eq("google_place_id", finalResult.id)
       .maybeSingle();
 
     if (existing) {
@@ -505,13 +628,13 @@ Deno.serve(async (req) => {
         ok: true,
         data: {
           desc: place.desc,
-          address: existing.address || result.formattedAddress,
-          lat: existing.lat || result.location?.latitude || null,
-          lon: existing.lon || result.location?.longitude || null,
+          address: existing.address || finalResult.formattedAddress,
+          lat: existing.lat || finalResult.location?.latitude || null,
+          lon: existing.lon || finalResult.location?.longitude || null,
           image_url: enriched.image_url,
-          placeId: existing.google_place_id || result.id,
-          rating: enriched.rating ?? result.rating ?? null,
-          reviewCount: enriched.reviewCount ?? result.userRatingCount ?? null,
+          placeId: existing.google_place_id || finalResult.id,
+          rating: enriched.rating ?? finalResult.rating ?? null,
+          reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
         }
       };
     }
@@ -529,13 +652,13 @@ Deno.serve(async (req) => {
         ok: true,
         data: {
           desc: place.desc,
-          address: existingByName.address || result.formattedAddress,
-          lat: existingByName.lat || result.location?.latitude || null,
-          lon: existingByName.lon || result.location?.longitude || null,
+          address: existingByName.address || finalResult.formattedAddress,
+          lat: existingByName.lat || finalResult.location?.latitude || null,
+          lon: existingByName.lon || finalResult.location?.longitude || null,
           image_url: enriched.image_url,
-          placeId: existingByName.google_place_id || result.id,
-          rating: enriched.rating ?? result.rating ?? null,
-          reviewCount: enriched.reviewCount ?? result.userRatingCount ?? null,
+          placeId: existingByName.google_place_id || finalResult.id,
+          rating: enriched.rating ?? finalResult.rating ?? null,
+          reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
         },
       };
     }
@@ -543,17 +666,17 @@ Deno.serve(async (req) => {
     const row = {
       region,
       name_ko: place.desc,
-      name_ja: result.displayName || null,
+      name_ja: finalResult.displayName || null,
       type: place.type,
       description: null as string | null,
-      address: result.formattedAddress ?? null,
-      lat: result.location?.latitude ?? null,
-      lon: result.location?.longitude ?? null,
+      address: finalResult.formattedAddress ?? null,
+      lat: finalResult.location?.latitude ?? null,
+      lon: finalResult.location?.longitude ?? null,
       confidence: "auto_verified",
       source: "api",
-      google_place_id: result.id,
-      rating: result.rating ?? null,
-      review_count: result.userRatingCount ?? null,
+      google_place_id: finalResult.id,
+      rating: finalResult.rating ?? null,
+      review_count: finalResult.userRatingCount ?? null,
     };
 
     const { data: upserted, error: upsertErr } = await supabase
@@ -570,23 +693,23 @@ Deno.serve(async (req) => {
       ok: true,
       data: {
         desc: place.desc,
-        address: result.formattedAddress,
-        lat: result.location?.latitude || null,
-        lon: result.location?.longitude || null,
+        address: finalResult.formattedAddress,
+        lat: finalResult.location?.latitude || null,
+        lon: finalResult.location?.longitude || null,
         image_url: null,
-        placeId: result.id,
-        rating: result.rating ?? null,
-        reviewCount: result.userRatingCount ?? null,
+        placeId: finalResult.id,
+        rating: finalResult.rating ?? null,
+        reviewCount: finalResult.userRatingCount ?? null,
       }
     };
 
     let imageUrl: string | null = null;
     try {
-      const photoName = await getBestPhotoName(result.id, apiKey);
+      const photoName = await getBestPhotoName(finalResult.id, apiKey);
       if (photoName) {
         await new Promise((r) => setTimeout(r, 120));
         const buf = await downloadPhoto(photoName, apiKey);
-        const storagePath = `rag/${region}/${result.id}.jpg`;
+        const storagePath = `rag/${region}/${finalResult.id}.jpg`;
         const { error: uploadErr } = await supabase.storage
           .from(BUCKET)
           .upload(storagePath, buf, { contentType: "image/jpeg", upsert: true });
@@ -604,13 +727,13 @@ Deno.serve(async (req) => {
       ok: true,
       data: {
         desc: place.desc,
-        address: result.formattedAddress,
-        lat: result.location?.latitude || null,
-        lon: result.location?.longitude || null,
+        address: finalResult.formattedAddress,
+        lat: finalResult.location?.latitude || null,
+        lon: finalResult.location?.longitude || null,
         image_url: imageUrl,
-        placeId: result.id,
-        rating: result.rating ?? null,
-        reviewCount: result.userRatingCount ?? null,
+        placeId: finalResult.id,
+        rating: finalResult.rating ?? null,
+        reviewCount: finalResult.userRatingCount ?? null,
       }
     };
   };

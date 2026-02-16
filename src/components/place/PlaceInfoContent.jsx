@@ -41,15 +41,33 @@ const TODAY_BY_GETDAY = ['일요일', '월요일', '화요일', '수요일', '�
 /** 영어 시간 텍스트 → 한국어 정규화 */
 function normalizeTimeText(t) {
   if (!t) return t;
-  if (/\bClosed\b/i.test(t)) return '휴무';
-  if (/\bOpen 24 hours\b/i.test(t)) return '24시간 영업';
+  const trimmed = t.trim();
+  if (/^Closed$/i.test(trimmed)) return '휴무';
+  if (/^Open 24 hours$/i.test(trimmed)) return '24시간 영업';
+  if (/^Open$/i.test(trimmed)) return null; // 단독 "Open"은 유효한 영업시간 아님
+  if (/^Temporarily closed$/i.test(trimmed)) return '임시 휴업';
+  if (/^Permanently closed$/i.test(trimmed)) return '폐업';
+  // "Closed" / "Open" 키워드 한국어 변환
+  let s = t.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
   // AM/PM → 24시간 변환
-  return t.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
+  s = s.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
     let hour = parseInt(h, 10);
     if (ap.toUpperCase() === 'PM' && hour !== 12) hour += 12;
     if (ap.toUpperCase() === 'AM' && hour === 12) hour = 0;
     return `${String(hour).padStart(2, '0')}:${m}`;
   });
+  return s;
+}
+
+/** 영업시간 문자열에 영어 상태(Closed/Open)가 남아있으면 한국어로 치환 */
+function sanitizeHoursForDisplay(hours) {
+  if (!hours || typeof hours !== 'string') return hours;
+  const t = hours.trim();
+  // 단독 상태 텍스트
+  if (/^(Closed|Open|Open now|Temporarily closed|Permanently closed)$/i.test(t)) return null;
+  if (/^Open\s*[⋅·•]\s*/i.test(t)) return null;
+  // 남은 영어 키워드 치환
+  return hours.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
 }
 
 function parseHoursToDays(hours) {
@@ -249,7 +267,7 @@ export default function PlaceInfoContent({
       if (cancelled) return;
       if (!p) {
         setRagImage(null);
-        setRagEnriched(null);
+        // Don't reset ragEnriched — Google Places effect may have already set data
         return;
       }
       if (!mainImage && p.image_url) setRagImage(p.image_url);
@@ -261,8 +279,11 @@ export default function PlaceInfoContent({
       if (!place?.placeId && p.google_place_id) enriched.placeId = p.google_place_id;
       if (place?.lat == null && p.lat != null) enriched.lat = p.lat;
       if (place?.lon == null && p.lon != null) enriched.lon = p.lon;
-      if (!cancelled) setRagEnriched(Object.keys(enriched).length > 0 ? enriched : null);
-    }).catch(() => { if (!cancelled) { setRagImage(null); setRagEnriched(null); } });
+      if (!cancelled) setRagEnriched((prev) => {
+        const merged = { ...(prev || {}), ...enriched };
+        return Object.keys(merged).length > 0 ? merged : null;
+      });
+    }).catch(() => { if (!cancelled) { setRagImage(null); setRagEnriched((prev) => prev); } });
     return () => { cancelled = true; };
   }, [place?.name, place?.address, mainImage]);
 
@@ -470,12 +491,14 @@ export default function PlaceInfoContent({
       }
       if (row.field === 'hours') {
         // Simple hours display (not parseable to days)
+        const sanitizedHours = sanitizeHoursForDisplay(ep.hours);
+        if (!sanitizedHours) return null; // 상태 텍스트만 있으면 표시 안 함
         return (
           <div key={row.field} style={rowStyle}>
             <Icon name="clock" size={20} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0, marginTop: SPACING.xs }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-surface-variant2)', marginBottom: SPACING.xs }}>영업시간</div>
-              <div style={{ fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface)' }}>{ep.hours}</div>
+              <div style={{ fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface)' }}>{sanitizedHours}</div>
             </div>
           </div>
         );

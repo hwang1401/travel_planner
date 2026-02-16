@@ -218,9 +218,14 @@ export async function addItemManually(page, time, typeLabel, name) {
   // Click "추가" button (form submit)
   const addBtn = page.locator('button').filter({ hasText: /^추가$/ }).first();
   await addBtn.click();
-
-  // Wait for AddPlacePage to close (back to planner)
   await page.waitForTimeout(800);
+
+  // 중복 시간 확인 다이얼로그 처리
+  const dupDialog = page.locator('text=중복 시간');
+  if (await dupDialog.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    await page.locator('button:has-text("추가")').last().click();
+    await page.waitForTimeout(800);
+  }
 }
 
 /**

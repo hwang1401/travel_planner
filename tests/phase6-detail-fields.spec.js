@@ -260,9 +260,11 @@ test.describe('Phase 6: DetailDialog 모든 편집 플로우', () => {
       }
     }
 
-    // 에러 없음
-    const err = page.locator('text=Something went wrong');
-    expect(await err.isVisible({ timeout: 1_000 }).catch(() => false)).toBe(false);
+    // 주소가 실제로 적용됐는지 확인 — 주소 행에 값이 채워져야 함
+    const addressRow = page.locator('div[role="button"]:has-text("주소")').first();
+    const addressText = await addressRow.textContent();
+    // "장소 검색" placeholder가 아닌 실제 주소가 표시되어야 함
+    expect(addressText).not.toContain('장소 검색');
 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
@@ -479,7 +481,7 @@ test.describe('Phase 6: DetailDialog 모든 편집 플로우', () => {
     // 영속성 — FE-14에서 설정한 메모가 리로드 후에도 유지되는지
     await clickItem(page, 'P6 이치란 본점');
     await page.waitForTimeout(500);
-    await expect(page.locator('text=영속성 테스트 메모')).toBeVisible({ timeout: 3_000 });
+    await expect(page.locator('text=영속성 테스트 메모').first()).toBeVisible({ timeout: 3_000 });
 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);

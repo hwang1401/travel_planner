@@ -72,12 +72,12 @@ test.describe('Phase 9-A: 크로스 기능 통합', () => {
     await clickItem(page, '금각사');
     await page.waitForTimeout(500);
     await editDetailField(page, '가격', '¥500');
-    await editDetailField(page, '부가정보', '오전 방문 추천');
+    await editDetailField(page, '메모', '오전 방문 추천', true);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
     // PlaceCard 반영 확인
-    await expect(page.locator('text=오전 방문 추천')).toBeVisible({ timeout: 3_000 });
+    await expect(page.locator('text=오전 방문 추천').first()).toBeVisible({ timeout: 3_000 });
 
     // Day 추가 + 아이템
     await page.locator('button[title="날짜 추가"]').click();
