@@ -1057,8 +1057,11 @@ export default function TravelPlanner() {
           if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
           if (itemIdx !== undefined && itemIdx !== null) {
             next[dayIdx].extraItems = [...next[dayIdx].extraItems];
-            if (itemIdx < next[dayIdx].extraItems.length) {
-              next[dayIdx].extraItems[itemIdx] = newItem;
+            // _extra 아이템의 itemIdx는 merged section 내 인덱스이므로
+            // extraItems 배열 인덱스와 다를 수 있음 → _id 기반으로 정확한 위치 검색
+            const actualIdx = findItemIndex(next[dayIdx].extraItems, newItem);
+            if (actualIdx >= 0) {
+              next[dayIdx].extraItems[actualIdx] = newItem;
             }
           } else {
             next[dayIdx].extraItems.push(newItem);

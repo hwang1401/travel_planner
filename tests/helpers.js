@@ -202,8 +202,9 @@ export async function addItemManually(page, time, typeLabel, name) {
     await page.locator(`button:has-text("${typeLabel}")`).first().click();
   }
 
-  // Set time via TimePicker
-  await page.locator('[aria-label="시간 선택"]').click();
+  // Set time via TimePicker — the trigger is a role="button" div showing default "09:00" or "시간 선택"
+  const timeTrigger = page.locator('div[role="button"]').filter({ hasText: /^\d{2}:\d{2}$|^시간 선택$/ }).first();
+  await timeTrigger.click();
   await page.waitForTimeout(300);
 
   // TimePickerDialog wheel — set hour and minute
@@ -214,8 +215,9 @@ export async function addItemManually(page, time, typeLabel, name) {
   const descField = page.locator('input[placeholder*="캐널시티"]');
   await descField.fill(name);
 
-  // Click "일정 추가하기" button
-  await page.getByRole('button', { name: '일정 추가하기' }).click();
+  // Click "추가" button (form submit)
+  const addBtn = page.locator('button').filter({ hasText: /^추가$/ }).first();
+  await addBtn.click();
 
   // Wait for AddPlacePage to close (back to planner)
   await page.waitForTimeout(800);
@@ -333,6 +335,18 @@ export async function getItemCount(page) {
   // Each PlaceCard has a time display + name
   const cards = page.locator('span[style*="width: 38px"], span[style*="width:38px"]');
   return cards.count();
+}
+
+/**
+ * Count how many times a specific text appears on the page.
+ * Useful for duplication detection — expected count is usually 1.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} text
+ * @returns {Promise<number>}
+ */
+export async function countText(page, text) {
+  await page.waitForTimeout(300);
+  return page.locator(`text=${text}`).count();
 }
 
 /**
