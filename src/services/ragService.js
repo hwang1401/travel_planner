@@ -272,7 +272,7 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
     }
     if (regions.length === 0) return result;
 
-    const selectCols = 'id, region, name_ko, type, description, tags, price_range, opening_hours, image_url, google_place_id, address, lat, lon, rating, review_count';
+    const selectCols = 'id, region, name_ko, type, description, tags, price_range, opening_hours, image_url, google_place_id, address, lat, lon, rating, review_count, business_status';
     const tags = extractTagsFromPreferences(preferences || '');
     const confidenceOr = 'confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null';
 
@@ -360,7 +360,9 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
       const tagStr = Array.isArray(p.tags) && p.tags.length ? ` 태그: ${p.tags.join(', ')}` : '';
       const extra = [p.price_range, p.opening_hours].filter(Boolean).join(' ');
       const coordStr = p.lat != null && p.lon != null ? ` [${Number(p.lat).toFixed(4)},${Number(p.lon).toFixed(4)}]` : '';
-      lines.push(`- [rag_id:${p.id}] [${p.region}] ${p.name_ko} (${p.type}): ${desc}${tagStr}${extra ? ` ${extra}` : ''}${coordStr}`);
+      const statusStr = p.business_status === 'CLOSED_TEMPORARILY' ? ' [임시 휴업]'
+        : p.business_status === 'CLOSED_PERMANENTLY' ? ' [폐업]' : '';
+      lines.push(`- [rag_id:${p.id}] [${p.region}] ${p.name_ko} (${p.type})${statusStr}: ${desc}${tagStr}${extra ? ` ${extra}` : ''}${coordStr}`);
     }
     result.placesText = lines.join('\n');
     result.placeCount = places.length;
@@ -382,7 +384,7 @@ export async function getPlaceByNameOrAddress({ name, address }) {
   const a = (address || '').trim();
   if (!n && !a) return null;
   try {
-    const cols = 'id, name_ko, address, image_url, region, type, lat, lon, rating, review_count, google_place_id, opening_hours';
+    const cols = 'id, name_ko, address, image_url, region, type, lat, lon, rating, review_count, google_place_id, opening_hours, business_status';
     const confidenceOr = 'confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null';
     let rows = [];
     if (n) {
@@ -412,7 +414,7 @@ export async function getPlaceByNameOrAddress({ name, address }) {
   }
 }
 
-const NEARBY_SELECT = 'id, region, name_ko, type, description, image_url, address, lat, lon, rating, google_place_id, price_range, opening_hours, tags';
+const NEARBY_SELECT = 'id, region, name_ko, type, description, image_url, address, lat, lon, rating, google_place_id, price_range, opening_hours, tags, business_status';
 const NEARBY_TYPES = ['food', 'spot', 'shop', 'stay'];
 const MAX_NEARBY_PER_TYPE = 5;
 const NEARBY_FETCH_LIMIT = 80;

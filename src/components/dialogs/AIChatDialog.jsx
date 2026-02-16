@@ -113,7 +113,8 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
     const placesArr = Array.isArray(places) ? places : [];
     setChatMessages((prev) => {
       const next = [...prev, { role: 'ai', text: message, type: respType || 'chat', places: placesArr, items, choices: choicesArr }];
-      if (items.length === 0 && placesArr.length === 0 && choicesArr.length > 0) setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
+      // TODO: choices 기능 개선 후 복원
+      // if (items.length === 0 && placesArr.length === 0 && choicesArr.length > 0) setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
       return next;
     });
     setTimeout(() => chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
@@ -144,7 +145,8 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
       }
       setChatMessages((prev) => {
         const next = [...prev, { role: 'ai', text: message, type: respType || 'chat', places: placesArr, items, choices: choicesArr }];
-        if (items.length === 0 && placesArr.length === 0 && choicesArr.length > 0) setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
+        // TODO: choices 기능 개선 후 복원
+        // if (items.length === 0 && placesArr.length === 0 && choicesArr.length > 0) setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
         return next;
       });
       setTimeout(() => chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
@@ -175,7 +177,8 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
         } else {
           setChatMessages((prev2) => {
             const next = [...prev2, { role: 'ai', text: message, type: respType || 'chat', places: placesArr, items, choices: choicesArr }];
-            if (items.length === 0 && placesArr.length === 0 && choicesArr.length > 0) setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
+            // TODO: choices 기능 개선 후 복원
+            // if (items.length === 0 && placesArr.length === 0 && choicesArr.length > 0) setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
             return next;
           });
         }
@@ -304,8 +307,15 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
                         {place.image ? (
                           <img src={place.image} alt="" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
                         ) : (
-                          <div style={{ width: '100%', aspectRatio: '4/3', background: catCfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name={CAT_ICONS[place.category] || 'pin'} size={28} style={{ color: catCfg.text }} />
+                          <div style={{
+                            width: '100%', aspectRatio: '4/3',
+                            background: 'var(--color-surface-container-lowest)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            gap: SPACING.xs,
+                            border: '1px dashed var(--color-outline-variant)',
+                          }}>
+                            <Icon name="pin" size={24} style={{ opacity: 0.35, color: 'var(--color-on-surface-variant2)' }} />
+                            <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', opacity: 0.8 }}>이미지 없음</span>
                           </div>
                         )}
                         <div style={{ padding: `${SPACING.ms} ${SPACING.md}` }}>
@@ -474,6 +484,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
               placeId: selectedAIPlace.placeId,
               tip: selectedAIPlace.description,
               type: selectedAIPlace.category,
+              businessStatus: selectedAIPlace.businessStatus,
             } : {
               name: selectedAIPlace.desc,
               address: selectedAIPlace.detail?.address,
@@ -487,6 +498,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
               placeId: selectedAIPlace.detail?.placeId,
               tip: selectedAIPlace.detail?.tip,
               type: selectedAIPlace.type,
+              businessStatus: selectedAIPlace.detail?.businessStatus,
             }}
             onAdd={(item) => {
               onBulkImport?.([item], 'append');

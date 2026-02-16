@@ -222,6 +222,7 @@ type PlaceResult = {
   rating: number | null;
   userRatingCount: number | null;
   openingHours: string | null;
+  businessStatus: string | null;
 };
 
 async function searchPlaces(
@@ -252,7 +253,7 @@ async function searchPlaces(
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.regularOpeningHours",
+        "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.regularOpeningHours,places.businessStatus",
     },
     body: JSON.stringify(body),
   });
@@ -265,6 +266,7 @@ async function searchPlaces(
     rating?: number;
     userRatingCount?: number;
     regularOpeningHours?: { weekdayDescriptions?: string[] };
+    businessStatus?: string;
   }> };
   if (!data?.places) return [];
   return data.places.map((p) => {
@@ -284,6 +286,7 @@ async function searchPlaces(
       rating: p.rating ?? null,
       userRatingCount: p.userRatingCount ?? null,
       openingHours: hoursStr,
+      businessStatus: p.businessStatus ?? null,
     };
   });
 }
@@ -604,15 +607,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 매칭 후보가 없으면 JA 첫 번째 결과라도 사용 (기존 호환)
+    // 매칭 후보가 없으면 잘못된 데이터 반환보다 실패 처리
     if (!finalResult) {
-      const fallback = jaResults[0] ?? null;
-      if (!fallback || !fallback.id) {
-        console.warn(`[verify-and-register] no result: ${place.desc}`);
-        return { ok: false };
-      }
-      console.warn(`[verify-and-register] name mismatch, using first result: ${place.desc} vs ${fallback.displayName}`);
-      finalResult = fallback;
+      console.warn(`[verify-and-register] no name-matched result: ${place.desc}`);
+      return { ok: false };
     }
 
     // 영업시간: JA(月曜日 형식)는 클라이언트 파싱 불가 → KO(월요일 형식) 우선 사용
@@ -640,6 +638,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existing) {
+      // business_status 최신화
+      if (finalResult.businessStatus) {
+        await supabase.from("rag_places").update({ business_status: finalResult.businessStatus }).eq("id", existing.id);
+      }
       const enriched = await enrichCachedPlace(existing, apiKey, supabase, BUCKET);
       return {
         ok: true,
@@ -653,6 +655,7 @@ Deno.serve(async (req) => {
           rating: enriched.rating ?? finalResult.rating ?? null,
           reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
           opening_hours: existing.opening_hours || finalResult.openingHours || null,
+          business_status: finalResult.businessStatus || null,
         }
       };
     }
@@ -665,6 +668,9 @@ Deno.serve(async (req) => {
       .eq("name_ko", place.desc)
       .maybeSingle();
     if (existingByName?.confidence === "verified") {
+      if (finalResult.businessStatus) {
+        await supabase.from("rag_places").update({ business_status: finalResult.businessStatus }).eq("id", existingByName.id);
+      }
       const enriched = await enrichCachedPlace(existingByName, apiKey, supabase, BUCKET);
       return {
         ok: true,
@@ -678,6 +684,7 @@ Deno.serve(async (req) => {
           rating: enriched.rating ?? finalResult.rating ?? null,
           reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
           opening_hours: existingByName.opening_hours || finalResult.openingHours || null,
+          business_status: finalResult.businessStatus || null,
         },
       };
     }
@@ -697,6 +704,7 @@ Deno.serve(async (req) => {
       rating: finalResult.rating ?? null,
       review_count: finalResult.userRatingCount ?? null,
       opening_hours: finalResult.openingHours ?? null,
+      business_status: finalResult.businessStatus ?? null,
     };
 
     const { data: upserted, error: upsertErr } = await supabase
@@ -721,6 +729,7 @@ Deno.serve(async (req) => {
         rating: finalResult.rating ?? null,
         reviewCount: finalResult.userRatingCount ?? null,
         opening_hours: finalResult.openingHours ?? null,
+        business_status: finalResult.businessStatus || null,
       }
     };
 
@@ -756,6 +765,7 @@ Deno.serve(async (req) => {
         rating: finalResult.rating ?? null,
         reviewCount: finalResult.userRatingCount ?? null,
         opening_hours: finalResult.openingHours ?? null,
+        business_status: finalResult.businessStatus || null,
       }
     };
   };

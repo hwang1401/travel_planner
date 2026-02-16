@@ -460,6 +460,7 @@ const FC_RECOMMEND_SYSTEM_PROMPT = `당신은 친절한 여행 대화 파트너�
 - 목록에서 고른 장소의 name/desc는 목록의 name_ko를 그대로 사용 (변형 금지)
 - 목록에서 고른 장소의 address는 목록의 주소를 그대로 복사
 - 해당 지역/카테고리에 장소가 없을 때만 직접 추천 (rag_id 생략)
+- 장소명 옆에 [임시 휴업] 또는 [폐업] 태그가 있으면 반드시 사용자에게 알려주세요. 예: "라멘스타디움은 현재 임시 휴업 중이에요." 절대 무시하지 마세요
 - 지역이 목록에 없으면 짧게 안내하고 rag_id 없이 채우기. 다른 지역 대신 추천 금지
 
 **대화 맥락 규칙:**
@@ -502,6 +503,7 @@ const RECOMMEND_SYSTEM_PROMPT_LEGACY = `당신은 친절한 여행 대화 파트
 - desc/name에는 반드시 구체적 장소명(가게명, 관광지명)을 넣으세요. "근처", "주변", "도톤보리에서 저녁" 같은 모호한 표현은 금지입니다.
 - 목록에서 고른 장소의 name/desc는 목록의 name_ko를 그대로 사용하세요 (변형 금지).
 - 목록에서 고른 장소의 address는 목록에 있는 주소를 그대로 복사하세요.
+- 장소명 옆에 [임시 휴업] 또는 [폐업] 태그가 있으면 반드시 사용자에게 알려주세요. 예: "라멘스타디움은 현재 임시 휴업 중이에요." 절대 무시하지 마세요.
 
 message 작성 시:
 - 존댓말(해요체)로 쓰되, 가이드·안내문 같은 공적인 톤은 피하고 친구에게 말하듯 편하게 쓰세요.
@@ -1010,6 +1012,7 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 - desc에는 반드시 구체적 장소명(가게명, 관광지명)을 넣으세요. "근처", "주변", "도톤보리에서 저녁" 같은 모호한 표현은 금지입니다.
 - 목록에서 고른 장소의 desc는 목록의 name_ko를 그대로 사용하세요 (변형 금지). 예: 목록에 "이치란 라멘 도톤보리점"이 있으면 desc도 "이치란 라멘 도톤보리점"으로 쓰세요.
 - 목록에서 고른 장소의 address는 목록에 있는 주소를 그대로 복사하세요. 주소를 변형하거나 새로 만들지 마세요.
+- 장소명 옆에 [임시 휴업] 또는 [폐업] 태그가 있으면 해당 장소를 일정에 포함하지 마세요. 대체 장소를 추천하세요.
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
 
@@ -1207,6 +1210,7 @@ async function verifyAndApplyRecommendPlaces(places, regionHint) {
       if (r.rating != null) place.rating = r.rating;
       if (r.reviewCount != null) place.reviewCount = r.reviewCount;
       if (r.opening_hours) place.hours = r.opening_hours;
+      if (r.business_status) place.businessStatus = r.business_status;
     }
 
     // 검증 후에도 이미지 없는 장소 로깅
@@ -1312,6 +1316,7 @@ async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
           if (verified.rating != null) item.detail.rating = verified.rating;
           if (verified.reviewCount != null) item.detail.reviewCount = verified.reviewCount;
           if (verified.opening_hours) item.detail.hours = verified.opening_hours;
+          if (verified.business_status) item.detail.businessStatus = verified.business_status;
         }
       }
     }

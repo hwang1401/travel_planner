@@ -282,6 +282,7 @@ export default function PlaceInfoContent({
       if (place?.rating == null && p.rating != null) enriched.rating = p.rating;
       if (place?.reviewCount == null && p.review_count != null) enriched.reviewCount = p.review_count;
       if (p.opening_hours && !place?.hours) enriched.hours = p.opening_hours;
+      if (p.business_status && !place?.businessStatus) enriched.businessStatus = p.business_status;
       if (!place?.placeId && p.google_place_id) enriched.placeId = p.google_place_id;
       if (place?.lat == null && p.lat != null) enriched.lat = p.lat;
       if (place?.lon == null && p.lon != null) enriched.lon = p.lon;
@@ -594,6 +595,22 @@ export default function PlaceInfoContent({
                 }}>
                   {place?.name || ''}
                 </h3>
+                {ep?.businessStatus === 'CLOSED_TEMPORARILY' && (
+                  <span style={{
+                    flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+                    padding: `${SPACING.xs} ${SPACING.md}`, borderRadius: RADIUS.full,
+                    border: '1px solid #FECACA', background: '#FEE2E2', color: '#DC2626',
+                    fontSize: 'var(--typo-caption-2-regular-size)', fontWeight: 600, whiteSpace: 'nowrap',
+                  }}>임시 휴업</span>
+                )}
+                {ep?.businessStatus === 'CLOSED_PERMANENTLY' && (
+                  <span style={{
+                    flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+                    padding: `${SPACING.xs} ${SPACING.md}`, borderRadius: RADIUS.full,
+                    border: '1px solid #FECACA', background: '#FEE2E2', color: '#DC2626',
+                    fontSize: 'var(--typo-caption-2-regular-size)', fontWeight: 600, whiteSpace: 'nowrap',
+                  }}>폐업</span>
+                )}
               </div>
             </div>
 
