@@ -166,7 +166,7 @@ export async function getPlaceDetails(placeId) {
       let photoUrl = null;
       if (place.photos?.length) {
         try {
-          photoUrl = place.photos[0].getURI({ maxWidth: 800 });
+          photoUrl = place.photos[0].getURI({ maxWidth: 1600 });
         } catch { /* 사진 없을 수 있음 */ }
       }
 
@@ -206,7 +206,7 @@ export async function getPlaceDetails(placeId) {
             return;
           }
           const loc = place.geometry?.location;
-          const photoUrl = place.photos?.[0]?.getUrl?.({ maxWidth: 800 }) ?? null;
+          const photoUrl = place.photos?.[0]?.getUrl?.({ maxWidth: 1600 }) ?? null;
           // periods로 실제 영업시간 구성, 없으면 weekday_text 사용 (localizeHoursText로 안전 번역)
           const oh = place.opening_hours;
           const hours = sanitizeHours(formatPeriodsToHours(oh?.periods) || localizeHoursText(oh?.weekday_text?.join('; ')) || null);
@@ -246,7 +246,7 @@ export async function getPlacePhotos(placeId, maxCount = 3) {
       await place.fetchFields({ fields: ['photos'] });
       if (!place.photos?.length) return [];
       return place.photos.slice(0, maxCount).map((photo) => {
-        try { return photo.getURI({ maxWidth: 800 }); }
+        try { return photo.getURI({ maxWidth: 1600 }); }
         catch { return null; }
       }).filter(Boolean);
     } catch (e) {
@@ -268,7 +268,7 @@ export async function getPlacePhotos(placeId, maxCount = 3) {
           }
           resolve(
             place.photos.slice(0, maxCount)
-              .map((p) => p.getUrl?.({ maxWidth: 800 }))
+              .map((p) => p.getUrl?.({ maxWidth: 1600 }))
               .filter(Boolean)
           );
         }

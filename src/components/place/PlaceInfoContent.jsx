@@ -297,7 +297,7 @@ export default function PlaceInfoContent({
       if (cancelled || !gd) return;
       setRagEnriched((prev) => {
         const next = { ...(prev || {}) };
-        if (gd.hours) next.hours = gd.hours;
+        if (gd.hours && !place?.hours && !prev?.hours) next.hours = gd.hours;
         if (!place?.address && !prev?.address && gd.formatted_address) next.address = gd.formatted_address;
         if (place?.rating == null && !prev?.rating && gd.rating != null) next.rating = gd.rating;
         if (place?.reviewCount == null && !prev?.reviewCount && gd.reviewCount != null) next.reviewCount = gd.reviewCount;
@@ -413,7 +413,11 @@ export default function PlaceInfoContent({
      ══════════════════════════ */
   if (view === 'info') {
     // Merge place data with RAG-enriched data for display
-    const ep = ragEnriched ? { ...place, ...ragEnriched } : place;
+    // ragEnriched의 undefined 값이 place의 기존 값을 덮어쓰지 않도록 필터링
+    const safeEnriched = ragEnriched
+      ? Object.fromEntries(Object.entries(ragEnriched).filter(([, v]) => v != null))
+      : null;
+    const ep = safeEnriched ? { ...place, ...safeEnriched } : place;
     const displayRating = ep?.rating != null ? ep.rating : null;
     const displayReviewCount = ep?.reviewCount != null ? ep.reviewCount : null;
     const hoursParsed = ep?.hours && !isStay ? parseHoursToDays(ep.hours) : null;

@@ -221,6 +221,7 @@ type PlaceResult = {
   location: { latitude: number; longitude: number } | null;
   rating: number | null;
   userRatingCount: number | null;
+  openingHours: string | null;
 };
 
 async function searchPlaces(
@@ -251,7 +252,7 @@ async function searchPlaces(
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount",
+        "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.regularOpeningHours",
     },
     body: JSON.stringify(body),
   });
@@ -263,10 +264,15 @@ async function searchPlaces(
     location?: { latitude?: number; longitude?: number };
     rating?: number;
     userRatingCount?: number;
+    regularOpeningHours?: { weekdayDescriptions?: string[] };
   }> };
   if (!data?.places) return [];
   return data.places.map((p) => {
     const loc = p.location;
+    const wdDesc = p.regularOpeningHours?.weekdayDescriptions;
+    const hoursStr = Array.isArray(wdDesc) && wdDesc.length > 0
+      ? wdDesc.join('; ')
+      : null;
     return {
       id: p.id ?? null,
       displayName: p.displayName?.text ?? "",
@@ -277,6 +283,7 @@ async function searchPlaces(
           : null,
       rating: p.rating ?? null,
       userRatingCount: p.userRatingCount ?? null,
+      openingHours: hoursStr,
     };
   });
 }
@@ -319,7 +326,7 @@ async function getBestPhotoName(placeId: string, apiKey: string): Promise<string
   return best.name;
 }
 
-async function downloadPhoto(photoName: string, apiKey: string, maxWidth = 800): Promise<ArrayBuffer> {
+async function downloadPhoto(photoName: string, apiKey: string, maxWidth = 1600): Promise<ArrayBuffer> {
   const url = `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth}&key=${apiKey}`;
   const res = await fetch(url, { redirect: "follow" });
   if (!res.ok) throw new Error(`Photo download failed: ${res.status}`);
@@ -465,7 +472,7 @@ Deno.serve(async (req) => {
 
   const processOne = async (
     place: { desc: string; type: string; address?: string; region?: string }
-  ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; placeId: string | null; rating: number | null; reviewCount: number | null } }> => {
+  ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; placeId: string | null; rating: number | null; reviewCount: number | null; opening_hours: string | null } }> => {
     // ── 0. DB 먼저 조회: 이미 등록된 장소면 Text Search 스킵 ──
     const regionKey = place.region
       ? (LABEL_TO_REGION[place.region] || place.region.toLowerCase())
@@ -481,7 +488,7 @@ Deno.serve(async (req) => {
     if (possibleRegions.length > 0) {
       const { data: cached } = await supabase
         .from("rag_places")
-        .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region")
+        .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region, opening_hours")
         .eq("name_ko", place.desc)
         .in("region", possibleRegions)
         .maybeSingle();
@@ -499,6 +506,7 @@ Deno.serve(async (req) => {
             placeId: cached.google_place_id,
             rating: enriched.rating,
             reviewCount: enriched.reviewCount,
+            opening_hours: cached.opening_hours || null,
           },
         };
       }
@@ -606,6 +614,15 @@ Deno.serve(async (req) => {
       console.warn(`[verify-and-register] name mismatch, using first result: ${place.desc} vs ${fallback.displayName}`);
       finalResult = fallback;
     }
+
+    // 영업시간: JA(月曜日 형식)는 클라이언트 파싱 불가 → KO(월요일 형식) 우선 사용
+    if (finalResult.id) {
+      const koMatch = koResults.find((kr) => kr.id === finalResult!.id);
+      if (koMatch?.openingHours) {
+        finalResult = { ...finalResult, openingHours: koMatch.openingHours };
+      }
+    }
+
     const region =
       finalResult.location != null
         ? findRegionByCoords(finalResult.location.latitude, finalResult.location.longitude)
@@ -618,7 +635,7 @@ Deno.serve(async (req) => {
     // ── 2. google_place_id로 기존 데이터 조회 (Text Search 결과 기반) ──
     const { data: existing } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region")
+      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region, opening_hours")
       .eq("google_place_id", finalResult.id)
       .maybeSingle();
 
@@ -635,6 +652,7 @@ Deno.serve(async (req) => {
           placeId: existing.google_place_id || finalResult.id,
           rating: enriched.rating ?? finalResult.rating ?? null,
           reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
+          opening_hours: existing.opening_hours || finalResult.openingHours || null,
         }
       };
     }
@@ -642,7 +660,7 @@ Deno.serve(async (req) => {
     // region+name_ko 기준 verified 데이터가 있으면 덮어쓰지 않음
     const { data: existingByName } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region")
+      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region, opening_hours")
       .eq("region", region)
       .eq("name_ko", place.desc)
       .maybeSingle();
@@ -659,6 +677,7 @@ Deno.serve(async (req) => {
           placeId: existingByName.google_place_id || finalResult.id,
           rating: enriched.rating ?? finalResult.rating ?? null,
           reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
+          opening_hours: existingByName.opening_hours || finalResult.openingHours || null,
         },
       };
     }
@@ -677,6 +696,7 @@ Deno.serve(async (req) => {
       google_place_id: finalResult.id,
       rating: finalResult.rating ?? null,
       review_count: finalResult.userRatingCount ?? null,
+      opening_hours: finalResult.openingHours ?? null,
     };
 
     const { data: upserted, error: upsertErr } = await supabase
@@ -700,6 +720,7 @@ Deno.serve(async (req) => {
         placeId: finalResult.id,
         rating: finalResult.rating ?? null,
         reviewCount: finalResult.userRatingCount ?? null,
+        opening_hours: finalResult.openingHours ?? null,
       }
     };
 
@@ -734,6 +755,7 @@ Deno.serve(async (req) => {
         placeId: finalResult.id,
         rating: finalResult.rating ?? null,
         reviewCount: finalResult.userRatingCount ?? null,
+        opening_hours: finalResult.openingHours ?? null,
       }
     };
   };
@@ -748,6 +770,7 @@ Deno.serve(async (req) => {
     placeId: string | null;
     rating: number | null;
     reviewCount: number | null;
+    opening_hours: string | null;
   }> = [];
 
   for (const place of toProcess) {

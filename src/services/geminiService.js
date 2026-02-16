@@ -1206,6 +1206,7 @@ async function verifyAndApplyRecommendPlaces(places, regionHint) {
       if (r.lon != null) place.lon = r.lon;
       if (r.rating != null) place.rating = r.rating;
       if (r.reviewCount != null) place.reviewCount = r.reviewCount;
+      if (r.opening_hours) place.hours = r.opening_hours;
     }
 
     // 검증 후에도 이미지 없는 장소 로깅
@@ -1310,6 +1311,7 @@ async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
           if (verified.placeId) item.detail.placeId = verified.placeId;
           if (verified.rating != null) item.detail.rating = verified.rating;
           if (verified.reviewCount != null) item.detail.reviewCount = verified.reviewCount;
+          if (verified.opening_hours) item.detail.hours = verified.opening_hours;
         }
       }
     }

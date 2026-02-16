@@ -292,13 +292,15 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
                   scrollSnapType: 'x mandatory',
                   display: 'flex', gap: '8px',
                   msOverflowStyle: 'none', scrollbarWidth: 'none',
+                  maskImage: msg.places.length > 2 ? 'linear-gradient(to right, black calc(100% - 24px), transparent)' : undefined,
+                  WebkitMaskImage: msg.places.length > 2 ? 'linear-gradient(to right, black calc(100% - 24px), transparent)' : undefined,
                 }}>
                   {msg.places.map((place, j) => {
                     const catCfg = TYPE_CONFIG[place.category] || TYPE_CONFIG.spot;
                     return (
                       <div key={j}
                         onClick={(e) => { e.stopPropagation(); setPlaceView('info'); setSelectedAIPlace({ _isPlace: true, ...place }); }}
-                        style={{ flex: '0 0 160px', scrollSnapAlign: 'start', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer' }}>
+                        style={{ flex: '0 0 140px', scrollSnapAlign: 'start', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer' }}>
                         {place.image ? (
                           <img src={place.image} alt="" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
                         ) : (
