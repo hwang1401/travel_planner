@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from '../../hooks/useBackClose';
 import { SPACING, RADIUS } from '../../styles/tokens';
 
 const ROW_HEIGHT = 44;
@@ -46,6 +47,7 @@ function snapScrollTop(el, maxIndex) {
  * value "HH:mm", onConfirm(value), onClose. minuteStep 5 | 15 | 30.
  */
 export default function TimePickerDialog({ open, value, onConfirm, onClose, minuteStep = 5, zIndex = 10000 }) {
+  useBackClose(open, onClose);
   const [hourIndex, setHourIndex] = useState(12);
   const [minuteIndex, setMinuteIndex] = useState(0);
   const hourRef = useRef(null);

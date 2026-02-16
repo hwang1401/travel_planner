@@ -10,6 +10,7 @@ import { getItemCoords } from '../../data/locations';
 import { getNearbyPlaces } from '../../services/ragService';
 import { TYPE_CONFIG, TYPE_LABELS, SPACING } from '../../styles/tokens';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import { useBackClose } from '../../hooks/useBackClose';
 
 /* ── Map helper: create numbered day icon ── */
 function createDayIcon(color, label) {
@@ -71,9 +72,10 @@ function createNearbyIcon(type) {
 }
 
 /* ── Full Map Dialog ── */
-export default function FullMapDialog({ days, onClose, onAddItem }) {
+export default function FullMapDialog({ days, onClose, onAddItem, initialDay = 0 }) {
   useScrollLock();
-  const [selectedDay, setSelectedDay] = useState(0);
+  useBackClose(true, onClose);
+  const [selectedDay, setSelectedDay] = useState(initialDay);
   const [flyTarget, setFlyTarget] = useState(null);
   const [selectedItemIdx, setSelectedItemIdx] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);

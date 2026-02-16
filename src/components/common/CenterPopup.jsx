@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from '../../hooks/useBackClose';
 import { SPACING, RADIUS } from '../../styles/tokens';
 
 /**
@@ -14,6 +15,7 @@ import { SPACING, RADIUS } from '../../styles/tokens';
  *  - contentOverflowVisible : true면 콘텐츠·자식(드롭다운 등)이 모달 밖으로 노출 가능
  */
 export default function CenterPopup({ title, onClose, children, maxWidth = 320, minHeight, contentOverflowVisible }) {
+  useBackClose(true, onClose);
   const [vpOffset, setVpOffset] = useState({ top: 0, height: window.innerHeight });
   const backdropRef = useRef(null);
 

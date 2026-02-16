@@ -1,11 +1,13 @@
 import { createPortal } from 'react-dom';
 import Button from './Button';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import { useBackClose } from '../../hooks/useBackClose';
 import { RADIUS } from '../../styles/tokens';
 
 /* ── Image Viewer (fullscreen lightbox via Portal) ── */
 export default function ImageViewer({ src, alt, onClose }) {
   useScrollLock(!!src);
+  useBackClose(!!src, onClose);
   if (!src) return null;
 
   // Render via Portal so it escapes any parent overflow:hidden / z-index stacking

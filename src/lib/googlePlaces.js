@@ -75,6 +75,60 @@ export async function getPlacePredictions(input, limit = 8) {
   return [];
 }
 
+/* ── periods → "요일: HH:MM – HH:MM" 문자열 변환 ── */
+const DAY_NAMES = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
+function formatPeriodsToHours(periods) {
+  if (!periods?.length) return null;
+  const byDay = {};
+  for (const p of periods) {
+    const openDay = p.open?.day;
+    if (openDay == null) continue;
+    // 24시간 영업: close가 없거나 open과 동일한 시간
+    if (!p.close || (p.close.day === openDay && p.close.hour === 0 && p.close.minute === 0 && p.open.hour === 0 && p.open.minute === 0)) {
+      byDay[openDay] = '24시간 영업';
+      continue;
+    }
+    const pad = (n) => String(n).padStart(2, '0');
+    const openHour = p.open?.hour ?? 0;
+    const openMin = p.open?.minute ?? 0;
+    const closeHour = p.close?.hour ?? 0;
+    const closeMin = p.close?.minute ?? 0;
+    const timeStr = `${pad(openHour)}:${pad(openMin)} – ${pad(closeHour)}:${pad(closeMin)}`;
+    byDay[openDay] = timeStr;
+  }
+  const parts = [];
+  for (let d = 0; d < 7; d++) {
+    if (byDay[d]) parts.push(`${DAY_NAMES[d]}: ${byDay[d]}`);
+    else parts.push(`${DAY_NAMES[d]}: 휴무`);
+  }
+  return parts.join('; ');
+}
+
+/* ── 영어 weekdayDescriptions → 한국어 변환 (safety net) ── */
+const EN_DAY_MAP = { Monday: '월요일', Tuesday: '화요일', Wednesday: '수요일', Thursday: '목요일', Friday: '금요일', Saturday: '토요일', Sunday: '일요일' };
+
+function localizeHoursText(text) {
+  if (!text || typeof text !== 'string') return text;
+  let s = text;
+  // 영어 요일 → 한국어
+  for (const [en, ko] of Object.entries(EN_DAY_MAP)) {
+    s = s.replace(new RegExp(en, 'gi'), ko);
+  }
+  // "Closed" → "휴무"
+  s = s.replace(/\bClosed\b/gi, '휴무');
+  // "Open 24 hours" → "24시간 영업"
+  s = s.replace(/\bOpen 24 hours\b/gi, '24시간 영업');
+  // AM/PM → 24시간 (예: "11:00 AM" → "11:00", "2:30 PM" → "14:30")
+  s = s.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
+    let hour = parseInt(h, 10);
+    if (ap.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+    if (ap.toUpperCase() === 'AM' && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, '0')}:${m}`;
+  });
+  return s;
+}
+
 /** Place 상세: { lat, lon, formatted_address, name, photoUrl? } */
 export async function getPlaceDetails(placeId) {
   if (!placeId) return null;
@@ -86,7 +140,7 @@ export async function getPlaceDetails(placeId) {
     try {
       const place = new google.maps.places.Place({ id: placeId });
       await place.fetchFields({
-        fields: ['displayName', 'formattedAddress', 'location', 'photos', 'rating', 'userRatingCount', 'openingHours', 'priceLevel'],
+        fields: ['displayName', 'formattedAddress', 'location', 'photos', 'rating', 'userRatingCount', 'regularOpeningHours', 'priceLevel'],
       });
 
       const loc = place.location;
@@ -97,7 +151,11 @@ export async function getPlaceDetails(placeId) {
         } catch { /* 사진 없을 수 있음 */ }
       }
 
-      clearSessionToken(); // 디테일 fetch 후 세션 종료
+      clearSessionToken();
+
+      // periods로 실제 영업시간 구성, 없으면 weekdayDescriptions 사용 (localizeHoursText로 안전 번역)
+      const oh = place.regularOpeningHours;
+      const hours = formatPeriodsToHours(oh?.periods) || localizeHoursText(oh?.weekdayDescriptions?.join('; ')) || null;
 
       return {
         lat: loc ? loc.lat() : null,
@@ -108,7 +166,7 @@ export async function getPlaceDetails(placeId) {
         placeId,
         rating: place.rating ?? null,
         reviewCount: place.userRatingCount ?? null,
-        hours: place.regularOpeningHours?.weekdayDescriptions?.join('; ') || null,
+        hours,
         priceLevel: place.priceLevel ?? null,
       };
     } catch (e) {
@@ -130,6 +188,9 @@ export async function getPlaceDetails(placeId) {
           }
           const loc = place.geometry?.location;
           const photoUrl = place.photos?.[0]?.getUrl?.({ maxWidth: 800 }) ?? null;
+          // periods로 실제 영업시간 구성, 없으면 weekday_text 사용 (localizeHoursText로 안전 번역)
+          const oh = place.opening_hours;
+          const hours = formatPeriodsToHours(oh?.periods) || localizeHoursText(oh?.weekday_text?.join('; ')) || null;
           resolve({
             lat: loc ? loc.lat() : null,
             lon: loc ? loc.lng() : null,
@@ -139,7 +200,7 @@ export async function getPlaceDetails(placeId) {
             placeId,
             rating: place.rating ?? null,
             reviewCount: place.user_ratings_total ?? null,
-            hours: place.opening_hours?.weekday_text?.join('; ') || null,
+            hours,
             priceLevel: place.price_level ?? null,
           });
         }

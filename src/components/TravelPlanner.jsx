@@ -1056,16 +1056,9 @@ export default function TravelPlanner() {
           if (!next[dayIdx]) next[dayIdx] = {};
           if (!next[dayIdx].extraItems) next[dayIdx].extraItems = [];
           if (itemIdx !== undefined && itemIdx !== null) {
-            const oldItem = newItem;
-            if (oldItem) {
-              const idx = findItemIndex(next[dayIdx].extraItems, oldItem);
-              if (idx >= 0) {
-                next[dayIdx].extraItems = [...next[dayIdx].extraItems];
-                next[dayIdx].extraItems[idx] = newItem;
-              } else if (Array.isArray(next[dayIdx].extraItems) && itemIdx < next[dayIdx].extraItems.length) {
-                next[dayIdx].extraItems = [...next[dayIdx].extraItems];
-                next[dayIdx].extraItems[itemIdx] = newItem;
-              }
+            next[dayIdx].extraItems = [...next[dayIdx].extraItems];
+            if (itemIdx < next[dayIdx].extraItems.length) {
+              next[dayIdx].extraItems[itemIdx] = newItem;
             }
           } else {
             next[dayIdx].extraItems.push(newItem);
@@ -1084,17 +1077,7 @@ export default function TravelPlanner() {
             next[dayIdx].sections = { ...next[dayIdx].sections };
             const sec = next[dayIdx].sections[sectionIdx];
             const newItems = [...(sec.items || [])];
-            const oldItem = newItem;
-            if (oldItem) {
-              const matchIdx = findItemIndex(newItems, oldItem);
-              if (matchIdx >= 0) {
-                newItems[matchIdx] = newItem;
-              } else if (itemIdx < newItems.length) {
-                newItems[itemIdx] = newItem;
-              } else {
-                newItems.push(newItem);
-              }
-            } else if (itemIdx < newItems.length) {
+            if (itemIdx < newItems.length) {
               newItems[itemIdx] = newItem;
             }
             next[dayIdx].sections[sectionIdx] = { ...sec, items: newItems };
@@ -1106,10 +1089,7 @@ export default function TravelPlanner() {
               const edSec = edSections[sectionIdx];
               if (edSec && Array.isArray(edSec.items)) {
                 const edNewItems = [...edSec.items];
-                const edMatchIdx = oldItem ? findItemIndex(edNewItems, oldItem) : -1;
-                if (edMatchIdx >= 0) {
-                  edNewItems[edMatchIdx] = newItem;
-                } else if (itemIdx < edNewItems.length) {
+                if (itemIdx < edNewItems.length) {
                   edNewItems[itemIdx] = newItem;
                 }
                 const nextExtra = [...next._extraDays];
@@ -2092,7 +2072,7 @@ export default function TravelPlanner() {
             gap: "var(--spacing-sp40)",
           }}>
             {[
-              { icon: "pin", iconColor: "var(--color-primary)", label: "직접 일정 추가", desc: "시간·유형·일정명을 직접 입력해요", onClick: () => { setShowAddSheet(false); setShowAddPlace(true); } },
+              { icon: "pin", iconColor: "var(--color-on-surface-variant)", label: "직접 일정 추가", desc: "시간·유형·일정명을 직접 입력해요", onClick: () => { setShowAddSheet(false); setShowAddPlace(true); } },
               { icon: "document", iconColor: "var(--color-on-surface-variant)", label: "예약 정보 붙여넣기", desc: "확인메일, 바우처를 복붙하면 AI가 정리", onClick: () => { setShowAddSheet(false); setShowPasteInfo(true); } },
               { icon: "flash", iconColor: "var(--color-on-surface-variant)", label: "AI와 대화하며 계획하기", desc: "여행 스타일을 알려주면 AI가 일정을 제안해요", onClick: () => { setShowAddSheet(false); setShowAiChat(true); } },
             ].map((action, i) => (
@@ -2175,6 +2155,7 @@ export default function TravelPlanner() {
       {showMap && (
           <FullMapDialog
             days={DAYS}
+            initialDay={selectedDay}
             onClose={() => setShowMap(false)}
             onAddItem={canEdit ? (dayIdx, item, sectionIdx) => {
               handleSaveItem(item, dayIdx, sectionIdx ?? -1, null);

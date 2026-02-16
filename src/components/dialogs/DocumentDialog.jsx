@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import EmptyState from '../common/EmptyState';
@@ -39,6 +40,7 @@ export default function DocumentDialog({ onClose, tripId, isLegacy }) {
 
 /* ── Legacy (read-only) version ── */
 function LegacyDocumentDialog({ onClose }) {
+  useBackClose(true, onClose);
   const [tab, setTab] = useState(0);
   const [viewImage, setViewImage] = useState(null);
   const current = LEGACY_TABS[tab];
@@ -70,6 +72,7 @@ function LegacyDocumentDialog({ onClose }) {
 
 /* ── Dynamic (Supabase) version ── */
 function DynamicDocumentDialog({ onClose, tripId }) {
+  useBackClose(true, onClose);
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDoc, setSelectedDoc] = useState(null);
@@ -256,8 +259,8 @@ function DynamicDocumentDialog({ onClose, tripId }) {
               )}
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: SPACING.md, marginTop: SPACING.lx }}>
-                <Button variant="neutral" size="md" iconLeft="edit" fullWidth onClick={() => setShowForm(selectedDoc)} style={{ borderColor: "var(--color-outline-variant)" }}>수정</Button>
+              <div style={{ display: 'flex', gap: SPACING.md, marginTop: SPACING.lx, overflow: 'hidden' }}>
+                <Button variant="neutral" size="md" iconLeft="edit" onClick={() => setShowForm(selectedDoc)} style={{ flex: 1, minWidth: 0, borderColor: "var(--color-outline-variant)" }}>수정</Button>
                 <Button variant="ghost-danger" size="md" iconLeft="trash" onClick={() => handleDelete(selectedDoc)} style={{ flexShrink: 0 }}>삭제</Button>
               </div>
             </div>

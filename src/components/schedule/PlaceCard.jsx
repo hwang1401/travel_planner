@@ -25,7 +25,8 @@ export default function PlaceCard({
 
   const cfg = getTypeConfig(item.type);
   const placeName = item.detail?.name || item.desc || "";
-  const subInfo = item.sub || "";
+  const tipText = item.detail?.tip || "";
+  const subInfo = tipText ? tipText.split('\n')[0] : "";
 
   /* ── 롱프레스 핸들러 ── */
   const longPressTimer = useRef(null);

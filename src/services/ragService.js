@@ -382,7 +382,7 @@ export async function getPlaceByNameOrAddress({ name, address }) {
   const a = (address || '').trim();
   if (!n && !a) return null;
   try {
-    const cols = 'id, name_ko, address, image_url, region, type';
+    const cols = 'id, name_ko, address, image_url, region, type, lat, lon, rating, review_count, google_place_id, opening_hours';
     const confidenceOr = 'confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null';
     let rows = [];
     if (n) {
@@ -403,8 +403,9 @@ export async function getPlaceByNameOrAddress({ name, address }) {
         .limit(5);
       if (!error && data?.length) rows = data;
     }
-    const withImage = rows.find((p) => p.image_url);
-    return withImage || null;
+    if (rows.length === 0) return null;
+    // image 있는 행 우선, 없으면 첫 번째 행 반환
+    return rows.find((p) => p.image_url) || rows[0];
   } catch (err) {
     console.warn('[RAG] getPlaceByNameOrAddress error:', err);
     return null;

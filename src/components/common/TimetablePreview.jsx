@@ -10,6 +10,7 @@
  */
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from '../../hooks/useBackClose';
 import { COLOR, RADIUS, SPACING } from '../../styles/tokens';
 import Button from './Button';
 import Icon from './Icon';
@@ -247,6 +248,7 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
 
 // ── 전체 시간표 팝업 다이얼로그 ──
 function TimetableDetailDialog({ timetable, accentColor, onClose, onTimeRowClick }) {
+  useBackClose(true, onClose);
   const [viewportRect, setViewportRect] = useState(null);
   useEffect(() => {
     const vv = window.visualViewport;

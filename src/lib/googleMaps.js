@@ -32,7 +32,7 @@ export function loadGoogleMapsScript() {
       return;
     }
     const script = document.createElement('script');
-    script.src = `${GOOGLE_SCRIPT_URL}?key=${encodeURIComponent(key)}&libraries=places`;
+    script.src = `${GOOGLE_SCRIPT_URL}?key=${encodeURIComponent(key)}&libraries=places&language=ko&region=KR`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();

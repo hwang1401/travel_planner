@@ -9,6 +9,7 @@
  */
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import AddressSearch from '../common/AddressSearch';
@@ -19,6 +20,7 @@ const VIEW_ADDRESS = 'address';
 const VIEW_STATION = 'station';
 
 export default function AddressToStationPicker({ onClose, onSelect, mode, fixedStation = '' }) {
+  useBackClose(true, onClose);
   const [view, setView] = useState(VIEW_ADDRESS);
   const [addressError, setAddressError] = useState(null);
   const [stationQuery, setStationQuery] = useState('');

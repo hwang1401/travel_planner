@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
-import { getStationsByRegion, getStationList, findRoutesByStations } from '../../data/timetable';
+import { getStationsByRegion, getStationList } from '../../data/timetable';
 import { SPACING } from '../../styles/tokens';
 
 /**
@@ -11,6 +12,7 @@ import { SPACING } from '../../styles/tokens';
  * PageTransition의 transform 등 부모 레이아웃에 영향 받지 않음.
  */
 export default function StationPickerModal({ onClose, onSelect, initialFrom = '', initialTo = '' }) {
+  useBackClose(true, onClose);
   const [step, setStep] = useState(initialFrom ? 2 : 1);
   const [from, setFrom] = useState(initialFrom);
   const [query, setQuery] = useState('');
@@ -18,23 +20,18 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
   const regionGroups = useMemo(() => getStationsByRegion(), []);
   const allStations = useMemo(() => getStationList(), []);
 
-  const availableDests = useMemo(() => {
-    if (!from) return [];
-    return allStations.filter((s) => s !== from && findRoutesByStations(from, s).length > 0);
-  }, [from, allStations]);
-
   const q = (query || '').trim().toLowerCase();
   const filteredGroups = useMemo(() => {
     const src = step === 1
       ? regionGroups
-      : regionGroups.map((g) => {
-          const destSet = new Set(availableDests);
-          return { ...g, stations: g.stations.filter((s) => destSet.has(s)) };
-        });
+      : regionGroups.map((g) => ({
+          ...g,
+          stations: g.stations.filter((s) => s !== from),
+        }));
     return src
       .map((g) => ({ ...g, stations: g.stations.filter((s) => !q || s.toLowerCase().includes(q)) }))
       .filter((g) => g.stations.length > 0);
-  }, [step, regionGroups, availableDests, q]);
+  }, [step, regionGroups, from, q]);
 
   const handlePick = (station) => {
     if (step === 1) {
@@ -177,7 +174,7 @@ export default function StationPickerModal({ onClose, onSelect, initialFrom = ''
           <div style={{ padding: `60px ${SPACING.xxl}`, textAlign: 'center' }}>
             <Icon name="navigation" size={36} style={{ color: 'var(--color-on-surface-variant2)', opacity: 0.2, marginBottom: SPACING.xl }} />
             <p style={{ margin: 0, fontSize: 'var(--typo-body-2-size)', color: 'var(--color-on-surface-variant2)' }}>
-              {q ? '검색 결과가 없습니다' : (step === 2 ? `${from}에서 출발하는 노선이 없습니다` : '등록된 역이 없습니다')}
+              {q ? '검색 결과가 없습니다' : '등록된 역이 없습니다'}
             </p>
           </div>
         ) : (

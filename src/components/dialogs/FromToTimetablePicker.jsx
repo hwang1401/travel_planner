@@ -10,6 +10,7 @@
  */
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import AddressSearch from '../common/AddressSearch';
@@ -25,6 +26,7 @@ const STEP_TO = 2;
 const STEP_ROUTE = 3;
 
 export default function FromToTimetablePicker({ onClose, onSelect, initialFrom = '', initialTo = '', initialRouteId = '' }) {
+  useBackClose(true, onClose);
   const [step, setStep] = useState(initialFrom && initialTo ? STEP_ROUTE : initialFrom ? STEP_TO : STEP_FROM);
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);

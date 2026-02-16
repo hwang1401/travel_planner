@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useBackClose } from '../../hooks/useBackClose';
 import Icon from "../common/Icon";
 import Button from "../common/Button";
 import { getTypeConfig, SPACING, RADIUS } from "../../styles/tokens";
@@ -12,12 +13,40 @@ export default function ImportPreviewDialog({
   conflicts,      // { internal, external }
   dayLabel,       // e.g. "Day 1"
   existingCount,  // number of existing items in the day
-  onReplace,      // replace entire day
-  onAppend,       // append to existing
+  onAppend,       // append selected items
   onCancel,
 }) {
-  const hasConflicts = conflicts.internal.length > 0 || conflicts.external.length > 0;
+  useBackClose(true, onCancel);
+  const [selected, setSelected] = useState(() => new Set(items.map((_, i) => i)));
   const [expandedIndex, setExpandedIndex] = useState(null);
+
+  const allSelected = selected.size === items.length;
+
+  const toggleItem = (idx) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(items.map((_, i) => i)));
+  };
+
+  const handleAppend = () => {
+    const selectedItems = items.filter((_, i) => selected.has(i));
+    if (selectedItems.length > 0) onAppend(selectedItems);
+  };
+
+  // Build a map: item index → external conflict info
+  const externalConflictMap = new Map();
+  for (const c of conflicts.external) {
+    const idx = items.findIndex((it) => it.time === c.time && it.desc === c.newDesc);
+    if (idx >= 0) externalConflictMap.set(idx, c);
+  }
 
   return createPortal(
     <div
@@ -51,62 +80,40 @@ export default function ImportPreviewDialog({
               fontWeight: "var(--typo-body-1-n---bold-weight)",
               color: "var(--color-on-surface)",
             }}>
-              AI 일정 분석 결과
+              AI 추천 일정
             </h3>
             <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onCancel} />
           </div>
-          <p style={{
-            margin: `${SPACING.sm} 0 0`, fontSize: "var(--typo-caption-2-regular-size)",
-            color: "var(--color-on-surface-variant2)",
+          <div style={{
+            margin: `${SPACING.sm} 0 0`,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
-            {dayLabel} · {items.length}개 일정 인식
-            {existingCount > 0 && ` · 기존 ${existingCount}개`}
-          </p>
-        </div>
-
-        {/* Warnings */}
-        {hasConflicts && (
-          <div style={{ padding: `${SPACING.lg} ${SPACING.xxl} 0` }}>
-            {conflicts.internal.length > 0 && (
-              <div style={{
-                padding: `${SPACING.ml} ${SPACING.lg}`, marginBottom: SPACING.md,
-                background: "var(--color-warning-container)",
-                borderRadius: RADIUS.md,
-                border: "1px solid var(--color-warning-container)",
-              }}>
-                <p style={{
-                  margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
-                  color: "var(--color-on-warning-container)",
-                  display: "flex", alignItems: "flex-start", gap: SPACING.ms,
-                }}>
-                  <Icon name="flash" size={12} style={{ marginTop: SPACING.xs, flexShrink: 0 }} />
-                  <span>
-                    파일 내 중복 시간: {conflicts.internal.map((c) => c.time).join(", ")}
-                  </span>
-                </p>
-              </div>
-            )}
-            {conflicts.external.length > 0 && (
-              <div style={{
-                padding: `${SPACING.ml} ${SPACING.lg}`, marginBottom: SPACING.md,
-                background: "var(--color-error-container)",
-                borderRadius: RADIUS.md,
-                border: "1px solid var(--color-error)",
-              }}>
-                <p style={{
-                  margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
-                  color: "var(--color-on-error-container)",
-                  display: "flex", alignItems: "flex-start", gap: SPACING.ms,
-                }}>
-                  <Icon name="flash" size={12} style={{ marginTop: SPACING.xs, flexShrink: 0 }} />
-                  <span>
-                    기존 일정과 시간 충돌: {conflicts.external.map((c) => `${c.time} (${c.existingDescs[0]})`).join(", ")}
-                  </span>
-                </p>
-              </div>
-            )}
+            <p style={{
+              margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
+              color: "var(--color-on-surface-variant2)",
+            }}>
+              {dayLabel} · {items.length}개 일정 인식
+              {existingCount > 0 && ` · 기존 ${existingCount}개`}
+            </p>
+            <label style={{
+              display: "flex", alignItems: "center", gap: SPACING.ms,
+              fontSize: "var(--typo-caption-2-regular-size)",
+              color: "var(--color-on-surface-variant2)",
+              cursor: "pointer", userSelect: "none",
+            }}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                style={{
+                  width: 16, height: 16, margin: 0, cursor: "pointer",
+                  accentColor: "var(--color-primary)",
+                }}
+              />
+              전체 선택
+            </label>
           </div>
-        )}
+        </div>
 
         {/* Parse errors */}
         {errors.length > 0 && (
@@ -133,7 +140,8 @@ export default function ImportPreviewDialog({
             {items.map((item, i) => {
               const cfg = getTypeConfig(item.type);
               const isLast = i === items.length - 1;
-              const hasExternalConflict = conflicts.external.some((c) => c.time === item.time && c.newDesc === item.desc);
+              const isChecked = selected.has(i);
+              const conflictInfo = externalConflictMap.get(i);
               const hasDetail = item.detail && (item.detail.address || item.detail.tip || item.detail.timetable);
               const isExpanded = expandedIndex === i;
               return (
@@ -141,7 +149,10 @@ export default function ImportPreviewDialog({
                   key={i}
                   style={{
                     borderBottom: isLast ? "none" : "1px solid var(--color-surface-dim)",
-                    background: hasExternalConflict ? "var(--color-error-container)" : "transparent",
+                    background: conflictInfo ? "var(--color-error-container)" : "transparent",
+                    opacity: isChecked ? 1 : 0.4,
+                    transition: "opacity 0.15s",
+                    ...(conflictInfo ? { borderLeft: "3px solid var(--color-error)" } : {}),
                   }}
                 >
                   <div
@@ -150,6 +161,16 @@ export default function ImportPreviewDialog({
                       padding: `${SPACING.md} ${SPACING.lg}`,
                     }}
                   >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleItem(i)}
+                      style={{
+                        width: 16, height: 16, margin: 0, marginTop: 2,
+                        cursor: "pointer", flexShrink: 0,
+                        accentColor: "var(--color-primary)",
+                      }}
+                    />
                     <span style={{
                       width: "36px", flexShrink: 0, textAlign: "right",
                       fontSize: "var(--typo-caption-2-bold-size)",
@@ -199,6 +220,16 @@ export default function ImportPreviewDialog({
                           )}
                         </p>
                       )}
+                      {conflictInfo && (
+                        <p style={{
+                          margin: `${SPACING.xs} 0 0`, fontSize: "var(--typo-caption-3-regular-size)",
+                          color: "var(--color-error)",
+                          display: "flex", alignItems: "center", gap: "3px",
+                        }}>
+                          <span>⚡</span>
+                          <span>기존 '{conflictInfo.existingDescs[0]}' ({conflictInfo.time})과 시간 겹침</span>
+                        </p>
+                      )}
                     </div>
                     <span style={{
                       fontSize: "var(--typo-caption-3-regular-size)",
@@ -213,7 +244,7 @@ export default function ImportPreviewDialog({
                     <div
                       style={{
                         padding: `${SPACING.sm} ${SPACING.lg} ${SPACING.md}`,
-                        paddingLeft: `calc(36px + ${SPACING.md} + ${SPACING.lg})`,
+                        paddingLeft: `calc(16px + 36px + ${SPACING.md} * 2 + ${SPACING.lg})`,
                         background: "var(--color-surface-container-low)",
                         borderTop: "1px solid var(--color-outline-variant)",
                         fontSize: "var(--typo-caption-2-regular-size)",
@@ -265,21 +296,15 @@ export default function ImportPreviewDialog({
           >
             취소
           </Button>
-          {existingCount > 0 && (
-            <Button
-              variant="neutral" size="lg"
-              onClick={onAppend}
-              style={{ flex: 1, borderColor: "var(--color-outline-variant)" }}
-            >
-              추가
-            </Button>
-          )}
           <Button
             variant="primary" size="lg"
-            onClick={onReplace}
+            onClick={handleAppend}
+            disabled={selected.size === 0}
             style={{ flex: 1 }}
           >
-            {existingCount > 0 ? "전체 교체" : "일정 생성"}
+            {existingCount > 0
+              ? `선택 추가 (${selected.size}개)`
+              : `일정 추가 (${selected.size}개)`}
           </Button>
         </div>
       </div>

@@ -8,24 +8,23 @@
  */
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
-import { getStationsByRegion, getStationList, findRoutesByStations } from '../../data/timetable';
+import { getStationsByRegion, getStationList } from '../../data/timetable';
 import { SPACING } from '../../styles/tokens';
 
 export default function SingleStationPicker({ onClose, onSelect, mode, fixedStation, initialValue = '' }) {
+  useBackClose(true, onClose);
   const [query, setQuery] = useState('');
 
   const allStations = useMemo(() => getStationList(), []);
   const regionGroups = useMemo(() => getStationsByRegion(), []);
 
   const stationList = useMemo(() => {
-    if (!fixedStation) return [];
-    if (mode === 'from') {
-      return allStations.filter((s) => s !== fixedStation && findRoutesByStations(s, fixedStation).length > 0);
-    }
-    return allStations.filter((s) => s !== fixedStation && findRoutesByStations(fixedStation, s).length > 0);
-  }, [mode, fixedStation, allStations]);
+    if (!fixedStation) return allStations;
+    return allStations.filter((s) => s !== fixedStation);
+  }, [fixedStation, allStations]);
 
   const searchLower = (query || '').trim().toLowerCase();
   const filteredGroups = useMemo(() => {

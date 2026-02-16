@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import { TIMETABLE_DB } from '../../data/timetable';
@@ -16,6 +17,7 @@ const FIELD_PX = 'var(--spacing-sp140, 14px)';
 const FIELD_RADIUS = 'var(--radius-md, 8px)';
 
 export default function TimetableSearchDialog({ onClose, onSelect }) {
+  useBackClose(true, onClose);
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {

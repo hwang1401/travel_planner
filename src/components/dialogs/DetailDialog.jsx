@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import { useBackClose } from '../../hooks/useBackClose';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import Icon from '../common/Icon';
@@ -14,6 +15,7 @@ import Skeleton from '../common/Skeleton';
 import CenterPopup from '../common/CenterPopup';
 import TimePickerDialog from '../common/TimePickerDialog';
 import ChipSelector from '../common/ChipSelector';
+import Toast from '../common/Toast';
 import { uploadImage, generateImagePath } from '../../services/imageService';
 import AddressSearch from '../common/AddressSearch';
 import AddressToStationPicker from './AddressToStationPicker';
@@ -59,6 +61,20 @@ const EN_DAY = { Monday: '월요일', Tuesday: '화요일', Wednesday: '수요�
 /** getDay() 0=일, 1=월, ... 6=토 → 한국어 요일 */
 const TODAY_BY_GETDAY = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 
+/** 영어 시간 텍스트 → 한국어 정규화 */
+function normalizeTimeText(t) {
+  if (!t) return t;
+  if (/\bClosed\b/i.test(t)) return '휴무';
+  if (/\bOpen 24 hours\b/i.test(t)) return '24시간 영업';
+  // AM/PM → 24시간 변환
+  return t.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
+    let hour = parseInt(h, 10);
+    if (ap.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+    if (ap.toUpperCase() === 'AM' && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, '0')}:${m}`;
+  });
+}
+
 function parseHoursToDays(hours) {
   if (!hours || typeof hours !== 'string') return null;
   const raw = hours.split(/\s*[;；]\s*/).map((s) => s.trim()).filter(Boolean);
@@ -68,7 +84,7 @@ function parseHoursToDays(hours) {
     if (!match) continue;
     let day = match[1];
     if (EN_DAY[day]) day = EN_DAY[day];
-    parsed.push({ day, time: match[2].trim() });
+    parsed.push({ day, time: normalizeTimeText(match[2].trim()) });
   }
   if (parsed.length === 0) return null;
   parsed.sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
@@ -192,6 +208,7 @@ export default function DetailDialog({
   tripId,
 }) {
   useScrollLock(!!detail);
+  useBackClose(!!detail, onClose);
   if (!detail) return null;
 
   const [viewImage, setViewImage] = useState(null);
@@ -208,6 +225,7 @@ export default function DetailDialog({
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const nearbyCacheRef = useRef({});
   const nearbyScrollRef = useRef(null);
+  const [nearbyPages, setNearbyPages] = useState({ food: 0, spot: 0, shop: 0 });
   const carouselScrollRef = useRef(null);
   const contentScrollRef = useRef(null);
   const effectiveDetail = overlayDetail || detail;
@@ -223,6 +241,7 @@ export default function DetailDialog({
   const [timePickerPickedIndex, setTimePickerPickedIndex] = useState(null); // 시간표 행 탭 시 저장 시 해당 행을 picked로
   const [singleStationPicker, setSingleStationPicker] = useState(null); // { mode: 'from'|'to' }
   const [showAddressSearchDialog, setShowAddressSearchDialog] = useState(false);
+  const [copyToast, setCopyToast] = useState(null);
   const [showImageManageDialog, setShowImageManageDialog] = useState(false);
   const [imageToReplace, setImageToReplace] = useState(null); // url when replacing one image
   const [hoursExpanded, setHoursExpanded] = useState(false); // 영업시간 구글 스타일 접기/펼치기
@@ -391,11 +410,12 @@ export default function DetailDialog({
     if (Number.isNaN(lat) || Number.isNaN(lon)) return;
     const excludeId = overlayPlace?.id ?? null;
     const key = `${lat},${lon},${excludeId ?? ''}`;
-    if (nearbyCacheRef.current[key]) { setNearbyByType(nearbyCacheRef.current[key]); return; }
+    if (nearbyCacheRef.current[key]) { setNearbyByType(nearbyCacheRef.current[key]); setNearbyPages({ food: 0, spot: 0, shop: 0 }); return; }
     setNearbyLoading(true);
     getNearbyPlaces({ lat, lon, excludeName: effectiveDetail.name, excludeId }).then((byType) => {
       nearbyCacheRef.current[key] = byType;
       setNearbyByType(byType);
+      setNearbyPages({ food: 0, spot: 0, shop: 0 });
       setNearbyLoading(false);
     }).catch(() => setNearbyLoading(false));
   }, [showNearby, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.name, overlayPlace?.id]);
@@ -660,9 +680,8 @@ export default function DetailDialog({
   /* ── 콘텐츠 렌더 (칩별) ── */
   const infoRows = [
     { field: 'hours', icon: 'clock', label: isStay ? '체크인·체크아웃' : '영업시간', value: effectiveDetail.hours, placeholder: isStay ? '체크인·체크아웃 입력' : '영업시간 입력', onClick: () => openTextEdit('hours', isStay ? '체크인·체크아웃' : '영업시간', effectiveDetail.hours) },
-    { icon: 'pin', label: '주소', value: effectiveDetail.address, placeholder: '장소 검색', onClick: () => setShowAddressSearchDialog(true), miniMap: true },
+    { icon: 'pin', label: '주소', value: effectiveDetail.address, placeholder: '장소 검색', onClick: () => setShowAddressSearchDialog(true), miniMap: true, copyable: true },
     { icon: 'pricetag', label: '가격', value: effectiveDetail.price, placeholder: '가격 입력', onClick: () => openTextEdit('price', '가격', effectiveDetail.price) },
-    { icon: 'info', label: '부가정보', value: item?.sub, placeholder: '부가정보 입력', onClick: () => openTextEdit('sub', '부가정보', item?.sub) },
     { icon: 'bulb', label: '메모', value: effectiveDetail.tip, placeholder: '메모를 입력하세요', onClick: () => openTextEdit('tip', '메모', effectiveDetail.tip, true), multiline: true },
   ];
 
@@ -801,17 +820,27 @@ export default function DetailDialog({
           </div>
         );
       }
+      const rowClickable = canEditInline || (row.copyable && row.value);
+      const handleRowClick = canEditInline
+        ? row.onClick
+        : (row.copyable && row.value)
+          ? () => {
+              navigator.clipboard.writeText(row.value).then(() => {
+                setCopyToast({ message: '주소가 복사되었습니다' });
+              }).catch(() => {});
+            }
+          : undefined;
       return (
         <div
           key={row.label}
-          role={canEditInline ? 'button' : undefined}
-          tabIndex={canEditInline ? 0 : undefined}
-          onClick={canEditInline ? row.onClick : undefined}
+          role={rowClickable ? 'button' : undefined}
+          tabIndex={rowClickable ? 0 : undefined}
+          onClick={handleRowClick}
           style={{
             display: 'flex', alignItems: 'flex-start', gap: SPACING.lg,
             padding: `${SPACING.lg} 0`,
             borderBottom: !isLast ? '1px solid var(--color-outline-variant)' : 'none',
-            cursor: canEditInline ? 'pointer' : 'default',
+            cursor: rowClickable ? 'pointer' : 'default',
             background: 'transparent',
           }}
         >
@@ -914,40 +943,55 @@ export default function DetailDialog({
           ))}
         </div>
       )}
-      {!nearbyLoading && (
-        <>
-          {nearbyByType.food?.length > 0 && (
-            <SectionWrap label="주변 맛집" px="0">
-              <div style={{ display: 'flex', gap: SPACING.lg, overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', paddingBottom: SPACING.sm }}>
-                {nearbyByType.food.map((p) => (
+      {!nearbyLoading && (() => {
+        const CARDS_PER_PAGE = 3;
+        const renderPagedSection = (label, places, typeKey) => {
+          if (!places?.length) return null;
+          const page = nearbyPages[typeKey] || 0;
+          const totalPages = Math.ceil(places.length / CARDS_PER_PAGE);
+          const start = page * CARDS_PER_PAGE;
+          const visible = places.slice(start, start + CARDS_PER_PAGE);
+          return (
+            <div style={{ padding: `${SPACING.xxl} 0 0` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
+                <SectionLabel>{label}</SectionLabel>
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm }}>
+                    <button type="button" onClick={() => setNearbyPages((prev) => ({ ...prev, [typeKey]: Math.max(0, page - 1) }))}
+                      disabled={page === 0}
+                      style={{ border: 'none', background: 'none', cursor: page === 0 ? 'default' : 'pointer', padding: SPACING.xs, display: 'flex', opacity: page === 0 ? 0.25 : 0.7, fontFamily: 'inherit' }}>
+                      <Icon name="chevronLeft" size={16} />
+                    </button>
+                    <span style={{ fontSize: 'var(--typo-caption-2-medium-size)', fontWeight: 500, color: 'var(--color-on-surface-variant2)', minWidth: '28px', textAlign: 'center' }}>
+                      {page + 1}/{totalPages}
+                    </span>
+                    <button type="button" onClick={() => setNearbyPages((prev) => ({ ...prev, [typeKey]: Math.min(totalPages - 1, page + 1) }))}
+                      disabled={page >= totalPages - 1}
+                      style={{ border: 'none', background: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer', padding: SPACING.xs, display: 'flex', opacity: page >= totalPages - 1 ? 0.25 : 0.7, fontFamily: 'inherit' }}>
+                      <Icon name="chevronRight" size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: SPACING.lg, paddingBottom: SPACING.sm }}>
+                {visible.map((p) => (
                   <NearbyPlaceCard key={p.id || p.name_ko} place={p} onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }} onAddToSchedule={onAddToSchedule} />
                 ))}
               </div>
-            </SectionWrap>
-          )}
-          {nearbyByType.spot?.length > 0 && (
-            <SectionWrap label="주변 볼거리" px="0">
-              <div style={{ display: 'flex', gap: SPACING.lg, overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', paddingBottom: SPACING.sm }}>
-                {nearbyByType.spot.map((p) => (
-                  <NearbyPlaceCard key={p.id || p.name_ko} place={p} onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }} onAddToSchedule={onAddToSchedule} />
-                ))}
-              </div>
-            </SectionWrap>
-          )}
-          {nearbyByType.shop?.length > 0 && (
-            <SectionWrap label="주변 쇼핑" px="0">
-              <div style={{ display: 'flex', gap: SPACING.lg, overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', paddingBottom: SPACING.sm }}>
-                {nearbyByType.shop.map((p) => (
-                  <NearbyPlaceCard key={p.id || p.name_ko} place={p} onSelect={(pl) => { setOverlayDetail(ragPlaceToDetail(pl)); setOverlayPlace(pl); }} onAddToSchedule={onAddToSchedule} />
-                ))}
-              </div>
-            </SectionWrap>
-          )}
-          {!nearbyByType.food?.length && !nearbyByType.spot?.length && !nearbyByType.shop?.length && (
-            <p style={{ padding: `${SPACING.xxxl} 0`, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>주변 추천 없음</p>
-          )}
-        </>
-      )}
+            </div>
+          );
+        };
+        return (
+          <>
+            {renderPagedSection('주변 맛집', nearbyByType.food, 'food')}
+            {renderPagedSection('주변 볼거리', nearbyByType.spot, 'spot')}
+            {renderPagedSection('주변 쇼핑', nearbyByType.shop, 'shop')}
+            {!nearbyByType.food?.length && !nearbyByType.spot?.length && !nearbyByType.shop?.length && (
+              <p style={{ padding: `${SPACING.xxxl} 0`, textAlign: 'center', color: 'var(--color-on-surface-variant2)', fontSize: 'var(--typo-body-2-size)' }}>주변 추천 없음</p>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 
@@ -1036,7 +1080,7 @@ export default function DetailDialog({
           </div>
 
           {/* 라인 2: 평점 + 카테고리 (단순 텍스트) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, marginBottom: item?.sub ? SPACING.sm : 0, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, marginBottom: effectiveDetail.tip ? SPACING.sm : 0, flexWrap: 'wrap' }}>
             {displayRating != null ? (
               <>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 0, fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
@@ -1071,8 +1115,8 @@ export default function DetailDialog({
             ))}
           </div>
 
-          {/* 라인 3: 포인트 한 줄 (highlights[0] 우선, 없으면 부가정보 sub) */}
-          {(effectiveDetail.highlights?.[0] || item?.sub) && (
+          {/* 라인 3: 메모(tip) 첫 줄 */}
+          {effectiveDetail.tip && (
             <p style={{
               margin: 0,
               fontSize: 'var(--typo-label-1-n---regular-size)',
@@ -1083,7 +1127,7 @@ export default function DetailDialog({
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}>
-              {effectiveDetail.highlights?.[0] || item?.sub}
+              {effectiveDetail.tip.split('\n')[0]}
             </p>
           )}
         </div>
@@ -1240,9 +1284,9 @@ export default function DetailDialog({
           <>
             {/* overlay view of nearby place — 기존 스타일 유지 */}
             {hasExtraText && (
-              <SectionWrap label="부가정보" px="0">
+              <SectionWrap label="정보" px="0">
                 <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface-variant)', whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
-                  {[effectiveDetail._item?.desc, effectiveDetail._item?.sub].filter(Boolean).join('\n')}
+                  {effectiveDetail._item?.desc || ''}
                 </p>
               </SectionWrap>
             )}
@@ -1982,6 +2026,11 @@ export default function DetailDialog({
           onClose={() => setSingleStationPicker(null)}
           onSelect={handleSingleStationSelect}
         />
+      )}
+
+      {/* 주소 복사 토스트 */}
+      {copyToast && (
+        <Toast message={copyToast.message} onDone={() => setCopyToast(null)} />
       )}
     </>,
     document.body
