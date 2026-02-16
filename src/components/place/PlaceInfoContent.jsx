@@ -36,19 +36,23 @@ const SectionLabel = ({ children }) => (
 /* ── Hours parsing ── */
 const DAY_ORDER = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
 const EN_DAY = { Monday: '월요일', Tuesday: '화요일', Wednesday: '수요일', Thursday: '목요일', Friday: '금요일', Saturday: '토요일', Sunday: '일요일' };
+const JA_DAY = { '月曜日': '월요일', '火曜日': '화요일', '水曜日': '수요일', '木曜日': '목요일', '金曜日': '금요일', '土曜日': '토요일', '日曜日': '일요일' };
 const TODAY_BY_GETDAY = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 
-/** 영어 시간 텍스트 → 한국어 정규화 */
+/** 영어/일본어 시간 텍스트 → 한국어 정규화 */
 function normalizeTimeText(t) {
   if (!t) return t;
   const trimmed = t.trim();
-  if (/^Closed$/i.test(trimmed)) return '휴무';
-  if (/^Open 24 hours$/i.test(trimmed)) return '24시간 영업';
+  if (/^Closed$/i.test(trimmed) || trimmed === '定休日') return '휴무';
+  if (/^Open 24 hours$/i.test(trimmed) || trimmed === '24時間営業') return '24시간 영업';
   if (/^Open$/i.test(trimmed)) return null; // 단독 "Open"은 유효한 영업시간 아님
   if (/^Temporarily closed$/i.test(trimmed)) return '임시 휴업';
   if (/^Permanently closed$/i.test(trimmed)) return '폐업';
   // "Closed" / "Open" 키워드 한국어 변환
   let s = t.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
+  // 일본어 시간 형식 "11時00分〜23時00分" → "11:00 – 23:00"
+  s = s.replace(/(\d{1,2})時(\d{2})分/g, (_, h, m) => `${String(h).padStart(2, '0')}:${m}`);
+  s = s.replace(/〜/g, ' – ');
   // AM/PM → 24시간 변환
   s = s.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
     let hour = parseInt(h, 10);
@@ -59,12 +63,13 @@ function normalizeTimeText(t) {
   return s;
 }
 
-/** 영업시간 문자열에 영어 상태(Closed/Open)가 남아있으면 한국어로 치환 */
+/** 영업시간 문자열에 상태 텍스트만 있으면 null, 아니면 한국어로 치환 */
 function sanitizeHoursForDisplay(hours) {
   if (!hours || typeof hours !== 'string') return hours;
   const t = hours.trim();
-  // 단독 상태 텍스트
-  if (/^(Closed|Open|Open now|Temporarily closed|Permanently closed)$/i.test(t)) return null;
+  if (!t) return null;
+  // 단독 상태 텍스트 (영어/한국어/일본어)
+  if (/^(Closed|Open|Open now|Temporarily closed|Permanently closed|영업\s*중|폐업|임시\s*휴업|営業中|閉店)$/i.test(t)) return null;
   if (/^Open\s*[⋅·•]\s*/i.test(t)) return null;
   // 남은 영어 키워드 치환
   return hours.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
@@ -75,10 +80,11 @@ function parseHoursToDays(hours) {
   const raw = hours.split(/\s*[;；]\s*/).map((s) => s.trim()).filter(Boolean);
   const parsed = [];
   for (const segment of raw) {
-    const match = segment.match(/^(월요일|화요일|수요일|목요일|금요일|토요일|일요일|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s*[:：]\s*(.+)$/i);
+    const match = segment.match(/^(월요일|화요일|수요일|목요일|금요일|토요일|일요일|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|月曜日|火曜日|水曜日|木曜日|金曜日|土曜日|日曜日)\s*[:：]\s*(.+)$/i);
     if (!match) continue;
     let day = match[1];
     if (EN_DAY[day]) day = EN_DAY[day];
+    if (JA_DAY[day]) day = JA_DAY[day];
     parsed.push({ day, time: normalizeTimeText(match[2].trim()) });
   }
   if (parsed.length === 0) return null;
@@ -275,7 +281,7 @@ export default function PlaceInfoContent({
       if (!place?.address && p.address) enriched.address = p.address;
       if (place?.rating == null && p.rating != null) enriched.rating = p.rating;
       if (place?.reviewCount == null && p.review_count != null) enriched.reviewCount = p.review_count;
-      if (p.opening_hours) enriched.hours = p.opening_hours;
+      if (p.opening_hours && !place?.hours) enriched.hours = p.opening_hours;
       if (!place?.placeId && p.google_place_id) enriched.placeId = p.google_place_id;
       if (place?.lat == null && p.lat != null) enriched.lat = p.lat;
       if (place?.lon == null && p.lon != null) enriched.lon = p.lon;
@@ -413,11 +419,15 @@ export default function PlaceInfoContent({
      ══════════════════════════ */
   if (view === 'info') {
     // Merge place data with RAG-enriched data for display
-    // ragEnriched의 undefined 값이 place의 기존 값을 덮어쓰지 않도록 필터링
+    // ragEnriched의 undefined/null 값이 place의 기존 값을 덮어쓰지 않도록 필터링
     const safeEnriched = ragEnriched
-      ? Object.fromEntries(Object.entries(ragEnriched).filter(([, v]) => v != null))
+      ? Object.fromEntries(Object.entries(ragEnriched).filter(([k, v]) =>
+          v != null && !(k === 'hours' && typeof v === 'string' && !v.trim())))
       : null;
-    const ep = safeEnriched ? { ...place, ...safeEnriched } : place;
+    const merged = safeEnriched ? { ...place, ...safeEnriched } : { ...place };
+    // place.hours(챗봇/엣지함수 제공)는 최우선 — enriched 데이터로 덮어쓰이지 않도록 보호
+    if (place?.hours) merged.hours = place.hours;
+    const ep = merged;
     const displayRating = ep?.rating != null ? ep.rating : null;
     const displayReviewCount = ep?.reviewCount != null ? ep.reviewCount : null;
     const hoursParsed = ep?.hours && !isStay ? parseHoursToDays(ep.hours) : null;
