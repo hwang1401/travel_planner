@@ -156,3 +156,8 @@ body {
   animation: skeletonShimmer 1.2s ease-in-out infinite;
   border-radius: var(--radius-sm, 4px);
 }
+
+/* 배포 시 CSS 로드 순서와 관계없이 다크 모드 primary를 라이트와 동일하게 유지 */
+:root[data-theme="dark"] {
+  --color-primary: var(--palette-blue-60);
+}
