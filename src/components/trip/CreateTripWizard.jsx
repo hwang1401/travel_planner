@@ -405,8 +405,30 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
             const isDone = step > s || (step === 3 && step3Mode);
             const isCurrent = step === s || (step === 3 && step3Mode && s === 3);
             const isActive = isDone || isCurrent;
+            const canGoToStep = step >= s;
+            const handleStepClick = () => {
+              if (!canGoToStep) return;
+              setStep(s);
+              if (s < 3) setStep3Mode(null);
+            };
             return (
-              <div key={s} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sp80)' }}>
+              <button
+                key={s}
+                type="button"
+                onClick={handleStepClick}
+                disabled={!canGoToStep}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-sp80)',
+                  padding: 0,
+                  border: 'none',
+                  background: 'none',
+                  cursor: canGoToStep ? 'pointer' : 'default',
+                }}
+              >
                 <div style={{
                   width: '24px',
                   height: '24px',
@@ -435,13 +457,13 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                 <span style={{
                   fontSize: 'var(--typo-caption-2-medium-size)',
                   fontWeight: 'var(--typo-caption-2-medium-weight)',
-                  color: isCurrent ? 'var(--color-primary)' : isDone ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
+                  color: isCurrent ? 'var(--color-primary)' : isDone ? 'var(--color-on-surface-variant2)' : 'var(--color-on-surface-variant2)',
                   transition: 'color 0.2s',
                   textAlign: 'center',
                 }}>
                   {label}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
