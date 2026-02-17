@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Button from '../common/Button';
 import Field from '../common/Field';
 import Icon from '../common/Icon';
@@ -102,7 +103,7 @@ function DateRangePickerSheet({ startDate, endDate, onConfirm, onClose }) {
   };
 
   return (
-    <BottomSheet onClose={onClose} maxHeight="auto" zIndex="var(--z-toast)">
+    <BottomSheet onClose={onClose} maxHeight="90vh" zIndex="var(--z-toast)">
       <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxl}` }}>
         {/* Header */}
         <div style={{ marginBottom: SPACING.lx }}>
@@ -956,14 +957,15 @@ export default function CreateTripDialog({ onClose, onCreate, editTrip }) {
         )}
       </div>
 
-      {/* Date Range Picker */}
-      {showDatePicker && (
+      {/* Date Range Picker — 포탈로 body에 렌더해 메인 시트 transform 영향 없이 전체 화면에 표시 */}
+      {showDatePicker && createPortal(
         <DateRangePickerSheet
           startDate={startDate}
           endDate={endDate}
           onConfirm={(s, e) => { setStartDate(s); setEndDate(e); }}
           onClose={() => setShowDatePicker(false)}
-        />
+        />,
+        document.body
       )}
 
       {/* Toast */}

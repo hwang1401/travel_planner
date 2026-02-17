@@ -5,7 +5,8 @@ import Icon from "../common/Icon";
 import Button from "../common/Button";
 import Tab from "../common/Tab";
 import { getTypeConfig, SPACING, RADIUS } from "../../styles/tokens";
-import { TYPE_LABELS, detectConflicts } from "../../utils/scheduleParser";
+import { TYPE_LABELS } from "../../styles/tokens";
+import { detectConflicts } from "../../utils/scheduleParser";
 
 /* ── helpers ── */
 function getDayExistingItems(day) {

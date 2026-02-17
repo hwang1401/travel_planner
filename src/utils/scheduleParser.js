@@ -26,12 +26,9 @@
  * Markdown tables (| ... |) are ignored.
  */
 
-const VALID_TYPES = new Set(["food", "spot", "shop", "move", "flight", "stay", "info"]);
+import { TYPE_LABELS } from '../styles/tokens';
 
-const TYPE_LABELS = {
-  food: "식사", spot: "관광", shop: "쇼핑",
-  move: "이동", flight: "항공", stay: "숙소", info: "정보",
-};
+const VALID_TYPES = new Set(["food", "spot", "shop", "move", "flight", "stay", "info"]);
 
 export { TYPE_LABELS };
 

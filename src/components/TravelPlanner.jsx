@@ -4,8 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { usePresence } from "../hooks/usePresence";
 
 /* Data imports */
-import { BASE_DAYS } from "../data/days";
-import { loadCustomData, mergeData, generateDaySummary } from "../data/storage";
+import { mergeData, generateDaySummary } from "../utils/scheduleUtils";
 import { TYPE_CONFIG } from "../data/guides";
 import { COLOR, SPACING, RADIUS, TYPE_LABELS, getTypeConfig } from "../styles/tokens";
 /* Service imports */
@@ -33,7 +32,6 @@ import DetailDialog from "./dialogs/DetailDialog";
 import AddRAGPlaceSheet from "./dialogs/AddRAGPlaceSheet";
 import DocumentDialog from "./dialogs/DocumentDialog";
 import ShoppingGuideDialog from "./dialogs/ShoppingGuideDialog";
-import DayInfoDialog from "./dialogs/DayInfoDialog";
 import AIChatDialog from "./dialogs/AIChatDialog";
 import TimePickerDialog from "./common/TimePickerDialog";
 import AddDayDialog from "./dialogs/AddDayDialog";
@@ -82,9 +80,18 @@ function ensureItemIds(data) {
         ...day,
         sections: day.sections.map((sec) => ({
           ...sec,
-          items: (sec.items || []).map((it) =>
-            it && !it._id ? { ...it, _id: crypto.randomUUID() } : it
-          ),
+          items: (sec.items || []).map((it) => {
+            if (!it) return it;
+            let item = it;
+            if (!item._id) item = { ...item, _id: crypto.randomUUID() };
+            // _extraDays.sections 내 아이템은 _extra 플래그가 있으면 안 됨
+            // (_extra는 extraItems 전용 — 잘못 설정되면 수정이 저장 안 되는 버그 발생)
+            if (item._extra) {
+              if (item === it) item = { ...item };
+              delete item._extra;
+            }
+            return item;
+          }),
         })),
       };
     });
@@ -137,7 +144,7 @@ function getItemKey(item) {
  * @param {object} prev - 이전 customData (shallow-copy guard 비교용)
  * @param {number} dayIdx - 원본 Day 인덱스
  * @param {object} target - 삭제할 아이템 (findItemIndex로 매칭)
- * @param {number} baseLen - BASE_DAYS 길이 (0이면 standalone)
+ * @param {number} baseLen - base days 길이 (항상 0)
  * @returns {boolean} 삭제 성공 여부
  */
 function removeItemFromDay(next, prev, dayIdx, target, baseLen) {
@@ -309,24 +316,20 @@ export default function TravelPlanner() {
   const { tripId } = useParams();
   const { user } = useAuth();
 
-  /* ── Mode detection ── */
-  const isLegacy = !tripId || tripId === "legacy";
-
   /* ── Trip metadata (Supabase trips only) ── */
   const [tripMeta, setTripMeta] = useState(null);
-  const [myRole, setMyRole] = useState(isLegacy ? "owner" : null);
-  const [tripLoading, setTripLoading] = useState(!isLegacy);
+  const [myRole, setMyRole] = useState(null);
+  const [tripLoading, setTripLoading] = useState(true);
 
   /* ── Schedule data ── */
-  const [customData, setCustomData] = useState(() => isLegacy ? loadCustomData() : {});
-  const [scheduleLoading, setScheduleLoading] = useState(!isLegacy);
+  const [customData, setCustomData] = useState({});
+  const [scheduleLoading, setScheduleLoading] = useState(true);
 
   /* ── UI state ── */
   const [selectedDay, setSelectedDay] = useState(0);
   const [activeDetail, setActiveDetail] = useState(null);
   const [showDocs, setShowDocs] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
-  const [dayInfoTab, setDayInfoTab] = useState(null);
   // editTarget 제거됨 (항상 null이었으므로 dead code — HI-4)
   const [openAiTab, setOpenAiTab] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
@@ -377,21 +380,21 @@ export default function TravelPlanner() {
 
   /* ── Presence: who is online ── */
   const presenceUser = useMemo(() => {
-    if (isLegacy || !user) return null;
+    if (!user) return null;
     return {
       id: user.id,
       name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User",
       avatarUrl: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
     };
-  }, [isLegacy, user]);
-  const { onlineUsers } = usePresence(isLegacy ? null : tripId, presenceUser);
+  }, [user]);
+  const { onlineUsers } = usePresence(tripId, presenceUser);
 
   /* ── Permissions ── */
   const canEdit = myRole === "owner" || myRole === "editor";
 
   /* ── Load trip metadata + schedule from Supabase ── */
   useEffect(() => {
-    if (isLegacy) return;
+    if (!tripId) return;
 
     let cancelled = false;
 
@@ -410,16 +413,10 @@ export default function TravelPlanner() {
         setMyRole(role);
         setShareCode(code);
 
-        // Auto-migrate: add _standalone flag for non-legacy Supabase trips
+        // Auto-migrate: ensure _standalone flag
         const schedData = schedule.data || {};
-        if (!schedData._standalone) {
-          // Legacy-duplicated data has numeric keys with `sections` overrides
-          const hasLegacySections = Object.keys(schedData).some(
-            (k) => !k.startsWith("_") && !isNaN(Number(k)) && schedData[k]?.sections
-          );
-          if (!hasLegacySections) schedData._standalone = true;
-        }
-        const loadBaseLen = schedData._standalone ? 0 : BASE_DAYS.length;
+        if (!schedData._standalone) schedData._standalone = true;
+        const loadBaseLen = 0;
         setCustomData(sanitizeScheduleData(ensureItemIds(schedData), loadBaseLen));
         lastSavedVersionRef.current = schedule.version ?? 0;
         setTripLoading(false);
@@ -435,26 +432,21 @@ export default function TravelPlanner() {
 
     load();
     return () => { cancelled = true; };
-  }, [tripId, isLegacy]);
+  }, [tripId]);
 
   /* ── Pull-to-refresh: 일정 다시 불러오기 ── */
   const refreshSchedule = useCallback(async () => {
-    if (isLegacy) return;
+    if (!tripId) return;
     try {
       const schedule = await loadSchedule(tripId);
       const schedData = schedule?.data || {};
-      if (!schedData._standalone) {
-        const hasLegacySections = Object.keys(schedData).some(
-          (k) => !k.startsWith("_") && !isNaN(Number(k)) && schedData[k]?.sections
-        );
-        if (!hasLegacySections) schedData._standalone = true;
-      }
-      const refreshBaseLen = schedData._standalone ? 0 : BASE_DAYS.length;
+      if (!schedData._standalone) schedData._standalone = true;
+      const refreshBaseLen = 0;
       setCustomData(sanitizeScheduleData(ensureItemIds(schedData), refreshBaseLen));
     } catch (err) {
       console.error("[TravelPlanner] Refresh error:", err);
     }
-  }, [tripId, isLegacy]);
+  }, [tripId]);
 
   /* ── Dirty Day 추적 헬퍼 (debounced save 콜백에서 사용하므로 위에 정의) ── */
   const clearDirtyTracking = useCallback(() => {
@@ -477,7 +469,7 @@ export default function TravelPlanner() {
 
   /* ── Setup debounced save for Supabase trips ── */
   useEffect(() => {
-    if (isLegacy || !tripId) return;
+    if (!tripId) return;
     const ds = createDebouncedSave(tripId, 800, (version) => {
       lastSavedVersionRef.current = version;
       // 저장 완료 시점의 dirtyGen을 캡처하여 지연 해제 예약
@@ -485,11 +477,11 @@ export default function TravelPlanner() {
     });
     debouncedSaveRef.current = ds;
     return () => { ds.cancel(); };
-  }, [tripId, isLegacy, scheduleClearDirtyTracking]);
+  }, [tripId, scheduleClearDirtyTracking]);
 
   /* ── Realtime subscription for Supabase trips ── */
   useEffect(() => {
-    if (isLegacy || !tripId) return;
+    if (!tripId) return;
 
     const unsubscribe = subscribeToSchedule(tripId, (payload) => {
       // 절대 본인 저장분을 realtime으로 덮어쓰지 않음
@@ -502,13 +494,8 @@ export default function TravelPlanner() {
       if (rtVersion > 0) lastReceivedRtVersionRef.current = rtVersion;
 
       const rtData = payload.data || {};
-      if (!rtData._standalone) {
-        const hasLegacySections = Object.keys(rtData).some(
-          (k) => !k.startsWith("_") && !isNaN(Number(k)) && rtData[k]?.sections
-        );
-        if (!hasLegacySections) rtData._standalone = true;
-      }
-      const rtBaseLen = rtData._standalone ? 0 : BASE_DAYS.length;
+      if (!rtData._standalone) rtData._standalone = true;
+      const rtBaseLen = 0;
       const sanitizedRemote = sanitizeScheduleData(ensureItemIds(rtData), rtBaseLen);
 
       // 로컬에 수정사항 없으면 기존처럼 전체 교체 (fast path)
@@ -524,17 +511,15 @@ export default function TravelPlanner() {
     });
 
     return unsubscribe;
-  }, [tripId, isLegacy, user?.id]);
+  }, [tripId, user?.id]);
 
   /* ── Persist schedule data ── */
   const persistSchedule = useCallback((newData) => {
-    if (isLegacy) {
-      localStorage.setItem("travel_custom_data", JSON.stringify(newData));
-    } else if (debouncedSaveRef.current) {
+    if (debouncedSaveRef.current) {
       lastSaveTimestampRef.current = Date.now();
       debouncedSaveRef.current.save(newData);
     }
-  }, [isLegacy]);
+  }, []);
 
   /* ── Save-aware setCustomData ── */
   const updateCustomData = useCallback((updater) => {
@@ -565,7 +550,7 @@ export default function TravelPlanner() {
 
   /** 즉시 저장 헬퍼: debounce를 취소하고 saveSchedule을 직접 호출 */
   const immediateSave = useCallback((snapshot) => {
-    if (!tripId || isLegacy || !snapshot) return;
+    if (!tripId || !snapshot) return;
     lastSaveTimestampRef.current = Date.now();
     debouncedSaveRef.current?.cancel?.();
     const saveGen = dirtyGenRef.current;
@@ -576,9 +561,10 @@ export default function TravelPlanner() {
       })
       .catch((err) => {
         console.error("[TravelPlanner] Save failed:", err);
-        setToast({ message: "저장에 실패했어요. 다시 시도해 주세요.", icon: "info" });
+        const errMsg = err?.message || err?.code || String(err);
+        setToast({ message: `저장 실패: ${errMsg}`, icon: "info" });
       });
-  }, [tripId, isLegacy, scheduleClearDirtyTracking]);
+  }, [tripId, scheduleClearDirtyTracking]);
 
   /* ── 삭제 복구: 스택 최상위 스냅샷으로 state 복원 후 재저장 ── */
   const handleDeleteUndo = useCallback(() => {
@@ -600,27 +586,12 @@ export default function TravelPlanner() {
     setToast({ message: "복구했어요", icon: "check" });
   }, [updateCustomData, immediateSave]);
 
-  /* ── Legacy: persist on change (backward compat) ── */
-  useEffect(() => {
-    if (isLegacy) {
-      localStorage.setItem("travel_custom_data", JSON.stringify(customData));
-    }
-  }, [customData, isLegacy]);
-
-  /* ── Base length: legacy/duplicated trips use BASE_DAYS, standalone trips use 0 ── */
-  const baseLen = useMemo(() => {
-    if (isLegacy) return BASE_DAYS.length;
-    // _standalone flag = new Supabase trip → no BASE_DAYS
-    if (customData._standalone) return 0;
-    // No flag = duplicated-from-legacy → use BASE_DAYS
-    return BASE_DAYS.length;
-  }, [customData._standalone, isLegacy]);
+  const baseLen = 0;
 
   /* ── Merge data ── */
   const DAYS = useMemo(() => {
-    const base = baseLen > 0 ? BASE_DAYS : [];
-    return mergeData(base, customData);
-  }, [customData, baseLen]);
+    return mergeData([], customData);
+  }, [customData]);
 
   /* ── 새 일정 생성 시 Day 1 자동 생성: standalone이고 일정이 비어 있으면 Day 1 하나 생성 ── */
   const defaultDay1 = useMemo(() => ({
@@ -640,12 +611,11 @@ export default function TravelPlanner() {
     _custom: true,
   }), []);
   useEffect(() => {
-    if (isLegacy || scheduleLoading) return;
-    if (baseLen !== 0) return;
+    if (scheduleLoading) return;
     const extra = customData._extraDays;
     if (extra && extra.length > 0) return;
     updateCustomData((prev) => ({ ...prev, _standalone: true, _extraDays: [defaultDay1] }));
-  }, [isLegacy, scheduleLoading, baseLen, customData._extraDays, updateCustomData, defaultDay1]);
+  }, [scheduleLoading, customData._extraDays, updateCustomData, defaultDay1]);
 
   const current = DAYS[selectedDay];
 
@@ -703,7 +673,9 @@ export default function TravelPlanner() {
       // _extra 아이템은 extraItems에 저장되므로 sectionIdx를 -1로 설정
       const effectiveSi = item._extra ? -1 : si;
       const resolvedLoc = getItemCoords(item, selectedDay);
-      const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
+      // item에 lat/lon이 이미 있으면 getItemCoords의 label은 name/desc (주소 아님) → 주소 fallback으로 사용 금지
+      const hasOwnCoords = item.detail?.lat != null && item.detail?.lon != null;
+      const resolvedAddress = item.detail?.address || (!hasOwnCoords && resolvedLoc ? resolvedLoc.label : "");
       const enrichedItem = resolvedAddress && !item.detail?.address
         ? { ...item, detail: { ...(item.detail || {}), address: resolvedAddress, name: item.detail?.name || item.desc, category: item.detail?.category || TYPE_LABELS[item.type] || "정보" } }
         : item;
@@ -800,15 +772,13 @@ export default function TravelPlanner() {
 
   /* ── Trip display info ── */
   const tripName = useMemo(() => {
-    if (isLegacy) return "후쿠오카 · 구마모토 · 유후인";
     return tripMeta?.name || "여행 일정";
-  }, [isLegacy, tripMeta]);
+  }, [tripMeta]);
 
   const tripSubtitle = useMemo(() => {
-    if (isLegacy) return "2026.02.19 — 02.24 · 5박 6일";
     if (!tripMeta) return "";
     return formatDateRange(tripMeta);
-  }, [isLegacy, tripMeta]);
+  }, [tripMeta]);
 
   /* ── Display day number and date (order + trip dates) ── */
   const displayDayInfo = useMemo(() => {
@@ -822,7 +792,7 @@ export default function TravelPlanner() {
     return DAYS.map((day, i) => {
       const displayDayNumber = i + 1;
       let displayDate = day.date;
-      if (!isLegacy && tripMeta?.startDate) {
+      if (tripMeta?.startDate) {
         const start = new Date(tripMeta.startDate);
         const d = new Date(start);
         d.setDate(d.getDate() + i);
@@ -830,7 +800,7 @@ export default function TravelPlanner() {
       }
       return { displayDayNumber, displayDate };
     });
-  }, [DAYS, isLegacy, tripMeta?.startDate]);
+  }, [DAYS, tripMeta?.startDate]);
 
   /* ── Handlers ── */
   const handleAddDay = useCallback((labelOrEmpty) => {
@@ -1062,6 +1032,8 @@ export default function TravelPlanner() {
             const actualIdx = findItemIndex(next[dayIdx].extraItems, newItem);
             if (actualIdx >= 0) {
               next[dayIdx].extraItems[actualIdx] = newItem;
+            } else {
+              console.warn("[TravelPlanner] handleSaveItem: extraItem not found for edit", { dayIdx, newItem });
             }
           } else {
             next[dayIdx].extraItems.push(newItem);
@@ -1070,9 +1042,7 @@ export default function TravelPlanner() {
           if (!next[dayIdx]) next[dayIdx] = {};
           if (!next[dayIdx].sections) next[dayIdx].sections = {};
           if (!next[dayIdx].sections[sectionIdx]) {
-            const sourceSec = baseLen > 0
-              ? BASE_DAYS[dayIdx]?.sections?.[sectionIdx]
-              : next._extraDays?.[dayIdx - baseLen]?.sections?.[sectionIdx];
+            const sourceSec = next._extraDays?.[dayIdx]?.sections?.[sectionIdx];
             next[dayIdx].sections[sectionIdx] = { items: [...(sourceSec?.items || [])] };
           }
           if (itemIdx !== undefined && itemIdx !== null) {
@@ -1082,6 +1052,8 @@ export default function TravelPlanner() {
             const newItems = [...(sec.items || [])];
             if (itemIdx < newItems.length) {
               newItems[itemIdx] = newItem;
+            } else {
+              console.warn("[TravelPlanner] handleSaveItem: itemIdx out of bounds", { dayIdx, sectionIdx, itemIdx, length: newItems.length });
             }
             next[dayIdx].sections[sectionIdx] = { ...sec, items: newItems };
 
@@ -1115,9 +1087,6 @@ export default function TravelPlanner() {
 
 
     immediateSave(nextSnapshot);
-    if (isLegacy) {
-      debouncedSaveRef.current?.flush?.();
-    }
     // 수정한 항목이 지금 정보 다이얼로그에 열려 있으면 activeDetail 갱신 (시간표 등 반영)
     setActiveDetail((prev) => {
       if (!prev || prev._si !== sectionIdx || prev._ii !== itemIdx) return prev;
@@ -1132,7 +1101,7 @@ export default function TravelPlanner() {
       : null;
     setToast({ message: isEdit ? (editToastMsg ?? '일정이 수정되었습니다') : '일정이 추가되었습니다', icon: isEdit ? 'edit' : 'check' });
     // 일정 추가 직후에만: 새 지역이 있으면 "여행지에 추가할까요?" 시트 (직접 추가·AI·붙여넣기 공통)
-    if (!isEdit && !isLegacy && tripId && Array.isArray(tripMeta?.destinations)) {
+    if (!isEdit && tripId && Array.isArray(tripMeta?.destinations)) {
       const itemRegions = getRegionsFromItems([newItem]);
       const currentRegions = getRegionCodesFromDestinations(tripMeta.destinations);
       const newRegionCodes = itemRegions.filter((r) => !currentRegions.includes(r));
@@ -1142,7 +1111,7 @@ export default function TravelPlanner() {
         setAddDestinationSheet({ regionNames: newRegionNames, regionCodes: newRegionCodes });
       }
     }
-  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, baseLen, immediateSave, isLegacy, tripMeta]);
+  }, [updateCustomData, DAYS, dayIndexMap, toOrigIdx, current, baseLen, immediateSave, tripMeta]);
 
   /* 삭제 실행 로직 (확인 다이얼로그 바깥에서 재사용) */
   const performDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
@@ -1155,7 +1124,10 @@ export default function TravelPlanner() {
       deleteUndoRef.current = [...deleteUndoRef.current, { snapshot: prev }];
 
       const next = { ...prev };
-      removeItemFromDay(next, prev, dayIdx, target, baseLen);
+      const deleted = removeItemFromDay(next, prev, dayIdx, target, baseLen);
+      if (!deleted) {
+        console.warn("[TravelPlanner] performDeleteItem: target not found", { dayIdx, target });
+      }
 
       const result = { ...next };
       nextSnapshot = result;
@@ -1494,7 +1466,7 @@ export default function TravelPlanner() {
 
     immediateSave(nextSnapshot);
 
-    if (!isLegacy && tripId && Array.isArray(tripMeta?.destinations)) {
+    if (tripId && Array.isArray(tripMeta?.destinations)) {
       const itemRegions = getRegionsFromItems(items);
       const currentRegions = getRegionCodesFromDestinations(tripMeta.destinations);
       const newRegionCodes = itemRegions.filter((r) => !currentRegions.includes(r));
@@ -1504,7 +1476,7 @@ export default function TravelPlanner() {
         setAddDestinationSheet({ regionNames: newRegionNames, regionCodes: newRegionCodes });
       }
     }
-  }, [updateCustomData, baseLen, immediateSave, isLegacy, tripId, tripMeta]);
+  }, [updateCustomData, baseLen, immediateSave, tripId, tripMeta]);
 
   /* ── Bulk Import: replace는 바로 적용, append는 중복 체크 후 적용 또는 DuplicateReviewDialog ── */
   const handleBulkImport = useCallback((items, mode, targetDisplayIdx) => {
@@ -1559,12 +1531,12 @@ export default function TravelPlanner() {
   }, [shareCode]);
 
   /* ── Loading state: 스켈레톤 ── */
-  if (!isLegacy && (tripLoading || scheduleLoading)) {
+  if (tripLoading || scheduleLoading) {
     return <ScheduleSkeleton />;
   }
 
   /* ── No access ── */
-  if (!isLegacy && !myRole) {
+  if (!myRole) {
     return (
       <div style={{
         width: "100%", height: "100vh", display: "flex", flexDirection: "column",
@@ -1616,7 +1588,7 @@ export default function TravelPlanner() {
               {tripName}
             </h1>
             {/* Viewer badge */}
-            {!isLegacy && !canEdit && (
+            {!canEdit && (
               <span style={{
                 padding: `${SPACING.xs} ${SPACING.ms}`, borderRadius: "var(--radius-sm, 4px)",
                 background: "var(--color-surface-container-lowest)",
@@ -1633,12 +1605,10 @@ export default function TravelPlanner() {
             {tripSubtitle}
           </p>
         </div>
-        {/* Share button (Supabase trips only) */}
-        {!isLegacy && (
-          <Button variant="ghost-neutral" size="md" iconOnly="share"
-            onClick={() => setShowShareSheet(true)}
-            title="공유 및 초대" />
-        )}
+        {/* Share button */}
+        <Button variant="ghost-neutral" size="md" iconOnly="share"
+          onClick={() => setShowShareSheet(true)}
+          title="공유 및 초대" />
         {/* More menu button */}
         <Button variant="ghost-neutral" size="md" iconOnly="moreHorizontal"
           onClick={() => setShowMoreMenu(true)}
@@ -1916,7 +1886,9 @@ export default function TravelPlanner() {
                 // _extra 아이템은 extraItems에 저장되므로 sectionIdx를 -1로 설정
                 const effectiveSi = item._extra ? -1 : si;
                 const resolvedLoc = getItemCoords(item, selectedDay);
-                const resolvedAddress = item.detail?.address || (resolvedLoc ? resolvedLoc.label : "");
+                // item에 lat/lon이 이미 있으면 getItemCoords의 label은 name/desc (주소 아님) → 주소 fallback으로 사용 금지
+                const hasOwnCoords = item.detail?.lat != null && item.detail?.lon != null;
+                const resolvedAddress = item.detail?.address || (!hasOwnCoords && resolvedLoc ? resolvedLoc.label : "");
                 const enrichedItem = resolvedAddress && !item.detail?.address
                   ? { ...item, detail: { ...(item.detail || {}), address: resolvedAddress, name: item.detail?.name || item.desc, category: item.detail?.category || TYPE_LABELS[item.type] || "정보" } }
                   : item;
@@ -2046,7 +2018,7 @@ export default function TravelPlanner() {
         detail={activeDetail}
         onClose={() => setActiveDetail(null)}
         dayColor="var(--color-primary)"
-        tripId={isLegacy ? null : tripId}
+        tripId={tripId}
         onDelete={canEdit && activeDetail?._item?._custom ? handleDeleteFromDetail : undefined}
         onMoveToDay={canEdit && activeDetail?._item?._custom ? handleMoveToDay : undefined}
         onSaveField={canEdit ? handleSaveFieldFromDetail : undefined}
@@ -2060,13 +2032,10 @@ export default function TravelPlanner() {
       )}
 
       {/* Document Dialog */}
-      {showDocs && <DocumentDialog onClose={() => setShowDocs(false)} tripId={isLegacy ? null : tripId} isLegacy={isLegacy} />}
+      {showDocs && <DocumentDialog onClose={() => setShowDocs(false)} tripId={tripId} />}
 
       {/* Shopping Guide Dialog */}
       {showGuide && <ShoppingGuideDialog onClose={() => setShowGuide(false)} destinations={tripMeta?.destinations} />}
-
-      {/* Day Info Dialog */}
-      {dayInfoTab && current && <DayInfoDialog dayNum={current.day} tab={dayInfoTab} onClose={() => setDayInfoTab(null)} color="var(--color-primary)" />}
 
       {/* "추가하기" Action Sheet — IconContainer로 아이콘 래핑 */}
       {showAddSheet && canEdit && (
@@ -2407,7 +2376,7 @@ export default function TravelPlanner() {
       )}
 
       {/* ── Share & Invite Bottom Sheet ── */}
-      {showShareSheet && !isLegacy && (
+      {showShareSheet && (
         <BottomSheet onClose={() => setShowShareSheet(false)} maxHeight="70vh" zIndex="var(--z-confirm)" title="공유 및 초대">
           <div style={{ padding: `${SPACING.md} ${SPACING.xxxl} ${SPACING.xxxl}` }}>
 
@@ -2647,34 +2616,30 @@ export default function TravelPlanner() {
         </BottomSheet>
       )}
 
-      {/* More Menu */}
+      {/* More Menu — 구분선 있는 버전으로 통일 */}
       {showMoreMenu && (
-        <BottomSheet onClose={() => setShowMoreMenu(false)} maxHeight="auto" zIndex="var(--z-confirm)">
-          <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxl}` }}>
+        <BottomSheet onClose={() => setShowMoreMenu(false)} maxHeight="auto" zIndex="var(--z-confirm)" title="">
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}`, display: 'flex', flexDirection: 'column' }}>
             {[
               { icon: "compass", label: "여행 가이드", onClick: () => { setShowMoreMenu(false); setShowGuide(true); } },
               { icon: "file", label: "여행 서류", onClick: () => { setShowMoreMenu(false); setShowDocs(true); } },
-              ...(!isLegacy ? [{ icon: "persons", label: `멤버 (${tripMeta?.members?.length || 0}명)`, onClick: () => { setShowMoreMenu(false); setShowShareSheet(true); } }] : []),
+              { icon: "persons", label: `멤버 (${tripMeta?.members?.length || 0}명)`, onClick: () => { setShowMoreMenu(false); setShowShareSheet(true); } },
             ].map((menuItem, idx) => (
               <button
                 key={idx}
+                type="button"
                 onClick={menuItem.onClick}
                 style={{
-                  display: "flex", alignItems: "center", gap: SPACING.lg,
-                  width: "100%", padding: `${SPACING.lx} ${SPACING.sm}`,
-                  background: "none", border: "none", cursor: "pointer",
-                  borderBottom: idx < 2 ? "1px solid var(--color-surface-dim)" : "none",
-                  textAlign: "left",
+                  display: "flex", alignItems: "center", gap: SPACING.md,
+                  width: "100%", padding: `${SPACING.lg} ${SPACING.xl}`,
+                  border: "none", borderTop: idx > 0 ? "1px solid var(--color-outline-variant)" : "none",
+                  borderRadius: 0, background: "transparent",
+                  color: "var(--color-on-surface)", fontSize: "var(--typo-label-2-medium-size)",
+                  fontWeight: "var(--typo-label-2-medium-weight)", cursor: "pointer", textAlign: "left",
                 }}
               >
-                <Icon name={menuItem.icon} size={18} style={{ color: "var(--color-on-surface-variant)", opacity: 0.7 }} />
-                <span style={{
-                  fontSize: "var(--typo-label-2-medium-size)",
-                  fontWeight: "var(--typo-label-2-medium-weight)",
-                  color: "var(--color-on-surface)",
-                }}>
-                  {menuItem.label}
-                </span>
+                <Icon name={menuItem.icon} size={20} style={{ opacity: 0.7, flexShrink: 0 }} />
+                <span>{menuItem.label}</span>
               </button>
             ))}
           </div>

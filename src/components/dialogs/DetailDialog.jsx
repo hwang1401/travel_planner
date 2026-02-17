@@ -24,6 +24,13 @@ import { getNearbyPlaces, getPlaceByNameOrAddress, cachePhotoToRAG } from '../..
 import { getPlacePhotos } from '../../lib/googlePlaces';
 import { COLOR, SPACING, RADIUS, TYPE_CONFIG, TYPE_LABELS, getCategoryColor } from '../../styles/tokens';
 import { TIMETABLE_DB, findBestTrain, matchByFromTo, findRoutesByStations } from '../../data/timetable';
+import {
+  DAY_ORDER, TODAY_BY_GETDAY,
+  parseHoursToDays, reorderHoursByPriority,
+  parseStayHours, sanitizeHoursForDisplay,
+  initHoursEditState,
+} from '../../utils/hoursParser';
+import { buildPlaceDetail } from '../../utils/itemBuilder';
 
 /**
  * ── DetailDialog (풀스크린) ──
@@ -55,123 +62,10 @@ const SectionWrap = ({ label, children, px }) => (
   </div>
 );
 
-/** 영업시간 문자열을 요일별 배열로 파싱. 실패 시 null. */
-const DAY_ORDER = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
-const EN_DAY = { Monday: '월요일', Tuesday: '화요일', Wednesday: '수요일', Thursday: '목요일', Friday: '금요일', Saturday: '토요일', Sunday: '일요일' };
-/** getDay() 0=일, 1=월, ... 6=토 → 한국어 요일 */
-const TODAY_BY_GETDAY = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
-
-/** 영어 시간 텍스트 → 한국어 정규화 */
-function normalizeTimeText(t) {
-  if (!t) return t;
-  const trimmed = t.trim();
-  if (/^Closed$/i.test(trimmed)) return '휴무';
-  if (/^Open 24 hours$/i.test(trimmed)) return '24시간 영업';
-  if (/^Open$/i.test(trimmed)) return null;
-  if (/^Temporarily closed$/i.test(trimmed)) return '임시 휴업';
-  if (/^Permanently closed$/i.test(trimmed)) return '폐업';
-  let s = t.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
-  // AM/PM → 24시간 변환
-  s = s.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
-    let hour = parseInt(h, 10);
-    if (ap.toUpperCase() === 'PM' && hour !== 12) hour += 12;
-    if (ap.toUpperCase() === 'AM' && hour === 12) hour = 0;
-    return `${String(hour).padStart(2, '0')}:${m}`;
-  });
-  return s;
-}
-
-/** 영업시간 문자열에 영어 상태만 남아있으면 null 반환 */
-function sanitizeHoursForDisplay(hours) {
-  if (!hours || typeof hours !== 'string') return hours;
-  const t = hours.trim();
-  if (/^(Closed|Open|Open now|Temporarily closed|Permanently closed)$/i.test(t)) return null;
-  if (/^Open\s*[⋅·•]\s*/i.test(t)) return null;
-  return hours.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
-}
-
-function parseHoursToDays(hours) {
-  if (!hours || typeof hours !== 'string') return null;
-  const raw = hours.split(/\s*[;；]\s*/).map((s) => s.trim()).filter(Boolean);
-  const parsed = [];
-  for (const segment of raw) {
-    const match = segment.match(/^(월요일|화요일|수요일|목요일|금요일|토요일|일요일|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s*[:：]\s*(.+)$/i);
-    if (!match) continue;
-    let day = match[1];
-    if (EN_DAY[day]) day = EN_DAY[day];
-    parsed.push({ day, time: normalizeTimeText(match[2].trim()) });
-  }
-  if (parsed.length === 0) return null;
-  parsed.sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
-  return parsed;
-}
-
-/** 조회일(우선 요일) 기준으로 재정렬. 우선 요일이 맨 앞, 이어서 그다음 요일 순. */
-function reorderHoursByPriority(parsed, priorityDay) {
-  if (!parsed?.length || !priorityDay) return parsed;
-  const pi = DAY_ORDER.indexOf(priorityDay);
-  if (pi === -1) return parsed;
-  return [...parsed].sort((a, b) => {
-    const ai = DAY_ORDER.indexOf(a.day);
-    const bi = DAY_ORDER.indexOf(b.day);
-    return ((ai - pi + 7) % 7) - ((bi - pi + 7) % 7);
-  });
-}
-
-/** 한 요일의 시간 문자열 파싱 → { closed: true } 또는 { open: 'HH:mm', close: 'HH:mm' } */
-function parseTimeSegment(timeStr) {
-  const t = (timeStr || '').trim();
-  if (!t || /휴무|closed/i.test(t)) return { closed: true };
-  const parts = t.split(/\s*[~\-–—]\s*/).map((s) => s.trim()).filter(Boolean);
-  const to24 = (part) => {
-    const m = part.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-    if (!m) return null;
-    let h = parseInt(m[1], 10);
-    const min = m[2];
-    if (m[3]) {
-      if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
-      if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
-    }
-    return `${String(h).padStart(2, '0')}:${min}`;
-  };
-  const open = parts[0] ? to24(parts[0]) : null;
-  const close = parts[1] ? to24(parts[1]) : null;
-  if (open && close) return { open, close, closed: false };
-  if (open) return { open, close: '23:59', closed: false };
-  return { closed: true };
-}
-
-/** 숙소 체크인/체크아웃 문자열 파싱. "15:00 / 11:00" 또는 "15:00~11:00" → { checkIn, checkOut } */
-function parseStayHours(hoursString) {
-  if (!hoursString || typeof hoursString !== 'string') return { checkIn: '15:00', checkOut: '11:00' };
-  const parts = hoursString.split(/\s*[\/~]\s*/).map((s) => s.trim()).filter(Boolean);
-  const match = (p) => /^\d{1,2}:\d{2}$/.test(p) ? p : null;
-  return {
-    checkIn: parts[0] ? match(parts[0]) || '15:00' : '15:00',
-    checkOut: parts[1] ? match(parts[1]) || '11:00' : '11:00',
-  };
-}
-
-/** 요일별 편집 초기값: parseHoursToDays 결과 + parseTimeSegment */
-function initHoursEditState(hoursString) {
-  const parsed = parseHoursToDays(hoursString || '');
-  const byDay = {};
-  if (parsed) for (const { day, time } of parsed) byDay[day] = parseTimeSegment(time);
-  return DAY_ORDER.map((day) => ({
-    day,
-    ...(byDay[day] || { closed: true }),
-    ...(byDay[day]?.closed !== false ? {} : { open: byDay[day].open || '09:00', close: byDay[day].close || '18:00' }),
-  })).map((row) => ({
-    day: row.day,
-    closed: row.closed !== false,
-    open: row.open || '09:00',
-    close: row.close || '18:00',
-  }));
-}
-
 /* RAG place → detail shape. 대표 한 줄은 포인트(highlights[0])로 상단 노출, 부가정보(sub)는 별도. */
 function ragPlaceToDetail(place) {
   if (!place) return null;
+  const pd = buildPlaceDetail(place);
   const cat = TYPE_LABELS[place.type];
   const tags = place.tags;
   const oneLine = (Array.isArray(tags) && tags.length > 0 && tags[0])
@@ -180,15 +74,14 @@ function ragPlaceToDetail(place) {
       ? place.description.trim().split(/\n/)[0].slice(0, 80).trim()
       : '';
   return {
-    name: place.name_ko, address: place.address, lat: place.lat, lon: place.lon,
-    image: place.image_url, placeId: place.google_place_id,
+    name: pd.name, address: pd.address, lat: pd.lat, lon: pd.lon,
+    image: pd.image, placeId: pd.placeId,
     categories: cat ? [cat] : [], tip: null,
     highlights: oneLine ? [oneLine] : null,
-    _item: { desc: place.name_ko, sub: place.description || '' },
+    _item: { desc: pd.name, sub: place.description || '' },
   };
 }
 
-const catMap = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
 
 /* 장소 검색 모달용: 선택한 위치에 핀 아이콘 */
 function createAddressPinIcon() {
@@ -522,7 +415,7 @@ export default function DetailDialog({
     if (fieldUpdates.type !== undefined) updated.type = fieldUpdates.type;
     if (fieldUpdates.moveFrom !== undefined) updated.moveFrom = fieldUpdates.moveFrom;
     if (fieldUpdates.moveTo !== undefined) updated.moveTo = fieldUpdates.moveTo;
-    if (!updated.detail) updated.detail = { name: updated.desc, category: catMap[updated.type] || '관광' };
+    if (!updated.detail) updated.detail = { name: updated.desc, category: TYPE_LABELS[updated.type] || '관광' };
     if (fieldUpdates.address !== undefined) updated.detail = { ...updated.detail, address: fieldUpdates.address };
     if (fieldUpdates.lat !== undefined) updated.detail = { ...updated.detail, lat: fieldUpdates.lat };
     if (fieldUpdates.lon !== undefined) updated.detail = { ...updated.detail, lon: fieldUpdates.lon };
@@ -1381,61 +1274,39 @@ export default function DetailDialog({
         </div>
       )}
 
-      {/* ══ 헤더 더보기 메뉴 → Day 이동 ══ */}
-      {showMoreSheet && (
-        <BottomSheet onClose={() => setShowMoreSheet(false)} maxHeight="auto" zIndex={3100} title="">
-          <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}` }}>
-            {onMoveToDay && moveDayOptions.length > 1 && (
-              <button
-                type="button"
-                onClick={() => { setShowMoreSheet(false); setShowMoveSheet(true); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: SPACING.md,
-                  width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
-                  border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
-                  color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
-                  fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
-                }}
-              >
-                <Icon name="pin" size={20} style={{ opacity: 0.7 }} />
-                다른 Day로 이동
-              </button>
-            )}
-            {canEditInline && tripId && !overlayDetail && displayImages.length > 0 && (
-              <button
-                type="button"
-                onClick={() => { setShowMoreSheet(false); setShowImageManageDialog(true); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: SPACING.md,
-                  width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
-                  border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
-                  color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
-                  fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
-                }}
-              >
-                <Icon name="file" size={20} style={{ opacity: 0.7 }} />
-                이미지 수정
-              </button>
-            )}
-            {canEditInline && tripId && !overlayDetail && displayImages.length === 0 && (
-              <button
-                type="button"
-                onClick={() => { setShowMoreSheet(false); imageFileRef.current?.click(); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: SPACING.md,
-                  width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
-                  border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent',
-                  color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
-                  fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
-                }}
-              >
-                <Icon name="file" size={20} style={{ opacity: 0.7 }} />
-                이미지 추가
-              </button>
-            )}
-          </div>
-        </BottomSheet>
-      )}
+      {/* ══ 헤더 더보기 메뉴 → Day 이동 (구분선 있는 버전으로 통일) ══ */}
+      {showMoreSheet && (() => {
+        const moreRows = [];
+        if (onMoveToDay && moveDayOptions.length > 1) {
+          moreRows.push({ key: 'move', icon: 'pin', label: '다른 Day로 이동', onClick: () => { setShowMoreSheet(false); setShowMoveSheet(true); } });
+        }
+        if (canEditInline && tripId && !overlayDetail && displayImages.length > 0) {
+          moreRows.push({ key: 'image-edit', icon: 'file', label: '이미지 수정', onClick: () => { setShowMoreSheet(false); setShowImageManageDialog(true); } });
+        }
+        if (canEditInline && tripId && !overlayDetail && displayImages.length === 0) {
+          moreRows.push({ key: 'image-add', icon: 'file', label: '이미지 추가', onClick: () => { setShowMoreSheet(false); imageFileRef.current?.click(); } });
+        }
+        const btnStyle = (idx) => ({
+          display: 'flex', alignItems: 'center', gap: SPACING.md,
+          width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+          border: 'none', borderTop: idx > 0 ? '1px solid var(--color-outline-variant)' : 'none',
+          borderRadius: 0, background: 'transparent',
+          color: 'var(--color-on-surface)', fontSize: 'var(--typo-label-2-medium-size)',
+          fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
+        });
+        return (
+          <BottomSheet onClose={() => setShowMoreSheet(false)} maxHeight="auto" zIndex={3100} title="">
+            <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}`, display: 'flex', flexDirection: 'column' }}>
+              {moreRows.map((row, idx) => (
+                <button key={row.key} type="button" onClick={row.onClick} style={btnStyle(idx)}>
+                  <Icon name={row.icon} size={20} style={{ opacity: 0.7, flexShrink: 0 }} />
+                  {row.label}
+                </button>
+              ))}
+            </div>
+          </BottomSheet>
+        );
+      })()}
 
       {/* ══ Day 이동 시트 ══ */}
       {showMoveSheet && (

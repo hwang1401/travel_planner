@@ -131,7 +131,16 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
             <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
           </div>
         )}
-        {children}
+        <div style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
+          WebkitOverflowScrolling: "touch",
+          overscrollBehavior: "contain",
+        }}>
+          {children}
+        </div>
       </div>
     </div>
   );

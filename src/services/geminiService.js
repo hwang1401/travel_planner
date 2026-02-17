@@ -5,6 +5,7 @@
 
 import { getRAGContext, extractTagsFromPreferences } from './ragService.js';
 import { matchTimetableRoute, findBestTrain, findRoutesByStations } from '../data/timetable.js';
+import { buildPlaceDetail, buildScheduleItem, ensureDetail } from '../utils/itemBuilder.js';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const API_URL = API_KEY
@@ -13,15 +14,17 @@ const API_URL = API_KEY
 
 /** Convert raw API error to user-friendly Korean message */
 function friendlyError(rawMsg, status) {
-  if (!rawMsg) return `API 오류 (${status})`;
-  if (rawMsg.includes("quota") || rawMsg.includes("rate")) {
-    const retryMatch = rawMsg.match(/retry in ([\d.]+)/i);
+  if (status === 503 || status === 502) return "AI 서버가 일시적으로 응답하지 않아요. 잠시 후 다시 시도해 주세요.";
+  if (status === 500) return "AI 서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.";
+  if (status === 429 || (rawMsg && (rawMsg.includes("quota") || rawMsg.includes("rate")))) {
+    const retryMatch = rawMsg?.match(/retry in ([\d.]+)/i);
     const sec = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 30;
-    return `요청 한도 초과 — ${sec}초 후 다시 시도해주세요`;
+    return `요청이 많아 잠시 대기가 필요해요. ${sec}초 후 다시 시도해 주세요.`;
   }
+  if (!rawMsg) return `일시적인 오류가 발생했어요. 다시 시도해 주세요.`;
   if (rawMsg.includes("API key")) return "API 키가 유효하지 않습니다";
   if (rawMsg.includes("safety")) return "AI 안전 필터에 의해 차단되었습니다";
-  if (rawMsg.length > 80) return `API 오류 (${status})`;
+  if (rawMsg.length > 80) return `일시적인 오류가 발생했어요. 다시 시도해 주세요.`;
   return rawMsg;
 }
 
@@ -37,9 +40,6 @@ function getRetrySeconds(rawMsg) {
 
 /** Sleep helper */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-/** Type → Korean category label (used across multiple functions) */
-const TYPE_LABELS = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
 
 /**
  * Extract text from Gemini response.
@@ -135,6 +135,22 @@ async function fetchWithRetry(body, { maxRetries = 2, onStatus } = {}) {
 
     const errData = await response.json().catch(() => ({}));
     const rawMsg = errData?.error?.message || "";
+
+    // 서버 오류 (500/502/503) — 자동 재시도
+    if ((response.status >= 500) && attempt < maxRetries) {
+      const waitSec = 5 + attempt * 3;
+      if (onStatus) {
+        for (let remaining = waitSec; remaining > 0; remaining--) {
+          onStatus(`서버 오류가 발생했어요. ${remaining}초 후 자동 재시도 (${attempt + 1}/${maxRetries})`);
+          await sleep(1000);
+        }
+        onStatus("재시도 중...");
+      } else {
+        await sleep(waitSec * 1000);
+      }
+      continue;
+    }
+
     const retrySec = getRetrySeconds(rawMsg);
 
     // Not a rate limit error, or last attempt — return error
@@ -275,26 +291,19 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus, a
     }
 
     // Normalize items
-    const TYPE_CAT = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
     const items = parsed
       .filter((item) => item && item.desc)
       .map((item) => {
         const itemType = ["food", "spot", "shop", "move", "flight", "stay", "info"].includes(item.type) ? item.type : "info";
         const timeStr = (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0");
-        const detailFromAI = item.detail && Object.keys(item.detail).some((k) => item.detail[k])
-          ? {
-              name: item.desc,
-              category: TYPE_CAT[itemType] || "정보",
-              ...(item.detail.address ? { address: item.detail.address } : {}),
-              ...(item.detail.timetable ? { hours: item.detail.timetable } : {}),
-              ...(item.detail.tip ? { tip: item.detail.tip } : {}),
-            }
+        let detail = item.detail && Object.keys(item.detail).some((k) => item.detail[k])
+          ? buildPlaceDetail({
+              name: item.desc, type: itemType,
+              address: item.detail.address, hours: item.detail.timetable, tip: item.detail.tip,
+            })
           : null;
         // For move: attach transport timetable from our DB — moveFrom/moveTo 우선, desc fallback
         if (itemType === "move") {
-          if (!detailFromAI) {
-            // detail이 없어도 시간표를 붙이기 위해 생성
-          }
           const mf = item.moveFrom?.trim();
           const mt = item.moveTo?.trim();
           let matched = null;
@@ -303,9 +312,9 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus, a
             if (routes.length > 0) matched = { routeId: routes[0].id, route: routes[0] };
           }
           if (!matched) matched = matchTimetableRoute(item.desc);
-          if (matched && detailFromAI) {
+          if (matched && detail) {
             const bestIdx = findBestTrain(matched.route.trains, timeStr);
-            detailFromAI.timetable = {
+            detail.timetable = {
               _routeId: matched.routeId,
               station: matched.route.station,
               direction: matched.route.direction,
@@ -313,17 +322,10 @@ export async function analyzeScheduleWithAI(content, context = "", { onStatus, a
             };
           }
         }
-        return {
-          _id: crypto.randomUUID(),
-          time: timeStr,
-          type: itemType,
-          desc: item.desc,
-          ...(itemType === "move" && item.moveFrom ? { moveFrom: item.moveFrom } : {}),
-          ...(itemType === "move" && item.moveTo ? { moveTo: item.moveTo } : {}),
-          ...(detailFromAI ? { detail: detailFromAI } : {}),
-          _extra: true,
-          _custom: true,
-        };
+        return buildScheduleItem({
+          time: timeStr, type: itemType, desc: item.desc, detail,
+          moveFrom: item.moveFrom, moveTo: item.moveTo,
+        });
       });
 
     return { items, error: null };
@@ -856,22 +858,18 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
       parsedType = parsed.type || 'chat';
     }
 
-    const TYPE_CAT2 = { food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" };
     const items = rawItems
       .filter((item) => item && item.desc)
       .map((item) => {
         const itemType = ["food", "spot", "shop", "move", "flight", "stay", "info"].includes(item.type) ? item.type : "info";
         const timeStr = (item.time || "").padStart(item.time?.includes(":") ? 5 : 0, "0");
         const ragId = item.rag_id ?? item._ragId;
-        const detailFromAI = item.detail && Object.keys(item.detail).some((k) => item.detail[k])
-          ? {
-              name: item.desc,
-              category: TYPE_CAT2[itemType] || "정보",
-              ...(item.detail.address ? { address: item.detail.address } : {}),
-              ...(item.detail.tip ? { tip: item.detail.tip } : {}),
-              ...(item.detail.lat != null ? { lat: item.detail.lat } : {}),
-              ...(item.detail.lon != null ? { lon: item.detail.lon } : {}),
-            }
+        let detail = item.detail && Object.keys(item.detail).some((k) => item.detail[k])
+          ? buildPlaceDetail({
+              name: item.desc, type: itemType,
+              address: item.detail.address, tip: item.detail.tip,
+              lat: item.detail.lat, lon: item.detail.lon,
+            })
           : null;
         // 교통(move): 시간표 매칭
         if (itemType === "move") {
@@ -884,7 +882,7 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
           }
           if (!matched) matched = matchTimetableRoute(item.desc);
           if (matched) {
-            const detail = detailFromAI || { name: item.desc, category: "교통" };
+            if (!detail) detail = buildPlaceDetail({ name: item.desc, type: 'move' });
             const bestIdx = findBestTrain(matched.route.trains, timeStr);
             detail.timetable = {
               _routeId: matched.routeId,
@@ -892,39 +890,19 @@ export async function getAIRecommendation(userMessage, chatHistory = [], dayCont
               direction: matched.route.direction,
               trains: matched.route.trains.map((t, i) => ({ ...t, picked: i === bestIdx })),
             };
-            return {
-              _id: crypto.randomUUID(),
-              time: timeStr,
-              type: itemType,
-              desc: item.desc,
-              ...(ragId != null ? { _ragId: ragId } : {}),
-              ...(item.moveFrom ? { moveFrom: item.moveFrom } : {}),
-              ...(item.moveTo ? { moveTo: item.moveTo } : {}),
-              detail,
-              _extra: true,
-              _custom: true,
-            };
           }
         }
-        return {
-          _id: crypto.randomUUID(),
-          time: timeStr,
-          type: itemType,
-          desc: item.desc,
-          ...(ragId != null ? { _ragId: ragId } : {}),
-          ...(itemType === "move" && item.moveFrom ? { moveFrom: item.moveFrom } : {}),
-          ...(itemType === "move" && item.moveTo ? { moveTo: item.moveTo } : {}),
-          ...(detailFromAI ? { detail: detailFromAI } : {}),
-          _extra: true,
-          _custom: true,
-        };
+        return buildScheduleItem({
+          time: timeStr, type: itemType, desc: item.desc, detail,
+          moveFrom: item.moveFrom, moveTo: item.moveTo, ragId,
+        });
       });
 
     // RAG로 이미지·placeId·주소 주입 (위에서 가져온 ragPlaces 사용)
     for (const item of items) {
       const match = findRAGMatch(item, ragPlaces);
       if (match) {
-        if (!item.detail) item.detail = { name: item.desc, category: TYPE_CAT2[item.type] || "정보" };
+        ensureDetail(item);
         if (match.image_url) item.detail.image = match.image_url;
         if (match.google_place_id) item.detail.placeId = match.google_place_id;
         if (match.address) {
@@ -1123,9 +1101,7 @@ function injectRAGData(days, ragPlaces) {
       for (const item of sec.items || []) {
         const match = findRAGMatch(item, ragPlaces);
         if (match) {
-          if (!item.detail) {
-            item.detail = { name: item.desc, category: '관광' };
-          }
+          ensureDetail(item);
           if (match.image_url) item.detail.image = match.image_url;
           if (match.google_place_id) item.detail.placeId = match.google_place_id;
           if (match.address) {
@@ -1250,7 +1226,7 @@ async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
         const desc = (item.desc || '').trim();
         if (!desc || seenDesc.has(desc)) continue;
         const ragMatch = findRAGMatch(item, ragPlaces || []);
-        if (ragMatch && ragMatch.image_url && ragMatch.rating != null && ragMatch.google_place_id) continue;
+        if (ragMatch && ragMatch.image_url && ragMatch.rating != null && ragMatch.google_place_id && ragMatch.opening_hours) continue;
         seenDesc.add(desc);
         const entry = { desc, type, address: item.detail?.address || '', region: regionHint || '' };
         if (ragMatch) {
@@ -1261,74 +1237,70 @@ async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
       }
     }
   }
-  // 미매칭 우선, 남은 슬롯에 불완전 RAG 장소 채우기
-  const collected = [
-    ...unmatched.slice(0, MAX_UNMATCHED_PLACES_TO_ENQUEUE),
-    ...incomplete.slice(0, Math.max(0, MAX_UNMATCHED_PLACES_TO_ENQUEUE - unmatched.length)),
-  ];
+  // 미매칭 우선, 그 뒤에 불완전 RAG 장소 추가 (개수 제한 없이 전부 수집)
+  const collected = [...unmatched, ...incomplete];
 
   if (collected.length === 0) return;
 
-  // 2. Edge Function 호출 (await)
+  // 2. Edge Function 배치 호출 (20개씩 나눠서 호출 — Edge Function 타임아웃 방지)
   const baseUrl = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!baseUrl || !anonKey) return;
 
   const url = `${baseUrl.replace(/\/$/, '')}/functions/v1/verify-and-register-places`;
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${anonKey}`,
-      },
-      body: JSON.stringify({ places: collected, regionHint: regionHint || undefined }),
-    });
+  const allResults = [];
 
-    if (!res.ok) {
-      console.warn('[GeminiService] verify-and-register HTTP error:', res.status);
-      return;
+  for (let i = 0; i < collected.length; i += MAX_UNMATCHED_PLACES_TO_ENQUEUE) {
+    const batch = collected.slice(i, i + MAX_UNMATCHED_PLACES_TO_ENQUEUE);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({ places: batch, regionHint: regionHint || undefined }),
+      });
+
+      if (!res.ok) {
+        console.warn('[GeminiService] verify-and-register HTTP error:', res.status);
+        continue;
+      }
+
+      const data = await res.json();
+      if (data.results?.length) allResults.push(...data.results);
+      if (data.daily_limit_reached) break;
+    } catch (err) {
+      console.warn('[GeminiService] verifyAndApply batch failed:', err);
     }
+  }
 
-    const data = await res.json();
-    const results = data.results || [];
+  if (allResults.length === 0) return;
 
-    if (!Array.isArray(results) || results.length === 0) return;
+  // 3. 결과를 days에 반영
+  for (const day of days) {
+    for (const sec of day.sections || []) {
+      for (const item of sec.items || []) {
+        const verified = allResults.find(r => r.desc === (item.desc || '').trim());
+        if (!verified) continue;
 
-    // 3. 결과를 days에 반영
-    for (const day of days) {
-      for (const sec of day.sections || []) {
-        for (const item of sec.items || []) {
-          const verified = results.find(r => r.desc === (item.desc || '').trim());
-          if (!verified) continue;
+        ensureDetail(item);
 
-          // detail 객체가 없으면 생성
-          if (!item.detail) {
-            item.detail = {
-              name: item.desc,
-              category: TYPE_LABELS[item.type] || '정보'
-            };
-          }
-
-          // 검증된 데이터로 업데이트
-          if (verified.address) item.detail.address = verified.address;
-          if (verified.lat != null) item.detail.lat = verified.lat;
-          if (verified.lon != null) item.detail.lon = verified.lon;
-          if (verified.image_url) item.detail.image = verified.image_url;
-          if (verified.placeId) item.detail.placeId = verified.placeId;
-          if (verified.rating != null) item.detail.rating = verified.rating;
-          if (verified.reviewCount != null) item.detail.reviewCount = verified.reviewCount;
-          if (verified.opening_hours) item.detail.hours = verified.opening_hours;
-          if (verified.business_status) item.detail.businessStatus = verified.business_status;
-        }
+        // 검증된 데이터로 업데이트
+        if (verified.address) item.detail.address = verified.address;
+        if (verified.lat != null) item.detail.lat = verified.lat;
+        if (verified.lon != null) item.detail.lon = verified.lon;
+        if (verified.image_url) item.detail.image = verified.image_url;
+        if (verified.placeId) item.detail.placeId = verified.placeId;
+        if (verified.rating != null) item.detail.rating = verified.rating;
+        if (verified.reviewCount != null) item.detail.reviewCount = verified.reviewCount;
+        if (verified.opening_hours) item.detail.hours = verified.opening_hours;
+        if (verified.business_status) item.detail.businessStatus = verified.business_status;
       }
     }
-
-    console.log(`[GeminiService] Applied ${results.length} verified places to schedule`);
-  } catch (err) {
-    console.warn('[GeminiService] verifyAndApply failed:', err);
-    // 실패해도 일정 생성은 진행 (주소 없는 채로)
   }
+
+  console.log(`[GeminiService] Applied ${allResults.length} verified places to schedule (${Math.ceil(collected.length / MAX_UNMATCHED_PLACES_TO_ENQUEUE)} batches)`);
 }
 
 /** 장기 일정은 7일 단위로 나눠 요청 (MAX_TOKENS·무료플랜 한도 방지) */
@@ -1409,15 +1381,11 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
             it.desc = cleanDesc(it.desc, typeVal);
             let detail = null;
             if (it.detail && Object.keys(it.detail).some((k) => it.detail[k])) {
-              const lat = it.detail.lat != null ? Number(it.detail.lat) : null;
-              const lon = it.detail.lon != null ? Number(it.detail.lon) : null;
-              detail = {
-                name: it.desc,
-                category: ({ food: "식사", spot: "관광", shop: "쇼핑", move: "교통", flight: "항공", stay: "숙소", info: "정보" })[typeVal] || "관광",
-                ...(it.detail.address ? { address: it.detail.address } : {}),
-                ...(it.detail.tip ? { tip: it.detail.tip } : {}),
-                ...(lat != null && lon != null && !Number.isNaN(lat) && !Number.isNaN(lon) ? { lat, lon } : {}),
-              };
+              detail = buildPlaceDetail({
+                name: it.desc, type: typeVal,
+                address: it.detail.address, tip: it.detail.tip,
+                lat: it.detail.lat, lon: it.detail.lon,
+              });
             }
             // 교통(move): moveFrom/moveTo 우선, desc fallback으로 시간표 매칭
             if (typeVal === "move") {
@@ -1430,9 +1398,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
               }
               if (!matched) matched = matchTimetableRoute(it.desc);
               if (matched) {
-                if (!detail) {
-                  detail = { name: it.desc, category: "교통" };
-                }
+                if (!detail) detail = buildPlaceDetail({ name: it.desc, type: 'move' });
                 const bestIdx = findBestTrain(matched.route.trains, timeStr);
                 detail.timetable = {
                   _routeId: matched.routeId,
@@ -1442,17 +1408,10 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
                 };
               }
             }
-            return {
-              time: timeStr,
-              type: typeVal,
-              desc: it.desc,
-              ...(typeVal === "move" && it.moveFrom ? { moveFrom: it.moveFrom } : {}),
-              ...(typeVal === "move" && it.moveTo ? { moveTo: it.moveTo } : {}),
-              ...(detail ? { detail } : {}),
-              ...(it.rag_id != null ? { _ragId: it.rag_id } : {}),
-              _extra: true,
-              _custom: true,
-            };
+            return buildScheduleItem({
+              time: timeStr, type: typeVal, desc: it.desc, detail,
+              moveFrom: it.moveFrom, moveTo: it.moveTo, ragId: it.rag_id,
+            });
           }),
       }));
       const dayNum = dayOffset + i + 1;

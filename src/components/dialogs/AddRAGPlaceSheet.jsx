@@ -5,8 +5,8 @@ import Field from '../common/Field';
 import Icon from '../common/Icon';
 import Tab from '../common/Tab';
 import TimePickerDialog from '../common/TimePickerDialog';
-import { TYPE_LABELS } from '../../styles/tokens';
-import { SPACING, RADIUS } from '../../styles/tokens';
+import { TYPE_LABELS, SPACING, RADIUS } from '../../styles/tokens';
+import { buildPlaceDetail } from '../../utils/itemBuilder';
 
 /**
  * RAG 장소를 일정에 추가할 때 쓰는 바텀시트.
@@ -31,20 +31,14 @@ export default function AddRAGPlaceSheet({ place, onConfirm, onClose, allDays, s
 
   const handleSave = () => {
     const t = (time || '').trim() || '12:00';
+    const detail = buildPlaceDetail(place);
     const item = {
       desc: place.name_ko || '',
       type: place.type || 'spot',
       time: /^\d{1,2}:\d{2}$/.test(t) ? t : '12:00',
       _custom: true,
       ...(place.description?.trim() ? { sub: place.description.trim() } : {}),
-      detail: {
-        name: place.name_ko,
-        address: place.address,
-        lat: place.lat,
-        lon: place.lon,
-        image: place.image_url,
-        placeId: place.google_place_id,
-      },
+      detail,
     };
     onConfirm(item, formDayIdx);
     onClose();

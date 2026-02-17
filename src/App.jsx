@@ -37,7 +37,6 @@ function AppRoutes() {
     <>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/trip/legacy" element={<TravelPlanner />} />
         <Route path="/trip/:tripId" element={<TravelPlanner />} />
         <Route path="/invite/:shareCode" element={<InvitePage />} />
       </Routes>

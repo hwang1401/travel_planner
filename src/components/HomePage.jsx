@@ -11,8 +11,6 @@ import CreateTripWizard from './trip/CreateTripWizard';
 import TripListSkeleton from './common/TripListSkeleton';
 import { loadTrips, createTrip, updateTrip, deleteTrip, duplicateTrip, getShareCode, formatDateRange } from '../services/tripService';
 import { getShareLink } from '../services/memberService';
-import { loadCustomData, mergeData } from '../data/storage';
-import { BASE_DAYS } from '../data/days';
 import BottomSheet from './common/BottomSheet';
 import PullToRefresh from './common/PullToRefresh';
 import { COLOR, SPACING, RADIUS } from '../styles/tokens';
@@ -21,6 +19,14 @@ const MIN_SPLASH_MS = 400;
 
 /* ── Trip Card Component ── */
 function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge, memberCount, onClick, onMore }) {
+  const destSummary = destinations?.length > 0
+    ? destinations.length === 1
+      ? destinations[0]
+      : `${destinations[0]} 외 ${destinations.length - 1}곳`
+    : null;
+
+  const hasCover = coverImage || coverColor;
+
   return (
     <div style={{ position: 'relative', marginBottom: SPACING.lg }}>
       <div
@@ -32,10 +38,11 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
           border: '1px solid var(--color-outline-variant)',
         }}
       >
-        {/* Cover: image or neutral surface */}
+        {/* Cover: image > coverColor gradient > none */}
         <div style={{
-          height: coverImage ? '100px' : '0',
+          height: coverImage ? '100px' : coverColor ? '60px' : '0',
           position: 'relative', overflow: 'hidden',
+          background: !coverImage && coverColor ? coverColor : undefined,
         }}>
           {coverImage && (
             <img
@@ -52,7 +59,7 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
 
         {/* Info area */}
         <div style={{ padding: `${SPACING.lx} ${SPACING.xl}` }}>
-          {/* Title */}
+          {/* Title + Badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.ms }}>
             <p style={{
               margin: 0,
@@ -78,24 +85,52 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
             )}
           </div>
 
-          {/* Meta: date + destinations + member count */}
-          <p style={{
-            margin: 0, fontSize: 'var(--typo-caption-2-regular-size)',
-            color: 'var(--color-on-surface-variant2)', lineHeight: 1.5,
-          }}>
-            {subtitle}
-            {destinations?.length > 0 && ` · ${destinations.map((d) => typeof d === 'string' ? d : d).join(', ')}`}
-            {memberCount > 0 && ` · ${memberCount}명`}
-          </p>
+          {/* Meta rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
+            {/* Row 1: 여행지 */}
+            {destSummary && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.ms }}>
+                <Icon name="pin" size={13} style={{ opacity: 0.5, flexShrink: 0 }} />
+                <span style={{
+                  fontSize: 'var(--typo-caption-2-regular-size)',
+                  color: 'var(--color-on-surface-variant2)',
+                }}>
+                  {destSummary}
+                </span>
+              </div>
+            )}
+            {/* Row 2: 날짜 + 멤버 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.ms }}>
+              <Icon name="calendar" size={13} style={{ opacity: 0.5, flexShrink: 0 }} />
+              <span style={{
+                fontSize: 'var(--typo-caption-2-regular-size)',
+                color: 'var(--color-on-surface-variant2)',
+                flex: 1,
+              }}>
+                {subtitle}
+              </span>
+              {memberCount > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.xs }}>
+                  <Icon name="persons" size={13} style={{ opacity: 0.5 }} />
+                  <span style={{
+                    fontSize: 'var(--typo-caption-2-regular-size)',
+                    color: 'var(--color-on-surface-variant2)',
+                  }}>
+                    {memberCount}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* More button (top-right) — Button 컴포넌트, 터치 영역 확대(size lg) */}
+      {/* More button (top-right) */}
       <div
         style={{
-          position: 'absolute', top: coverImage ? '8px' : '10px', right: '8px',
+          position: 'absolute', top: hasCover ? '8px' : '10px', right: '8px',
         }}
-        {...(coverImage && { 'data-cover': 'true' })}
+        {...(hasCover && { 'data-cover': 'true' })}
       >
         <Button
           variant="ghost-neutral"
@@ -104,7 +139,7 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
           title="더보기"
           onClick={(e) => { e.stopPropagation(); onMore(); }}
           style={
-            coverImage
+            hasCover
               ? { background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)' }
               : undefined
           }
@@ -125,12 +160,9 @@ export default function HomePage() {
   const [toast, setToast] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [moreMenu, setMoreMenu] = useState(null);
-  const [legacyHidden, setLegacyHidden] = useState(() => localStorage.getItem('legacy_trip_hidden') === 'true');
   const splashStartRef = useRef(null);
 
-  /* ── Total trip count (로그인 사용자에게는 로컬 레거시 미노출) ── */
-  const showLegacy = !user && !legacyHidden;
-  const totalTrips = trips.length + (showLegacy ? 1 : 0);
+  const totalTrips = trips.length;
 
   /* ── Load trips from Supabase (최소 스플래시 시간 적용으로 깜빡임 방지) ── */
   const fetchTrips = useCallback(async () => {
@@ -209,38 +241,6 @@ export default function HomePage() {
     });
   }, [fetchTrips]);
 
-  /* ── Duplicate legacy trip ── */
-  const handleDuplicateLegacy = useCallback(async () => {
-    setMoreMenu(null);
-    try {
-      // Bake BASE_DAYS + any localStorage customizations into a standalone schedule
-      const legacyCustom = loadCustomData();
-      const mergedDays = mergeData(BASE_DAYS, legacyCustom);
-      // Convert merged days into standalone format (_extraDays + _standalone flag)
-      const standaloneData = {
-        _standalone: true,
-        _extraDays: mergedDays.map((day, i) => ({
-          ...day,
-          day: i + 1,
-          _custom: true,
-        })),
-      };
-      const newTrip = await duplicateTrip({
-        name: '후쿠오카 · 유후인 여행 (복제)',
-        destinations: ['후쿠오카', '구마모토', '유후인'],
-        startDate: '2026-02-19',
-        endDate: '2026-02-24',
-        scheduleData: standaloneData,
-      });
-      setToast({ message: '여행이 복제되었습니다', icon: 'check' });
-      await fetchTrips();
-      navigate(`/trip/${newTrip.id}`);
-    } catch (err) {
-      console.error('Failed to duplicate legacy trip:', err);
-      setToast({ message: '복제에 실패했습니다', icon: 'info' });
-    }
-  }, [fetchTrips, navigate]);
-
   /* ── Duplicate Supabase trip ── */
   const handleDuplicateTrip = useCallback(async (trip) => {
     setMoreMenu(null);
@@ -294,26 +294,8 @@ export default function HomePage() {
     }
   }, []);
 
-  /* ── Delete legacy data ── */
-  const handleDeleteLegacy = useCallback(() => {
-    setMoreMenu(null);
-    setConfirmDialog({
-      title: '로컬 여행 삭제',
-      message: '이 여행을 목록에서 삭제하시겠습니까?\n로컬에 저장된 커스텀 데이터도 함께 삭제됩니다.',
-      confirmLabel: '삭제',
-      onConfirm: () => {
-        localStorage.removeItem('travel_custom_data');
-        localStorage.setItem('legacy_trip_hidden', 'true');
-        setLegacyHidden(true);
-        setConfirmDialog(null);
-        setToast({ message: '여행이 삭제되었습니다', icon: 'trash' });
-      },
-    });
-  }, []);
-
   /* ── Navigation ── */
   const handleOpenTrip = useCallback((trip) => navigate(`/trip/${trip.id}`), [navigate]);
-  const handleOpenLegacy = useCallback(() => navigate('/trip/legacy'), [navigate]);
 
   /* ── Sign out ── */
   const handleSignOut = useCallback(() => {
@@ -400,18 +382,6 @@ export default function HomePage() {
 
           {!loading && (
             <div style={{ animation: 'fadeIn 0.35s ease' }}>
-              {showLegacy && (
-                <TripCard
-                  title="후쿠오카 · 유후인 여행"
-                  subtitle="2/19 (목) — 2/24 (화) · 5박6일"
-                  destinations={['후쿠오카', '구마모토', '유후인']}
-                  coverColor="linear-gradient(135deg, #D94F3B, #F07040)"
-                  badge="로컬"
-                  onClick={handleOpenLegacy}
-                  onMore={() => setMoreMenu({ legacy: true })}
-                />
-              )}
-
               {trips.map((trip) => (
                 <TripCard
                   key={trip.id}
@@ -476,55 +446,26 @@ export default function HomePage() {
         />
       )}
 
-      {/* More Menu Bottom Sheet */}
+      {/* More Menu Bottom Sheet — 구분선 있는 버전으로 통일 */}
       {moreMenu && (
-        <BottomSheet onClose={() => setMoreMenu(null)} maxHeight="auto" zIndex={3000}>
-          <div style={{ padding: `${SPACING.md} ${SPACING.xxxl} ${SPACING.xxxl}` }}>
+        <BottomSheet onClose={() => setMoreMenu(null)} maxHeight="auto" zIndex={3000} title="">
+          <div style={{ padding: `${SPACING.md} ${SPACING.xxl} ${SPACING.xxxl}`, display: 'flex', flexDirection: 'column' }}>
             <h3 style={{
-              margin: `0 0 ${SPACING.xl}`,
+              margin: `0 0 ${SPACING.md}`,
               fontSize: 'var(--typo-body-1-n---bold-size)',
               fontWeight: 'var(--typo-body-1-n---bold-weight)',
               color: 'var(--color-on-surface)',
             }}>
-              {moreMenu.legacy ? '후쿠오카 · 유후인 여행' : moreMenu.trip?.name}
+              {moreMenu.trip?.name}
             </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.xs }}>
-              {/* 여행 수정 (Supabase only) */}
-              {!moreMenu.legacy && moreMenu.trip && (
-                <MoreMenuItem
-                  icon="edit" label="여행 수정"
-                  onClick={() => { setEditTrip(moreMenu.trip); setMoreMenu(null); }}
-                />
-              )}
-
-              {/* 여행 공유 (Supabase only) */}
-              {!moreMenu.legacy && moreMenu.trip && (
-                <MoreMenuItem
-                  icon="share" label="여행 공유"
-                  onClick={() => handleShareTrip(moreMenu.trip)}
-                />
-              )}
-
-              {/* 여행 복제 */}
-              <MoreMenuItem
-                icon="copy" label="여행 복제"
-                onClick={() => moreMenu.legacy ? handleDuplicateLegacy() : handleDuplicateTrip(moreMenu.trip)}
-              />
-
-              {/* 여행 삭제 */}
-              <MoreMenuItem
-                icon="trash" label="여행 삭제" danger
-                onClick={() => {
-                  if (moreMenu.legacy) {
-                    handleDeleteLegacy();
-                  } else {
-                    setMoreMenu(null);
-                    handleDelete(moreMenu.trip);
-                  }
-                }}
-              />
-            </div>
+            {[
+              moreMenu.trip && { icon: 'edit', label: '여행 수정', onClick: () => { setEditTrip(moreMenu.trip); setMoreMenu(null); } },
+              moreMenu.trip && { icon: 'share', label: '여행 공유', onClick: () => handleShareTrip(moreMenu.trip) },
+              { icon: 'copy', label: '여행 복제', onClick: () => handleDuplicateTrip(moreMenu.trip) },
+              { icon: 'trash', label: '여행 삭제', danger: true, onClick: () => { setMoreMenu(null); handleDelete(moreMenu.trip); } },
+            ].filter(Boolean).map((item, idx) => (
+              <MoreMenuItem key={item.label} showDivider={idx > 0} {...item} />
+            ))}
           </div>
         </BottomSheet>
       )}
@@ -537,32 +478,24 @@ export default function HomePage() {
   );
 }
 
-/* ── More Menu Item ── */
-function MoreMenuItem({ icon, label, onClick, danger = false }) {
+/* ── More Menu Item (구분선 있는 통일 스타일) ── */
+function MoreMenuItem({ icon, label, onClick, danger = false, showDivider = true }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       style={{
-        display: 'flex', alignItems: 'center', gap: SPACING.lg,
-        padding: `13px ${SPACING.lx}`, borderRadius: 'var(--radius-md, 8px)',
-        background: 'none', border: 'none', cursor: 'pointer',
-        width: '100%', textAlign: 'left', transition: 'background 0.15s',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = danger
-          ? 'var(--color-error-container, #FEE2E2)'
-          : 'var(--color-surface-container-lowest)';
-      }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-    >
-      <Icon name={icon} size={18} style={danger ? { flexShrink: 0, color: 'var(--color-error)' } : { flexShrink: 0, opacity: 0.6 }} />
-      <span style={{
-        fontSize: 'var(--typo-label-2-medium-size)',
-        fontWeight: 'var(--typo-label-2-medium-weight)',
+        display: 'flex', alignItems: 'center', gap: SPACING.md,
+        width: '100%', padding: `${SPACING.lg} ${SPACING.xl}`,
+        border: 'none', borderTop: showDivider ? '1px solid var(--color-outline-variant)' : 'none',
+        borderRadius: 0, background: 'transparent',
         color: danger ? 'var(--color-error)' : 'var(--color-on-surface)',
-      }}>
-        {label}
-      </span>
+        fontSize: 'var(--typo-label-2-medium-size)',
+        fontWeight: 'var(--typo-label-2-medium-weight)', cursor: 'pointer', textAlign: 'left',
+      }}
+    >
+      <Icon name={icon} size={20} style={{ opacity: 0.7, flexShrink: 0, ...(danger ? { color: 'var(--color-error)' } : {}) }} />
+      <span>{label}</span>
     </button>
   );
 }

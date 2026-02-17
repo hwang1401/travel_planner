@@ -696,9 +696,15 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
             </Button>
 
             {genError && (
-              <p style={{ margin: 0, padding: `${SPACING.ml} ${SPACING.lg}`, background: 'var(--color-error-container)', borderRadius: RADIUS.md, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
-                {genError}
-              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm, padding: SPACING.lg, background: 'var(--color-error-container)', borderRadius: RADIUS.md }}>
+                <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
+                  {genError}
+                </p>
+                <Button variant="ghost" size="sm" iconLeft="sync" onClick={() => { setGenError(''); handleGenerate(); }}
+                  style={{ alignSelf: 'flex-start', color: 'var(--color-error)' }}>
+                  다시 시도
+                </Button>
+              </div>
             )}
 
             {preview && <PreviewAccordion days={preview.days} expandedDay={expandedDay} setExpandedDay={setExpandedDay} onItemClick={setSelectedPlace} />}
@@ -824,9 +830,15 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
             )}
 
             {genError && (
-              <p style={{ margin: 0, padding: `${SPACING.ml} ${SPACING.lg}`, background: 'var(--color-error-container)', borderRadius: RADIUS.md, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
-                {genError}
-              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm, padding: SPACING.lg, background: 'var(--color-error-container)', borderRadius: RADIUS.md }}>
+                <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
+                  {genError}
+                </p>
+                <Button variant="ghost" size="sm" iconLeft="sync" onClick={() => { setGenError(''); handleGenerate(); }}
+                  style={{ alignSelf: 'flex-start', color: 'var(--color-error)' }}>
+                  다시 시도
+                </Button>
+              </div>
             )}
 
             {preview && <PreviewAccordion days={preview.days} expandedDay={expandedDay} setExpandedDay={setExpandedDay} onItemClick={setSelectedPlace} />}

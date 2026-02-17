@@ -26,52 +26,8 @@ function getCategoryIcon(cat) {
   return DOC_CATEGORIES.find((c) => c.value === cat)?.icon || 'file';
 }
 
-/* ── Legacy hardcoded tabs (for legacy trip) ── */
-const LEGACY_TABS = [
-  { label: "항공권", icon: "navigation", image: "/images/ticket_departure.jpg", caption: "KE8795 인천→후쿠오카 / KE788 후쿠오카→인천" },
-  { label: "JR패스", icon: "car", image: "/images/jrpass.jpg", caption: "JR 북큐슈 5일권 · 예약번호: FGY393247 (성인 2매)" },
-];
-
 /* ── Document Dialog ── */
-export default function DocumentDialog({ onClose, tripId, isLegacy }) {
-  if (isLegacy) return <LegacyDocumentDialog onClose={onClose} />;
-  return <DynamicDocumentDialog onClose={onClose} tripId={tripId} />;
-}
-
-/* ── Legacy (read-only) version ── */
-function LegacyDocumentDialog({ onClose }) {
-  useBackClose(true, onClose);
-  const [tab, setTab] = useState(0);
-  const [viewImage, setViewImage] = useState(null);
-  const current = LEGACY_TABS[tab];
-
-  return (
-    <BottomSheet onClose={onClose} maxHeight="85vh" title="여행 서류">
-      <div style={{ display: "flex", gap: SPACING.ms, padding: `${SPACING.lx} ${SPACING.xxl} 0` }}>
-        {LEGACY_TABS.map((t, i) => (
-          <Button key={i} variant={tab === i ? "primary" : "neutral"} size="md"
-            iconLeft={t.icon} onClick={() => setTab(i)} style={{ flex: 1 }}>
-            {t.label}
-          </Button>
-        ))}
-      </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: `${SPACING.lx} ${SPACING.xxl} ${SPACING.xxl}` }}>
-        <p style={{ margin: `0 0 ${SPACING.lg}`, fontSize: "var(--typo-caption-2-regular-size)", color: "var(--color-on-surface-variant)", lineHeight: "var(--typo-caption-2-regular-line-height)", textAlign: "center" }}>
-          {current.caption}
-        </p>
-        {current.image && (
-          <div onClick={() => setViewImage(current.image)} style={{ borderRadius: "var(--radius-md, 8px)", overflow: "hidden", border: "1px solid var(--color-outline-variant)", background: "var(--color-surface-container-lowest)", aspectRatio: "595 / 842", width: "100%", cursor: "zoom-in" }}>
-            <img src={current.image} alt={current.label} style={{ width: "100%", height: "100%", display: "block", objectFit: "contain" }} />
-          </div>
-        )}
-      </div>
-      <ImageViewer src={viewImage} alt={current.label} onClose={() => setViewImage(null)} />
-    </BottomSheet>
-  );
-}
-
-/* ── Dynamic (Supabase) version ── */
-function DynamicDocumentDialog({ onClose, tripId }) {
+export default function DocumentDialog({ onClose, tripId }) {
   useBackClose(true, onClose);
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);

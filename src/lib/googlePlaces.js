@@ -4,6 +4,7 @@
  */
 
 import { loadGoogleMapsScript } from './googleMaps.js';
+import { formatPeriodsToHours, localizeHoursText, sanitizeHoursForDisplay } from '../utils/hoursParser.js';
 
 /* ── Session token: 자동완성 세션 비용 최적화 ── */
 let _sessionToken = null;
@@ -75,79 +76,6 @@ export async function getPlacePredictions(input, limit = 8) {
   return [];
 }
 
-/* ── periods → "요일: HH:MM – HH:MM" 문자열 변환 ── */
-const DAY_NAMES = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
-
-function formatPeriodsToHours(periods) {
-  if (!periods?.length) return null;
-  const byDay = {};
-  for (const p of periods) {
-    const openDay = p.open?.day;
-    if (openDay == null) continue;
-    // 24시간 영업: close가 없거나 open과 동일한 시간
-    if (!p.close || (p.close.day === openDay && p.close.hour === 0 && p.close.minute === 0 && p.open.hour === 0 && p.open.minute === 0)) {
-      byDay[openDay] = '24시간 영업';
-      continue;
-    }
-    const pad = (n) => String(n).padStart(2, '0');
-    const openHour = p.open?.hour ?? 0;
-    const openMin = p.open?.minute ?? 0;
-    const closeHour = p.close?.hour ?? 0;
-    const closeMin = p.close?.minute ?? 0;
-    const timeStr = `${pad(openHour)}:${pad(openMin)} – ${pad(closeHour)}:${pad(closeMin)}`;
-    byDay[openDay] = timeStr;
-  }
-  const parts = [];
-  for (let d = 0; d < 7; d++) {
-    if (byDay[d]) parts.push(`${DAY_NAMES[d]}: ${byDay[d]}`);
-    else parts.push(`${DAY_NAMES[d]}: 휴무`);
-  }
-  return parts.join('; ');
-}
-
-/* ── 영어 weekdayDescriptions → 한국어 변환 (safety net) ── */
-const EN_DAY_MAP = { Monday: '월요일', Tuesday: '화요일', Wednesday: '수요일', Thursday: '목요일', Friday: '금요일', Saturday: '토요일', Sunday: '일요일' };
-
-function localizeHoursText(text) {
-  if (!text || typeof text !== 'string') return text;
-  let s = text;
-  // 영어 요일 → 한국어
-  for (const [en, ko] of Object.entries(EN_DAY_MAP)) {
-    s = s.replace(new RegExp(en, 'gi'), ko);
-  }
-  // "Closed" → "휴무"
-  s = s.replace(/\bClosed\b/gi, '휴무');
-  // "Temporarily closed" → "임시 휴업"
-  s = s.replace(/\bTemporarily\s+휴무\b/gi, '임시 휴업');
-  // "Permanently closed" → "폐업"
-  s = s.replace(/\bPermanently\s+휴무\b/gi, '폐업');
-  // "Open 24 hours" → "24시간 영업"
-  s = s.replace(/\bOpen 24 hours\b/gi, '24시간 영업');
-  // AM/PM → 24시간 (예: "11:00 AM" → "11:00", "2:30 PM" → "14:30")
-  s = s.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
-    let hour = parseInt(h, 10);
-    if (ap.toUpperCase() === 'PM' && hour !== 12) hour += 12;
-    if (ap.toUpperCase() === 'AM' && hour === 12) hour = 0;
-    return `${String(hour).padStart(2, '0')}:${m}`;
-  });
-  return s;
-}
-
-/**
- * 영업시간 문자열이 실제 영업시간인지, 현재 상태(Open/Closed)만인지 판별.
- * 상태만인 경우 null 반환. Google Places가 regularOpeningHours 대신
- * 현재 상태만 반환하는 경우가 있어 이를 걸러냄.
- */
-function sanitizeHours(hours) {
-  if (!hours || typeof hours !== 'string') return null;
-  const t = hours.trim();
-  // 단독 상태 텍스트 (실제 영업시간 아님)
-  if (/^(Closed|Open|Open now|Temporarily closed|Permanently closed|영업\s*중|폐업|임시\s*휴업)$/i.test(t)) return null;
-  // "Open ⋅ Closes 10 PM" 같은 현재 상태 (실제 영업시간 아님)
-  if (/^Open\s*[⋅·•]\s*/i.test(t)) return null;
-  return hours;
-}
-
 /** Place 상세: { lat, lon, formatted_address, name, photoUrl? } */
 export async function getPlaceDetails(placeId) {
   if (!placeId) return null;
@@ -174,7 +102,7 @@ export async function getPlaceDetails(placeId) {
 
       // periods로 실제 영업시간 구성, 없으면 weekdayDescriptions 사용 (localizeHoursText로 안전 번역)
       const oh = place.regularOpeningHours;
-      const hours = sanitizeHours(formatPeriodsToHours(oh?.periods) || localizeHoursText(oh?.weekdayDescriptions?.join('; ')) || null);
+      const hours = sanitizeHoursForDisplay(formatPeriodsToHours(oh?.periods) || localizeHoursText(oh?.weekdayDescriptions?.join('; ')) || null);
 
       return {
         lat: loc ? loc.lat() : null,
@@ -209,7 +137,7 @@ export async function getPlaceDetails(placeId) {
           const photoUrl = place.photos?.[0]?.getUrl?.({ maxWidth: 1600 }) ?? null;
           // periods로 실제 영업시간 구성, 없으면 weekday_text 사용 (localizeHoursText로 안전 번역)
           const oh = place.opening_hours;
-          const hours = sanitizeHours(formatPeriodsToHours(oh?.periods) || localizeHoursText(oh?.weekday_text?.join('; ')) || null);
+          const hours = sanitizeHoursForDisplay(formatPeriodsToHours(oh?.periods) || localizeHoursText(oh?.weekday_text?.join('; ')) || null);
           resolve({
             lat: loc ? loc.lat() : null,
             lon: loc ? loc.lng() : null,

@@ -1,9 +1,7 @@
-export function loadCustomData() {
-  try {
-    const saved = localStorage.getItem("travel_custom_data");
-    return saved ? JSON.parse(saved) : {};
-  } catch { return {}; }
-}
+/**
+ * 스케줄 데이터 병합 및 요약 유틸리티.
+ * (storage.js에서 이동 — localStorage 의존 코드 제거)
+ */
 
 /* ── Helper: parse "HH:MM" to minutes for sorting ── */
 function timeToMin(t) {
@@ -11,8 +9,6 @@ function timeToMin(t) {
   const [h, m] = t.split(":").map(Number);
   return (h || 0) * 60 + (m || 0);
 }
-
-/* smartTimeMin removed — 새벽 시간은 해당 일자의 시작으로 처리 */
 
 /* ── Helper: apply customData (section overrides + extraItems) to a day ── */
 function applyDayCustom(day, dayCustom, overrides) {
@@ -211,19 +207,16 @@ export function generateDaySummary(day) {
     .filter(Boolean);
 
   // 2) Parse costs by category
-  const costCategories = { food: 0, move: 0, flight: 0, other: 0 }; // food→식비, move→교통, flight→항공, spot/shop→기타
+  const costCategories = { food: 0, move: 0, flight: 0, other: 0 };
 
   allItems.forEach((item) => {
     let cost = 0;
-    // Try detail.price first
     if (item.detail?.price) {
       cost = parseYen(item.detail.price);
     }
-    // Also check sub for transport costs (e.g. "170엔", "310엔")
     if (item.sub) {
       const subCost = parseYen(item.sub);
       if (subCost > 0 && cost === 0) cost = subCost;
-      // For move/flight type, sub often has the cost
       if ((item.type === "move" || item.type === "flight") && subCost > 0) cost = subCost;
     }
 

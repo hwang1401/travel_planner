@@ -16,6 +16,11 @@ import { uploadImage, generateImagePath } from '../../services/imageService';
 import { getPlaceByNameOrAddress, cachePhotoToRAG } from '../../services/ragService';
 import { COLOR, SPACING, RADIUS, TYPE_CONFIG, TYPE_LABELS } from '../../styles/tokens';
 import { findRoutesByStations, findBestTrain } from '../../data/timetable';
+import {
+  TODAY_BY_GETDAY, parseHoursToDays, reorderHoursByPriority,
+  parseStayHours, sanitizeHoursForDisplay,
+} from '../../utils/hoursParser';
+import { buildPlaceDetail } from '../../utils/itemBuilder';
 
 /* ══════════════════════════════════════
    Helpers (ported from DetailDialog)
@@ -33,86 +38,6 @@ const SectionLabel = ({ children }) => (
     {children}
   </p>
 );
-
-/* ── Hours parsing ── */
-const DAY_ORDER = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
-const EN_DAY = { Monday: '월요일', Tuesday: '화요일', Wednesday: '수요일', Thursday: '목요일', Friday: '금요일', Saturday: '토요일', Sunday: '일요일' };
-const JA_DAY = { '月曜日': '월요일', '火曜日': '화요일', '水曜日': '수요일', '木曜日': '목요일', '金曜日': '금요일', '土曜日': '토요일', '日曜日': '일요일' };
-const TODAY_BY_GETDAY = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
-
-/** 영어/일본어 시간 텍스트 → 한국어 정규화 */
-function normalizeTimeText(t) {
-  if (!t) return t;
-  const trimmed = t.trim();
-  if (/^Closed$/i.test(trimmed) || trimmed === '定休日') return '휴무';
-  if (/^Open 24 hours$/i.test(trimmed) || trimmed === '24時間営業') return '24시간 영업';
-  if (/^Open$/i.test(trimmed)) return null; // 단독 "Open"은 유효한 영업시간 아님
-  if (/^Temporarily closed$/i.test(trimmed)) return '임시 휴업';
-  if (/^Permanently closed$/i.test(trimmed)) return '폐업';
-  // "Closed" / "Open" 키워드 한국어 변환
-  let s = t.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
-  // 일본어 시간 형식 "11時00分〜23時00分" → "11:00 – 23:00"
-  s = s.replace(/(\d{1,2})時(\d{2})分/g, (_, h, m) => `${String(h).padStart(2, '0')}:${m}`);
-  s = s.replace(/〜/g, ' – ');
-  // AM/PM → 24시간 변환
-  s = s.replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_, h, m, ap) => {
-    let hour = parseInt(h, 10);
-    if (ap.toUpperCase() === 'PM' && hour !== 12) hour += 12;
-    if (ap.toUpperCase() === 'AM' && hour === 12) hour = 0;
-    return `${String(hour).padStart(2, '0')}:${m}`;
-  });
-  return s;
-}
-
-/** 영업시간 문자열에 상태 텍스트만 있으면 null, 아니면 한국어로 치환 */
-function sanitizeHoursForDisplay(hours) {
-  if (!hours || typeof hours !== 'string') return hours;
-  const t = hours.trim();
-  if (!t) return null;
-  // 단독 상태 텍스트 (영어/한국어/일본어)
-  if (/^(Closed|Open|Open now|Temporarily closed|Permanently closed|영업\s*중|폐업|임시\s*휴업|営業中|閉店)$/i.test(t)) return null;
-  if (/^Open\s*[⋅·•]\s*/i.test(t)) return null;
-  // 남은 영어 키워드 치환
-  return hours.replace(/\bClosed\b/gi, '휴무').replace(/\bOpen 24 hours\b/gi, '24시간 영업');
-}
-
-function parseHoursToDays(hours) {
-  if (!hours || typeof hours !== 'string') return null;
-  const raw = hours.split(/\s*[;；]\s*/).map((s) => s.trim()).filter(Boolean);
-  const parsed = [];
-  for (const segment of raw) {
-    const match = segment.match(/^(월요일|화요일|수요일|목요일|금요일|토요일|일요일|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|月曜日|火曜日|水曜日|木曜日|金曜日|土曜日|日曜日)\s*[:：]\s*(.+)$/i);
-    if (!match) continue;
-    let day = match[1];
-    if (EN_DAY[day]) day = EN_DAY[day];
-    if (JA_DAY[day]) day = JA_DAY[day];
-    parsed.push({ day, time: normalizeTimeText(match[2].trim()) });
-  }
-  if (parsed.length === 0) return null;
-  parsed.sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
-  return parsed;
-}
-
-function reorderHoursByPriority(parsed, priorityDay) {
-  if (!parsed?.length || !priorityDay) return parsed;
-  const pi = DAY_ORDER.indexOf(priorityDay);
-  if (pi === -1) return parsed;
-  return [...parsed].sort((a, b) => {
-    const ai = DAY_ORDER.indexOf(a.day);
-    const bi = DAY_ORDER.indexOf(b.day);
-    return ((ai - pi + 7) % 7) - ((bi - pi + 7) % 7);
-  });
-}
-
-function parseStayHours(hoursString) {
-  if (!hoursString || typeof hoursString !== 'string') return { checkIn: '15:00', checkOut: '11:00' };
-  const parts = hoursString.split(/\s*[\/~]\s*/).map((s) => s.trim()).filter(Boolean);
-  const match = (p) => /^\d{1,2}:\d{2}$/.test(p) ? p : null;
-  return {
-    checkIn: parts[0] ? match(parts[0]) || '15:00' : '15:00',
-    checkOut: parts[1] ? match(parts[1]) || '11:00' : '11:00',
-  };
-}
 
 function formatPriceLevel(pl) {
   if (pl == null) return null;
@@ -398,28 +323,20 @@ export default function PlaceInfoContent({
       return;
     }
     setErrors({});
-    const categoryLabel = TYPE_LABELS[formType] || '정보';
     const timetable = (formType === 'move' && loadedTimetable?.trains?.length) ? loadedTimetable : null;
     const imageUrl = storageImageUrl || place?.image || null;
+    // place prop + ragEnriched 병합 (place 우선)
+    const ep = ragEnriched ? { ...ragEnriched, ...place } : { ...place };
+    const detail = buildPlaceDetail(
+      { ...ep, name: formName.trim(), image: imageUrl, type: formType },
+      { tip: memo.trim() || null, timetable },
+    );
     const newItem = {
       time: time.trim(), desc: formName.trim(), type: formType,
       ...(formType === 'move' && moveFrom ? { moveFrom } : {}),
       ...(formType === 'move' && moveTo ? { moveTo } : {}),
       _custom: true,
-      detail: {
-        name: formName.trim(), category: categoryLabel,
-        ...(place?.address?.trim() ? { address: place.address.trim() } : {}),
-        ...(place?.lat != null ? { lat: place.lat } : {}),
-        ...(place?.lon != null ? { lon: place.lon } : {}),
-        ...(memo.trim() ? { tip: memo.trim() } : {}),
-        ...(imageUrl ? { image: imageUrl } : {}),
-        ...(place?.placeId ? { placeId: place.placeId } : {}),
-        ...(place?.rating != null ? { rating: place.rating } : {}),
-        ...(place?.reviewCount != null ? { reviewCount: place.reviewCount } : {}),
-        ...(place?.hours ? { hours: place.hours } : {}),
-        ...(place?.priceLevel != null ? { priceLevel: place.priceLevel } : {}),
-        ...(timetable ? { timetable } : {}),
-      },
+      detail,
     };
     onAdd(newItem, formDayIdx);
   };

@@ -341,40 +341,51 @@ async function downloadPhoto(photoName: string, apiKey: string, maxWidth = 1600)
  * 한 번 채워놓으면 다음부터 완전한 캐시 히트.
  */
 async function enrichCachedPlace(
-  row: { id: string; google_place_id: string | null; rating: number | null; review_count: number | null; image_url: string | null; region?: string | null },
+  row: { id: string; google_place_id: string | null; rating: number | null; review_count: number | null; image_url: string | null; opening_hours?: string | null; region?: string | null },
   apiKey: string,
   supabase: ReturnType<typeof createClient>,
   bucket: string,
-): Promise<{ rating: number | null; reviewCount: number | null; image_url: string | null }> {
+): Promise<{ rating: number | null; reviewCount: number | null; image_url: string | null; opening_hours: string | null }> {
   const needsRating = row.rating == null;
   const needsImage = !row.image_url;
-  if ((!needsRating && !needsImage) || !row.google_place_id) {
-    return { rating: row.rating, reviewCount: row.review_count, image_url: row.image_url };
+  const needsHours = !row.opening_hours;
+  if ((!needsRating && !needsImage && !needsHours) || !row.google_place_id) {
+    return { rating: row.rating, reviewCount: row.review_count, image_url: row.image_url, opening_hours: row.opening_hours ?? null };
   }
 
   const updates: Record<string, unknown> = {};
   let rating = row.rating;
   let reviewCount = row.review_count;
   let imageUrl = row.image_url;
+  let openingHours = row.opening_hours ?? null;
 
   try {
     const fields: string[] = [];
     if (needsRating) fields.push("rating", "userRatingCount");
     if (needsImage) fields.push("photos");
+    if (needsHours) fields.push("regularOpeningHours");
 
-    const url = `https://places.googleapis.com/v1/places/${row.google_place_id}`;
+    const langParam = needsHours ? '?languageCode=ko' : '';
+    const url = `https://places.googleapis.com/v1/places/${row.google_place_id}${langParam}`;
     const res = await fetch(url, {
       headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fields.join(",") },
     });
-    if (!res.ok) return { rating, reviewCount, image_url: imageUrl };
+    if (!res.ok) return { rating, reviewCount, image_url: imageUrl, opening_hours: openingHours };
 
     const data = (await res.json()) as {
       rating?: number; userRatingCount?: number;
       photos?: Array<{ name: string; widthPx?: number; heightPx?: number }>;
+      regularOpeningHours?: { weekdayDescriptions?: string[] };
     };
 
     if (needsRating && data.rating != null) { rating = data.rating; updates.rating = rating; }
     if (needsRating && data.userRatingCount != null) { reviewCount = data.userRatingCount; updates.review_count = reviewCount; }
+
+    if (needsHours && data.regularOpeningHours?.weekdayDescriptions?.length) {
+      const hoursStr = data.regularOpeningHours.weekdayDescriptions.join('; ');
+      openingHours = hoursStr;
+      updates.opening_hours = hoursStr;
+    }
 
     if (needsImage && data.photos?.length) {
       let best = data.photos[0];
@@ -407,7 +418,7 @@ async function enrichCachedPlace(
     console.warn("[verify-and-register] enrich failed:", (e as Error).message);
   }
 
-  return { rating, reviewCount, image_url: imageUrl };
+  return { rating, reviewCount, image_url: imageUrl, opening_hours: openingHours };
 }
 
 Deno.serve(async (req) => {
@@ -509,7 +520,7 @@ Deno.serve(async (req) => {
             placeId: cached.google_place_id,
             rating: enriched.rating,
             reviewCount: enriched.reviewCount,
-            opening_hours: cached.opening_hours || null,
+            opening_hours: enriched.opening_hours || null,
           },
         };
       }
@@ -654,7 +665,7 @@ Deno.serve(async (req) => {
           placeId: existing.google_place_id || finalResult.id,
           rating: enriched.rating ?? finalResult.rating ?? null,
           reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
-          opening_hours: existing.opening_hours || finalResult.openingHours || null,
+          opening_hours: enriched.opening_hours || finalResult.openingHours || null,
           business_status: finalResult.businessStatus || null,
         }
       };
@@ -683,7 +694,7 @@ Deno.serve(async (req) => {
           placeId: existingByName.google_place_id || finalResult.id,
           rating: enriched.rating ?? finalResult.rating ?? null,
           reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
-          opening_hours: existingByName.opening_hours || finalResult.openingHours || null,
+          opening_hours: enriched.opening_hours || finalResult.openingHours || null,
           business_status: finalResult.businessStatus || null,
         },
       };
@@ -753,6 +764,26 @@ Deno.serve(async (req) => {
       console.warn("[verify-and-register] photo skip:", (e as Error).message);
     }
 
+    // Text Search에서 hours가 없으면 Place Details API로 보완
+    let openingHours = finalResult.openingHours ?? null;
+    if (!openingHours && finalResult.id) {
+      try {
+        const hRes = await fetch(
+          `https://places.googleapis.com/v1/places/${finalResult.id}?languageCode=ko`,
+          { headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "regularOpeningHours" } }
+        );
+        if (hRes.ok) {
+          const hData = (await hRes.json()) as { regularOpeningHours?: { weekdayDescriptions?: string[] } };
+          if (hData.regularOpeningHours?.weekdayDescriptions?.length) {
+            openingHours = hData.regularOpeningHours.weekdayDescriptions.join('; ');
+            await supabase.from("rag_places").update({ opening_hours: openingHours }).eq("id", rowId);
+          }
+        }
+      } catch (e) {
+        console.warn("[verify-and-register] hours enrichment skip:", (e as Error).message);
+      }
+    }
+
     return {
       ok: true,
       data: {
@@ -764,7 +795,7 @@ Deno.serve(async (req) => {
         placeId: finalResult.id,
         rating: finalResult.rating ?? null,
         reviewCount: finalResult.userRatingCount ?? null,
-        opening_hours: finalResult.openingHours ?? null,
+        opening_hours: openingHours,
         business_status: finalResult.businessStatus || null,
       }
     };
