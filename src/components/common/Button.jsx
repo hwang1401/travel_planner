@@ -166,6 +166,8 @@ export default function Button({
     ...customStyle,
   };
 
+  const isNeutralIcon = (variant === 'ghost-neutral' || variant === 'neutral') && (!!iconOnly || !!iconLeft || !!iconRight);
+
   return (
     <button
       onClick={disabled ? undefined : onClick}
@@ -176,6 +178,7 @@ export default function Button({
       style={baseStyle}
       className={className}
       disabled={disabled}
+      {...(isNeutralIcon ? { 'data-icon-tint': 'neutral' } : {})}
       {...rest}
     >
       {iconOnly ? (

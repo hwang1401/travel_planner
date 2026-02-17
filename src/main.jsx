@@ -3,6 +3,12 @@ import ReactDOM from "react-dom/client";
 import "leaflet/dist/leaflet.css";
 import "./index.css";
 import App from "./App";
+import { applyTheme, getTheme } from "./utils/theme";
+
+applyTheme();
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (getTheme() === "system") applyTheme();
+});
 
 class AppErrorBoundary extends React.Component {
   state = { hasError: false, error: null };

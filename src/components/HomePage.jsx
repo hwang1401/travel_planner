@@ -332,7 +332,7 @@ export default function HomePage() {
               </h1>
               {profile && (
                 <div
-                  onClick={handleSignOut}
+                  onClick={() => navigate('/settings')}
                   style={{
                     display: 'flex', alignItems: 'center', gap: SPACING.ms,
                     padding: `${SPACING.sm} ${SPACING.ml} ${SPACING.sm} ${SPACING.sm}`, borderRadius: '20px',
@@ -422,7 +422,7 @@ export default function HomePage() {
             onClick={() => setShowCreate(true)}
             style={{
               borderRadius: '24px', padding: `0 ${SPACING.xxxl}`, height: '48px',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+              boxShadow: 'var(--shadow-strong)',
             }}>
             여행 만들기
           </Button>

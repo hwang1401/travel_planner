@@ -6,6 +6,7 @@ import LoginPage from './components/LoginPage';
 import HomePage from './components/HomePage';
 import TravelPlanner from './components/TravelPlanner';
 import InvitePage from './components/InvitePage';
+import SettingsPage from './components/SettingsPage';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 
 const MIN_SPLASH_MS = 1500;
@@ -39,6 +40,7 @@ function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/trip/:tripId" element={<TravelPlanner />} />
         <Route path="/invite/:shareCode" element={<InvitePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
       <PwaInstallPrompt />
     </>

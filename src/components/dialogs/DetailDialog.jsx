@@ -11,6 +11,7 @@ import ConfirmDialog from '../common/ConfirmDialog';
 import ImageViewer from '../common/ImageViewer';
 import TimetablePreview from '../common/TimetablePreview';
 import NearbyPlaceCard from './NearbyPlaceCard';
+import PlaceInfoContent from '../place/PlaceInfoContent';
 import Skeleton from '../common/Skeleton';
 import CenterPopup from '../common/CenterPopup';
 import TimePickerDialog from '../common/TimePickerDialog';
@@ -76,6 +77,9 @@ function ragPlaceToDetail(place) {
   return {
     name: pd.name, address: pd.address, lat: pd.lat, lon: pd.lon,
     image: pd.image, placeId: pd.placeId,
+    rating: pd.rating ?? place.rating ?? null,
+    reviewCount: pd.reviewCount ?? place.review_count ?? null,
+    hours: pd.hours ?? place.opening_hours ?? null,
     categories: cat ? [cat] : [], tip: null,
     highlights: oneLine ? [oneLine] : null,
     _item: { desc: pd.name, sub: place.description || '' },
@@ -90,7 +94,7 @@ function createAddressPinIcon() {
     html: `<div style="
       width:28px;height:28px;border-radius:50%;
       background:var(--color-primary);
-      border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);
+      border:3px solid var(--color-surface);box-shadow:0 2px 8px var(--color-shadow, rgba(0,0,0,0.25));
     "></div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
@@ -136,7 +140,7 @@ export default function DetailDialog({
   const [nearbyPages, setNearbyPages] = useState({ food: 0, spot: 0, shop: 0 });
   const carouselScrollRef = useRef(null);
   const contentScrollRef = useRef(null);
-  const effectiveDetail = overlayDetail || detail;
+  const effectiveDetail = detail;
   const accentColor = dayColor || COLOR.primary;
   const swipeStart = useRef({ x: 0, y: 0, pointerId: null, fromNearbyScroll: false, fromCarousel: false });
   const curIdx = typeof currentDetailIndex === "number" ? currentDetailIndex : 0;
@@ -265,7 +269,6 @@ export default function DetailDialog({
   /* ── RAG 이미지 자동 로드 (표시 전용, 저장하지 않음) ── */
   /* 사용자가 의도적으로 이미지 삭제한 경우(_imageRemovedByUser) RAG로 덮어쓰지 않음 */
   useEffect(() => {
-    if (overlayDetail) { setRagImage(null); return; }
     if (effectiveDetail._imageRemovedByUser) { setRagImage(null); return; }
     const hasImage = mainImage || (imagesArray && imagesArray.length > 0);
     if (hasImage) { setRagImage(null); return; }
@@ -281,11 +284,10 @@ export default function DetailDialog({
       setRagImage(place.image_url);
     }).catch(() => { if (!cancelled) setRagImage(null); });
     return () => { cancelled = true; };
-  }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?._imageRemovedByUser, item?.desc, mainImage, imagesArray, overlayDetail]);
+  }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?._imageRemovedByUser, item?.desc, mainImage, imagesArray]);
 
   // placeId가 있으면 Google Places에서 최대 3장 사진 fetch (가드 조건으로 불필요한 API 호출 방지)
   useEffect(() => {
-    if (overlayDetail) return;
     const pid = effectiveDetail?.placeId;
     if (!pid) { setPlacePhotos([]); return; }
     if (effectiveDetail._imageRemovedByUser) return;
@@ -309,28 +311,23 @@ export default function DetailDialog({
       if (!cancelled) setPhotosLoading(false);
     });
     return () => { cancelled = true; };
-  }, [effectiveDetail?.placeId, effectiveDetail?._imageRemovedByUser, mainImage, imagesArray, overlayDetail, ragImage]);
+  }, [effectiveDetail?.placeId, effectiveDetail?._imageRemovedByUser, mainImage, imagesArray, ragImage]);
 
   useEffect(() => {
     if (!showNearby) return;
     const lat = Number(effectiveDetail.lat);
     const lon = Number(effectiveDetail.lon);
     if (Number.isNaN(lat) || Number.isNaN(lon)) return;
-    const excludeId = overlayPlace?.id ?? null;
-    const key = `${lat},${lon},${excludeId ?? ''}`;
+    const key = `${lat},${lon}`;
     if (nearbyCacheRef.current[key]) { setNearbyByType(nearbyCacheRef.current[key]); setNearbyPages({ food: 0, spot: 0, shop: 0 }); return; }
     setNearbyLoading(true);
-    getNearbyPlaces({ lat, lon, excludeName: effectiveDetail.name, excludeId }).then((byType) => {
+    getNearbyPlaces({ lat, lon, excludeName: effectiveDetail.name }).then((byType) => {
       nearbyCacheRef.current[key] = byType;
       setNearbyByType(byType);
       setNearbyPages({ food: 0, spot: 0, shop: 0 });
       setNearbyLoading(false);
     }).catch(() => setNearbyLoading(false));
-  }, [showNearby, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.name, overlayPlace?.id]);
-
-  useEffect(() => {
-    if (overlayDetail && contentScrollRef.current) contentScrollRef.current.scrollTop = 0;
-  }, [overlayDetail]);
+  }, [showNearby, effectiveDetail.lat, effectiveDetail.lon, effectiveDetail.name]);
 
   // 장소 검색 다이얼로그 열릴 때 현재 주소로 pending 초기화
   useEffect(() => {
@@ -352,7 +349,6 @@ export default function DetailDialog({
   /* ── 스와이프 ── */
   const MIN_SWIPE_PX = 60;
   const handleSwipeEnd = useCallback((endX, endY) => {
-    if (overlayDetail) return;
     if (swipeStart.current.fromNearbyScroll) return;
     if (swipeStart.current.fromCarousel) return;
     const { x: startX, y: startY } = swipeStart.current;
@@ -363,7 +359,7 @@ export default function DetailDialog({
     if (adx < MIN_SWIPE_PX || adx <= ady || typeof onNavigateToIndex !== "function") return;
     if (dx < 0 && curIdx < total - 1) onNavigateToIndex(curIdx + 1);
     else if (dx > 0 && curIdx > 0) onNavigateToIndex(curIdx - 1);
-  }, [overlayDetail, onNavigateToIndex, curIdx, total]);
+  }, [onNavigateToIndex, curIdx, total]);
 
   const handleStart = useCallback((clientX, clientY, pointerId) => {
     swipeStart.current = { x: clientX, y: clientY, pointerId };
@@ -398,9 +394,9 @@ export default function DetailDialog({
   const onPointerCancel = useCallback(() => { swipeStart.current.pointerId = null; }, []);
 
   /* ── 필드 저장 헬퍼 ── */
-  const canEditInline = !!onSaveField && isCustom && !overlayDetail;
+  const canEditInline = !!onSaveField && isCustom;
   /** onSaveField가 있으면 시간만 수정 가능 (커스텀 여부 무관) */
-  const canEditTime = !!onSaveField && !overlayDetail;
+  const canEditTime = !!onSaveField;
 
   const saveField = useCallback((fieldUpdates) => {
     if (!onSaveField || !item) return;
@@ -785,6 +781,7 @@ export default function DetailDialog({
                 scrollWheelZoom={false}
                 doubleClickZoom={false}
                 touchZoom={false}
+                className="map-pins-light"
               >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <Marker position={[effectiveDetail.lat, effectiveDetail.lon]} icon={createAddressPinIcon()} />
@@ -935,110 +932,108 @@ export default function DetailDialog({
     }}>
       {/* ══ 고정 헤더 ══ */}
       <div style={{ flexShrink: 0 }}>
-        {/* 상단 헤더: 이름 + 평점 + 카테고리 + 팁 */}
-        <div style={{
-          padding: `${SPACING.lg} ${px} ${SPACING.md}`,
-        }}>
-          {/* 라인 1: 장소명(좌측) + 시간뱃지 + 더보기 + 닫기 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.sm }}>
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: SPACING.sm }}>
-              <h3 style={{
-                margin: 0, flex: '0 1 auto', minWidth: 0,
-                fontSize: 'var(--typo-heading-3-bold-size)',
-                fontWeight: 'var(--typo-heading-3-bold-weight)',
-                color: 'var(--color-on-surface)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {canEditInline ? (
-                  <span onClick={() => openTextEdit('desc', '이름', item?.desc)} style={{ cursor: 'pointer' }}>
-                    {effectiveDetail.name || '이름 입력'}
-                  </span>
-                ) : effectiveDetail.name}
-              </h3>
-              {item?.time && (
-              <button
-                type="button"
-                onClick={canEditTime ? () => setShowTimePicker(true) : undefined}
-                style={(() => {
-                  const c = getCategoryColor('정보');
-                  return {
-                    padding: `${SPACING.sm} ${SPACING.ml}`,
-                    border: `1px solid ${c.border}`,
-                    background: c.bg,
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: 'var(--typo-caption-2-bold-size)',
-                    fontWeight: 'var(--typo-caption-2-bold-weight)',
-                    lineHeight: 1,
-                    color: c.color,
-                    cursor: canEditTime ? 'pointer' : 'default',
-                    fontFamily: 'inherit',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  };
-                })()}
-              >
-                {item.time}
-              </button>
+        {/* 기본 헤더: 이름 + 평점 + 카테고리 + 팁 */}
+          <div style={{ padding: `${SPACING.lg} ${px} ${SPACING.md}` }}>
+            {/* 라인 1: 장소명 + 시간뱃지 + 더보기 + 닫기 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.sm }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: SPACING.sm }}>
+                <h3 style={{
+                  margin: 0, flex: '0 1 auto', minWidth: 0,
+                  fontSize: 'var(--typo-heading-3-bold-size)',
+                  fontWeight: 'var(--typo-heading-3-bold-weight)',
+                  color: 'var(--color-on-surface)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {canEditInline ? (
+                    <span onClick={() => openTextEdit('desc', '이름', item?.desc)} style={{ cursor: 'pointer' }}>
+                      {effectiveDetail.name || '이름 입력'}
+                    </span>
+                  ) : effectiveDetail.name}
+                </h3>
+                {item?.time && (
+                <button
+                  type="button"
+                  onClick={canEditTime ? () => setShowTimePicker(true) : undefined}
+                  style={(() => {
+                    const c = getCategoryColor('정보');
+                    return {
+                      padding: `${SPACING.sm} ${SPACING.ml}`,
+                      border: `1px solid ${c.border}`,
+                      background: c.bg,
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: 'var(--typo-caption-2-bold-size)',
+                      fontWeight: 'var(--typo-caption-2-bold-weight)',
+                      lineHeight: 1,
+                      color: c.color,
+                      cursor: canEditTime ? 'pointer' : 'default',
+                      fontFamily: 'inherit',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                    };
+                  })()}
+                >
+                  {item.time}
+                </button>
+                )}
+              </div>
+              {((onMoveToDay && moveDayOptions.length > 1) || (canEditInline && tripId)) && (
+                <Button variant="ghost-neutral" size="sm" iconOnly="moreHorizontal" onClick={() => setShowMoreSheet(true)} title="더보기" style={{ flexShrink: 0 }} />
               )}
+              <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
             </div>
-            {!overlayDetail && ((onMoveToDay && moveDayOptions.length > 1) || (canEditInline && tripId)) && (
-              <Button variant="ghost-neutral" size="sm" iconOnly="moreHorizontal" onClick={() => setShowMoreSheet(true)} title="더보기" style={{ flexShrink: 0 }} />
-            )}
-            <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} style={{ flexShrink: 0 }} />
-          </div>
 
-          {/* 라인 2: 평점 + 카테고리 (단순 텍스트) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, marginBottom: effectiveDetail.tip ? SPACING.sm : 0, flexWrap: 'wrap' }}>
-            {displayRating != null ? (
-              <>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 0, fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
-                  {[1, 2, 3, 4, 5].map((i) => {
-                    const filled = i <= Math.min(5, Math.round(Number(displayRating)));
-                    return <Icon key={i} name={filled ? 'star' : 'starOutlined'} size={14} />;
-                  })}
-                  <span style={{ marginLeft: SPACING.xs }}>{Number(displayRating).toFixed(1)}</span>
-                </span>
-                {displayReviewCount != null && (
-                  <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant2)' }}>
-                    ({displayReviewCount})
+            {/* 라인 2: 평점 + 카테고리 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, marginBottom: effectiveDetail.tip ? SPACING.sm : 0, flexWrap: 'wrap' }}>
+              {displayRating != null ? (
+                <>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 0, fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
+                    {[1, 2, 3, 4, 5].map((i) => {
+                      const filled = i <= Math.min(5, Math.round(Number(displayRating)));
+                      return <Icon key={i} name={filled ? 'star' : 'starOutlined'} size={14} />;
+                    })}
+                    <span style={{ marginLeft: SPACING.xs }}>{Number(displayRating).toFixed(1)}</span>
                   </span>
-                )}
-                <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 1, color: 'var(--color-on-surface-variant2)' }}>·</span>
-              </>
-            ) : (
-              <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
-                평점 없음
-              </span>
-            )}
-            {(effectiveDetail.categories?.length > 0
-              ? effectiveDetail.categories
-              : effectiveDetail.category ? [effectiveDetail.category] : []
-            ).map((cat, i) => (
-              <span key={cat} style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1 }}>
-                {(i > 0 || displayRating == null) && (
-                  <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant2)', marginRight: SPACING.sm }}>·</span>
-                )}
-                <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>{cat}</span>
-              </span>
-            ))}
-          </div>
+                  {displayReviewCount != null && (
+                    <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant2)' }}>
+                      ({displayReviewCount})
+                    </span>
+                  )}
+                  <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 1, color: 'var(--color-on-surface-variant2)' }}>·</span>
+                </>
+              ) : (
+                <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>
+                  평점 없음
+                </span>
+              )}
+              {(effectiveDetail.categories?.length > 0
+                ? effectiveDetail.categories
+                : effectiveDetail.category ? [effectiveDetail.category] : []
+              ).map((cat, i) => (
+                <span key={cat} style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1 }}>
+                  {(i > 0 || displayRating == null) && (
+                    <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant2)', marginRight: SPACING.sm }}>·</span>
+                  )}
+                  <span style={{ fontSize: 'var(--typo-label-1-n---regular-size)', fontWeight: 'var(--typo-label-1-n---regular-weight)', lineHeight: 1, color: 'var(--color-on-surface-variant)' }}>{cat}</span>
+                </span>
+              ))}
+            </div>
 
-          {/* 라인 3: 메모(tip) 첫 줄 */}
-          {effectiveDetail.tip && (
-            <p style={{
-              margin: 0,
-              fontSize: 'var(--typo-label-1-n---regular-size)',
-              fontWeight: 'var(--typo-label-1-n---regular-weight)',
-              lineHeight: 1,
-              color: 'var(--color-on-surface-variant)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {effectiveDetail.tip.split('\n')[0]}
-            </p>
-          )}
-        </div>
+            {/* 라인 3: 메모(tip) 첫 줄 */}
+            {effectiveDetail.tip && (
+              <p style={{
+                margin: 0,
+                fontSize: 'var(--typo-label-1-n---regular-size)',
+                fontWeight: 'var(--typo-label-1-n---regular-weight)',
+                lineHeight: 1,
+                color: 'var(--color-on-surface-variant)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {effectiveDetail.tip.split('\n')[0]}
+              </p>
+            )}
+          </div>
 
         {/* 교통이면: 출발지 → 도착지 (예상 소요시간 표시) */}
         {isMove && (item?.moveFrom || item?.moveTo || item?.desc) && (() => {
@@ -1160,7 +1155,7 @@ export default function DetailDialog({
         )}
 
         {/* 칩 네비게이션 — 2개 이상일 때만 */}
-        {!overlayDetail && chipItems.length > 1 && (
+        {chipItems.length > 1 && (
           <div style={{ padding: `${SPACING.lg} ${px} ${SPACING.sm}`, overflowX: 'auto' }}>
             <ChipSelector
               items={chipItems}
@@ -1185,30 +1180,14 @@ export default function DetailDialog({
         style={{
           flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
           WebkitOverflowScrolling: 'touch', touchAction: 'pan-y',
-          padding: `${overlayDetail ? 0 : SPACING.sm} ${px} ${SPACING.xl}`,
+          padding: `${SPACING.sm} ${px} ${SPACING.xl}`,
         }}
       >
-        {overlayDetail ? (
-          <>
-            {/* overlay view of nearby place — 기존 스타일 유지 */}
-            {hasExtraText && (
-              <SectionWrap label="정보" px="0">
-                <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface-variant)', whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
-                  {effectiveDetail._item?.desc || ''}
-                </p>
-              </SectionWrap>
-            )}
-            {effectiveDetail.address && (
-              <SectionWrap label="주소" px="0">
-                <p style={{ margin: 0, fontSize: 'var(--typo-label-1-n---regular-size)', color: 'var(--color-on-surface-variant)' }}>{effectiveDetail.address}</p>
-              </SectionWrap>
-            )}
-          </>
-        ) : renderActiveContent()}
+        {renderActiveContent()}
       </div>
 
       {/* ══ 하단 dot 인디케이터 (탭 시 해당 항목으로 이동) ══ */}
-      {!overlayDetail && allDetailPayloads && allDetailPayloads.length > 1 && (
+      {allDetailPayloads && allDetailPayloads.length > 1 && (
         <div style={{
           flexShrink: 0,
           padding: `${SPACING.md} ${px} 0 ${px}`,
@@ -1250,15 +1229,8 @@ export default function DetailDialog({
         </div>
       )}
 
-      {/* ══ 하단 고정 액션: overlay일 때 일정추가 ══ */}
-      {overlayDetail && onAddToSchedule && overlayPlace && (
-        <div style={{ flexShrink: 0, padding: `${SPACING.md} ${px} 0 ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
-          <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => onAddToSchedule(overlayPlace)}>일정추가</Button>
-        </div>
-      )}
-
       {/* ══ 하단 고정 액션: 삭제 + 길찾기(primary) ══ */}
-      {!overlayDetail && (directionsUrl || (isCustom && onDelete)) && (
+      {(directionsUrl || (isCustom && onDelete)) && (
         <div style={{
           flexShrink: 0,
           padding: `${SPACING.md} ${px} 0 ${px}`,
@@ -1280,10 +1252,10 @@ export default function DetailDialog({
         if (onMoveToDay && moveDayOptions.length > 1) {
           moreRows.push({ key: 'move', icon: 'pin', label: '다른 Day로 이동', onClick: () => { setShowMoreSheet(false); setShowMoveSheet(true); } });
         }
-        if (canEditInline && tripId && !overlayDetail && displayImages.length > 0) {
+        if (canEditInline && tripId && displayImages.length > 0) {
           moreRows.push({ key: 'image-edit', icon: 'file', label: '이미지 수정', onClick: () => { setShowMoreSheet(false); setShowImageManageDialog(true); } });
         }
-        if (canEditInline && tripId && !overlayDetail && displayImages.length === 0) {
+        if (canEditInline && tripId && displayImages.length === 0) {
           moreRows.push({ key: 'image-add', icon: 'file', label: '이미지 추가', onClick: () => { setShowMoreSheet(false); imageFileRef.current?.click(); } });
         }
         const btnStyle = (idx) => ({
@@ -1432,14 +1404,14 @@ export default function DetailDialog({
                           width: SPACING.xxxl,
                           height: SPACING.xxxl,
                           borderRadius: '50%',
-                          border: '2px solid #fff',
-                          background: isSelected ? 'var(--color-primary)' : 'rgba(0,0,0,0.3)',
+                          border: '2px solid var(--color-surface)',
+                          background: isSelected ? 'var(--color-primary)' : 'color-mix(in srgb, var(--color-scrim) 30%, transparent)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                          boxShadow: 'var(--shadow-normal)',
                         }}>
-                          {isSelected && <span style={{ color: '#fff', fontSize: 14, lineHeight: 1 }}>✓</span>}
+                          {isSelected && <span style={{ color: 'var(--color-on-primary)', fontSize: 14, lineHeight: 1 }}>✓</span>}
                         </span>
                       </button>
                     ) : null}
@@ -1662,6 +1634,7 @@ export default function DetailDialog({
                 style={{ height: '100%', width: '100%' }}
                 zoomControl={false}
                 attributionControl={false}
+                className="map-pins-light"
               >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -1917,6 +1890,33 @@ export default function DetailDialog({
       {/* 주소 복사 토스트 */}
       {copyToast && (
         <Toast message={copyToast.message} onDone={() => setCopyToast(null)} />
+      )}
+
+      {/* 주변 장소 상세 모달 */}
+      {overlayDetail && (
+        <BottomSheet maxHeight="60vh" zIndex={2500} onClose={() => { setOverlayDetail(null); setOverlayPlace(null); }}>
+          <PlaceInfoContent
+            view="info"
+            place={{
+              name: overlayDetail.name,
+              address: overlayDetail.address,
+              lat: overlayDetail.lat,
+              lon: overlayDetail.lon,
+              image: overlayDetail.image,
+              rating: overlayDetail.rating,
+              reviewCount: overlayDetail.reviewCount,
+              hours: overlayDetail.hours,
+              placeId: overlayDetail.placeId,
+              type: overlayPlace?.type,
+              businessStatus: overlayDetail.businessStatus,
+            }}
+          />
+          {onAddToSchedule && overlayPlace && (
+            <div style={{ padding: `${SPACING.md} ${SPACING.xxl}`, borderTop: '1px solid var(--color-outline-variant)' }}>
+              <Button variant="primary" size="lg" iconLeft="plus" fullWidth onClick={() => { onAddToSchedule(overlayPlace); setOverlayDetail(null); setOverlayPlace(null); }}>일정추가</Button>
+            </div>
+          )}
+        </BottomSheet>
       )}
     </>,
     document.body

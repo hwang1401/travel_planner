@@ -1712,19 +1712,20 @@ export default function TravelPlanner() {
                         display: "flex", alignItems: "center", gap: SPACING.ms,
                         padding: 0, border: "none", background: "none",
                         textAlign: "left", fontFamily: "inherit",
+                        color: "var(--color-on-surface)",
                       }}
                       onClick={canEdit ? () => setShowDayMoreMenu(true) : undefined}
                       title={canEdit ? "날짜 이름 수정 또는 삭제" : undefined}
                     >
                       <h2 style={{
-                        margin: 0, fontSize: "var(--typo-body-2-n---bold-size)", fontWeight: "var(--typo-body-2-n---bold-weight)", color: "var(--color-on-surface)",
+                        margin: 0, fontSize: "var(--typo-body-2-n---bold-size)", fontWeight: "var(--typo-body-2-n---bold-weight)", color: "inherit",
                         letterSpacing: "var(--typo-body-2-n---bold-letter-spacing)",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
                         {current.label}
                       </h2>
                       {canEdit && (
-                        <Icon name="edit" size={16} style={{ flexShrink: 0, opacity: 0.6 }} />
+                        <Icon name="edit" size={16} style={{ flexShrink: 0, opacity: 0.7 }} />
                       )}
                     </button>
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sp40)", flexWrap: "wrap", marginTop: "var(--spacing-sp20)" }}>
@@ -2153,7 +2154,7 @@ export default function TravelPlanner() {
           display: "flex", gap: SPACING.lg, alignItems: "center",
           borderTop: "1px solid var(--color-outline-variant)",
           background: "var(--color-surface)",
-          boxShadow: "0 -4px 16px rgba(0,0,0,0.1)",
+          boxShadow: "var(--shadow-strong)",
           animation: "slideUpActionBar 0.2s ease",
         }}>
           <button

@@ -20,14 +20,14 @@ import PlaceInfoContent from '../place/PlaceInfoContent';
 
 /* Leaflet numbered marker icon */
 function createSearchIcon(index, isSelected) {
-  const bg = isSelected ? 'var(--color-primary)' : '#D94F3B';
+  const bg = isSelected ? 'var(--color-primary)' : 'var(--color-error)';
   return L.divIcon({
     className: '',
     html: `<div style="
       width:28px;height:28px;border-radius:50%;
-      background:${bg};color:#fff;font-size:12px;font-weight:700;
+      background:${bg};color:var(--color-on-primary);font-size:12px;font-weight:700;
       display:flex;align-items:center;justify-content:center;
-      border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);
+      border:2.5px solid var(--color-surface);box-shadow:0 2px 6px var(--color-shadow, rgba(0,0,0,0.3));
       font-family:-apple-system,BlinkMacSystemFont,sans-serif;
     ">${index + 1}</div>`,
     iconSize: [28, 28],
@@ -347,6 +347,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId, al
             style={{ width: '100%', height: '100%' }}
             zoomControl={false}
             whenReady={() => setMapReady(true)}
+            className="map-pins-light"
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -377,7 +378,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId, al
             <Button variant="neutral" size="sm" onClick={handleManualEntry}
               style={{
                 borderRadius: RADIUS.full,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                boxShadow: 'var(--shadow-normal)',
                 background: 'var(--color-surface-container-lowest)',
               }}>
               직접 입력하기
@@ -400,7 +401,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId, al
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        boxShadow: '0 -2px 12px rgba(0,0,0,0.08)',
+        boxShadow: 'var(--shadow-normal)',
       }}>
         {/* Top spacer */}
         <div style={{ height: SPACING.lg, flexShrink: 0 }} />
@@ -462,7 +463,7 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId, al
                     number={i + 1}
                     size={24}
                     style={{
-                      background: selectedResultIdx === i ? 'var(--color-primary)' : '#D94F3B',
+                      background: selectedResultIdx === i ? 'var(--color-primary)' : 'var(--color-error)',
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>

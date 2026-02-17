@@ -57,13 +57,13 @@ function FlyToPoint({ coords, zoom }) {
 /* ── Small icon for nearby (secondary) pins ── */
 function createNearbyIcon(type) {
   const cfg = TYPE_CONFIG[type] || TYPE_CONFIG.info;
-  const color = cfg?.text || '#6B6B67';
+  const color = cfg?.text || 'var(--color-type-move-text)';
   return L.divIcon({
     className: '',
     html: `<div style="
       width:20px;height:20px;border-radius:50%;
       background:${color};border:2px solid var(--color-surface-container-lowest);
-      box-shadow:0 1px 4px rgba(0,0,0,0.2);
+      box-shadow:var(--shadow-normal);
     "></div>`,
     iconSize: [20, 20],
     iconAnchor: [10, 10],
@@ -274,6 +274,7 @@ export default function FullMapDialog({ days, onClose, onAddItem, initialDay = 0
           zoom={10}
           style={{ width: "100%", height: "100%" }}
           zoomControl={false}
+          className="map-pins-light"
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'

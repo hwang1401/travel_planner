@@ -62,7 +62,7 @@ function createAddressPinIcon() {
     html: `<div style="
       width:28px;height:28px;border-radius:50%;
       background:var(--color-primary);
-      border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);
+      border:3px solid var(--color-surface);box-shadow:0 2px 8px var(--color-shadow, rgba(0,0,0,0.25));
     "></div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
@@ -473,7 +473,7 @@ export default function PlaceInfoContent({
             {epHasCoords && (
               <div key={`minimap-${ep.lat}-${ep.lon}`} style={{ width: 80, height: 80, borderRadius: RADIUS.md, overflow: 'hidden', flexShrink: 0 }}>
                 <MapContainer center={[ep.lat, ep.lon]} zoom={15} style={{ height: '100%', width: '100%' }}
-                  zoomControl={false} attributionControl={false} dragging={false} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false}>
+                  zoomControl={false} attributionControl={false} dragging={false} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false} className="map-pins-light">
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <Marker position={[ep.lat, ep.lon]} icon={createAddressPinIcon()} />
                 </MapContainer>
@@ -532,7 +532,7 @@ export default function PlaceInfoContent({
                   <span style={{
                     flexShrink: 0, display: 'inline-flex', alignItems: 'center',
                     padding: `${SPACING.xs} ${SPACING.md}`, borderRadius: RADIUS.full,
-                    border: '1px solid #FECACA', background: '#FEE2E2', color: '#DC2626',
+                    border: '1px solid var(--color-error-container)', background: 'var(--color-error-container)', color: 'var(--color-on-error-container)',
                     fontSize: 'var(--typo-caption-2-regular-size)', fontWeight: 600, whiteSpace: 'nowrap',
                   }}>임시 휴업</span>
                 )}
@@ -540,7 +540,7 @@ export default function PlaceInfoContent({
                   <span style={{
                     flexShrink: 0, display: 'inline-flex', alignItems: 'center',
                     padding: `${SPACING.xs} ${SPACING.md}`, borderRadius: RADIUS.full,
-                    border: '1px solid #FECACA', background: '#FEE2E2', color: '#DC2626',
+                    border: '1px solid var(--color-error-container)', background: 'var(--color-error-container)', color: 'var(--color-on-error-container)',
                     fontSize: 'var(--typo-caption-2-regular-size)', fontWeight: 600, whiteSpace: 'nowrap',
                   }}>폐업</span>
                 )}

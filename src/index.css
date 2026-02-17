@@ -5,6 +5,7 @@
 @import "./styles/foundation.css";
 @import "./styles/semantic.css";
 @import "./styles/semantic-dark.css";
+@import "./styles/type-colors.css";
 @import "./styles/sizing.css";
 @import "./styles/typography.css";
 
@@ -88,13 +89,44 @@ body {
 @keyframes slideUp { from { transform: translateY(40px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
 @keyframes bottomSheetUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
 
-/* Leaflet popup overrides */
+/* 맵 영역: 타일이 항상 라이트이므로 다크모드에서도 핀/팝업은 라이트 테마 색 유지 */
+.map-pins-light {
+  --color-surface: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-surface: #1a1a1a;
+  --color-on-surface-variant: #49454f;
+  --color-on-surface-variant2: #5f5d65;
+  --color-outline-variant: #e4e1eb;
+  --color-surface-dim: #e8e8e8;
+  --color-shadow: rgba(0,0,0,0.25);
+}
+
+/* Leaflet popup — 테마 변수 적용 (맵 안에서는 .map-pins-light로 라이트 고정) */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--color-surface-container-lowest) !important;
+  color: var(--color-on-surface) !important;
+  border: 1px solid var(--color-outline-variant) !important;
+}
 .leaflet-popup-content-wrapper {
   border-radius: var(--radius-md) !important;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;
 }
 .leaflet-popup-content {
   margin: var(--spacing-sp100) var(--spacing-sp120) !important;
+  color: inherit !important;
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--color-on-surface-variant) !important;
+}
+.leaflet-container a.leaflet-popup-close-button:hover,
+.leaflet-container a.leaflet-popup-close-button:focus {
+  color: var(--color-on-surface) !important;
+}
+
+/* 다크모드: 기본(회색) 아이콘을 밝게 — 버튼/다이얼로그 등 전역 */
+[data-theme="dark"] img.icon-default {
+  filter: brightness(0) invert(1);
 }
 
 /* Day 순서 변경 버튼: 아이콘 가시성 (밝은 배경에서도 잘 보이도록) */

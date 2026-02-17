@@ -65,14 +65,23 @@ export default function Icon({ name, size = 16, style = {}, className = "" }) {
   const isPrimaryColor = style.color === "var(--color-primary)";
   const isRatingColor = style.color === "var(--color-rating)" || (name === "star" && style.color === undefined);
   const isRatingOutline = name === "starOutlined" && style.color === undefined;
-  const appliedStyle = {
-    display: "block",
-    flexShrink: 0,
-    ...style,
-    ...(isErrorColor ? { filter: ERROR_ICON_FILTER, color: undefined } : {}),
-    ...(isPrimaryColor ? { filter: PRIMARY_ICON_FILTER, color: undefined } : {}),
-    ...(isRatingColor ? { filter: RATING_ICON_FILTER, color: undefined } : {}),
-    ...(isRatingOutline ? { filter: RATING_OUTLINE_ICON_FILTER, color: undefined } : {}),
-  };
-  return <img src={src} alt="" width={size} height={size} style={appliedStyle} className={className} />;
+
+  /* error/primary/rating: img + filter (기존) */
+  if (isErrorColor || isPrimaryColor || isRatingColor || isRatingOutline) {
+    const appliedStyle = {
+      display: "block",
+      flexShrink: 0,
+      ...style,
+      ...(isErrorColor ? { filter: ERROR_ICON_FILTER, color: undefined } : {}),
+      ...(isPrimaryColor ? { filter: PRIMARY_ICON_FILTER, color: undefined } : {}),
+      ...(isRatingColor ? { filter: RATING_ICON_FILTER, color: undefined } : {}),
+      ...(isRatingOutline ? { filter: RATING_OUTLINE_ICON_FILTER, color: undefined } : {}),
+    };
+    return <img src={src} alt="" width={size} height={size} style={appliedStyle} className={className} />;
+  }
+
+  /* 그 외: img 사용 (마스크 방식은 일부 환경에서 미로딩으로 아이콘 비노출 → 롤백) */
+  const appliedStyle = { display: "block", flexShrink: 0, ...style };
+  const defaultClassName = [ "icon-default", className ].filter(Boolean).join(" ");
+  return <img src={src} alt="" width={size} height={size} style={appliedStyle} className={defaultClassName} />;
 }
