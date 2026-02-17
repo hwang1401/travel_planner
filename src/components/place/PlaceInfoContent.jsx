@@ -4,6 +4,7 @@ import L from 'leaflet';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import Field from '../common/Field';
+import Tab from '../common/Tab';
 import ImageViewer from '../common/ImageViewer';
 import Toast from '../common/Toast';
 import TimePickerDialog from '../common/TimePickerDialog';
@@ -183,10 +184,12 @@ export default function PlaceInfoContent({
   view,          // 'info' | 'form' (controlled by parent)
   onGoToForm,    // () => void — "일정 추가하기" tapped
   onBack,        // () => void — back from current view
-  onAdd,         // (item) => void — form submitted
+  onAdd,         // (item, dayIdx?) => void — form submitted
   tripId,
   initialTime,
   onAddToSchedule,
+  allDays,       // Day 배열 (Day 선택 Tab 표시용)
+  selectedDayIdx, // 현재 선택된 Day 인덱스 (초기값)
 }) {
   const px = SPACING.xxl;
   const contentScrollRef = useRef(null);
@@ -216,6 +219,19 @@ export default function PlaceInfoContent({
   const [singleStationPicker, setSingleStationPicker] = useState(null);
   const [errors, setErrors] = useState({});
   const [formToast, setFormToast] = useState(null);
+  const [formDayIdx, setFormDayIdx] = useState(selectedDayIdx ?? 0);
+
+  /* ── Day Tab ── */
+  const hasDayTabs = Array.isArray(allDays) && allDays.length > 1;
+  const dayTabItems = useMemo(() => {
+    if (!hasDayTabs) return [];
+    return allDays.map((d, i) => ({ label: `D${d.day ?? i + 1}`, value: i }));
+  }, [allDays, hasDayTabs]);
+
+  // Sync formDayIdx when selectedDayIdx prop changes
+  useEffect(() => {
+    if (selectedDayIdx != null) setFormDayIdx(selectedDayIdx);
+  }, [selectedDayIdx]);
 
   /* ── Derived ── */
   const hasCoords = place?.lat != null && place?.lon != null;
@@ -405,7 +421,7 @@ export default function PlaceInfoContent({
         ...(timetable ? { timetable } : {}),
       },
     };
-    onAdd(newItem);
+    onAdd(newItem, formDayIdx);
   };
 
   const handleCopyAddress = useCallback(() => {
@@ -721,6 +737,14 @@ export default function PlaceInfoContent({
         WebkitOverflowScrolling: 'touch', touchAction: 'pan-y',
       }}>
         <div style={{ padding: `${SPACING.lg} ${px} ${SPACING.xxxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.xl }}>
+          {/* Day selector */}
+          {hasDayTabs && (
+            <div>
+              <p style={{ margin: `0 0 ${SPACING.sm}`, fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant)' }}>추가할 Day</p>
+              <Tab items={dayTabItems} value={formDayIdx} onChange={setFormDayIdx} variant="pill" size="sm" />
+            </div>
+          )}
+
           {/* Category chips */}
           <div>
             <p style={{ margin: `0 0 ${SPACING.sm}`, fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 'var(--typo-caption-2-bold-weight)', color: 'var(--color-on-surface-variant)' }}>카테고리</p>

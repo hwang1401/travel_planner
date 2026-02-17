@@ -2029,12 +2029,14 @@ export default function TravelPlanner() {
       {addNearbyPlace && (
         <AddRAGPlaceSheet
           place={addNearbyPlace}
-          onConfirm={(item) => {
-            handleSaveItem(item, toOrigIdx(selectedDay), -1, null);
+          onConfirm={(item, dayIdx) => {
+            handleSaveItem(item, toOrigIdx(dayIdx ?? selectedDay), -1, null);
             setToast({ message: '일정에 추가되었습니다', icon: 'check' });
             setAddNearbyPlace(null);
           }}
           onClose={() => setAddNearbyPlace(null)}
+          allDays={DAYS}
+          selectedDayIdx={selectedDay}
         />
       )}
 
@@ -2132,9 +2134,11 @@ export default function TravelPlanner() {
       <AddPlacePage
         open={showAddPlace}
         onClose={() => setShowAddPlace(false)}
-        onSave={(item) => handleSaveItem(item, toOrigIdx(selectedDay), -1, null)}
+        onSave={(item, dayIdx) => handleSaveItem(item, toOrigIdx(dayIdx ?? selectedDay), -1, null)}
         dayIdx={toOrigIdx(selectedDay)}
         tripId={tripId}
+        allDays={DAYS}
+        selectedDayIdx={selectedDay}
       />
 
       {/* Paste Info Page (full-screen) */}

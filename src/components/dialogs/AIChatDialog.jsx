@@ -19,6 +19,87 @@ import { SPACING, COLOR, TYPE_CONFIG } from '../../styles/tokens';
 const PLACE_TYPES = ['food', 'spot', 'shop', 'stay'];
 const CAT_ICONS = { food: 'fire', spot: 'pin', shop: 'shopping' };
 
+/* ── 추천 카드 가로 스크롤 (실제 overflow 감지) ── */
+function PlaceCardCarousel({ places, hasText, onPlaceClick }) {
+  const scrollRef = useRef(null);
+  const [fade, setFade] = useState({ left: false, right: false });
+
+  const check = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setFade({
+      left: scrollLeft > 4,
+      right: scrollWidth - scrollLeft - clientWidth > 4,
+    });
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [check]);
+
+  const mask = fade.left && fade.right
+    ? 'linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)'
+    : fade.right
+    ? 'linear-gradient(to right, black calc(100% - 24px), transparent)'
+    : fade.left
+    ? 'linear-gradient(to right, transparent, black 24px)'
+    : undefined;
+
+  return (
+    <div
+      ref={scrollRef}
+      onScroll={check}
+      style={{
+        marginTop: hasText ? SPACING.ml : 0,
+        overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+        scrollSnapType: 'x mandatory',
+        display: 'flex', gap: '8px',
+        msOverflowStyle: 'none', scrollbarWidth: 'none',
+        touchAction: 'pan-x', overscrollBehaviorX: 'contain',
+        maskImage: mask, WebkitMaskImage: mask,
+      }}
+    >
+      {places.map((place, j) => (
+        <div key={j}
+          onClick={(e) => { e.stopPropagation(); onPlaceClick(place); }}
+          style={{ flex: '0 0 140px', scrollSnapAlign: 'start', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer' }}>
+          {place.image ? (
+            <img src={place.image} alt="" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
+          ) : (
+            <div style={{
+              width: '100%', aspectRatio: '4/3',
+              background: 'var(--color-surface-container-lowest)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: SPACING.xs,
+              border: '1px dashed var(--color-outline-variant)',
+            }}>
+              <Icon name="pin" size={24} style={{ opacity: 0.35, color: 'var(--color-on-surface-variant2)' }} />
+              <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', opacity: 0.8 }}>이미지 없음</span>
+            </div>
+          )}
+          <div style={{ padding: `${SPACING.ms} ${SPACING.md}` }}>
+            <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-regular-size)', fontWeight: 600, color: 'var(--color-on-surface)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.name}</p>
+            {place.rating != null && (
+              <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--color-on-surface-variant2)' }}>
+                <span style={{ color: '#F59E0B' }}>&#9733;</span> {Number(place.rating).toFixed(1)}
+              </p>
+            )}
+            {place.description && place.rating == null && (
+              <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--color-on-surface-variant2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.description}</p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Build chat history for API, enriching AI messages with recommended places/items context */
 function buildChatHistory(chatMessages) {
   return chatMessages.map((m) => {
@@ -223,7 +304,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
 
       {/* 채팅 영역 */}
       <div ref={chatScrollRef} style={{
-        flex: 1, overflowY: 'auto', padding: `${SPACING.xl} ${SPACING.xxl}`,
+        flex: 1, overflowY: selectedAIPlace ? 'hidden' : 'auto', padding: `${SPACING.xl} ${SPACING.xxl}`,
         display: 'flex', flexDirection: 'column', gap: SPACING.lg,
       }}>
         {chatMessages.length === 0 && !chatLoading && (
@@ -289,51 +370,11 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
 
               {/* type: recommend → 가로 스크롤 추천 카드 */}
               {msg.role === 'ai' && msg.type === 'recommend' && msg.places && msg.places.length > 0 && (
-                <div style={{
-                  marginTop: msg.text ? SPACING.ml : 0,
-                  overflowX: 'auto', WebkitOverflowScrolling: 'touch',
-                  scrollSnapType: 'x mandatory',
-                  display: 'flex', gap: '8px',
-                  msOverflowStyle: 'none', scrollbarWidth: 'none',
-                  touchAction: 'pan-x', overscrollBehaviorX: 'contain',
-                  maskImage: msg.places.length > 2 ? 'linear-gradient(to right, black calc(100% - 24px), transparent)' : undefined,
-                  WebkitMaskImage: msg.places.length > 2 ? 'linear-gradient(to right, black calc(100% - 24px), transparent)' : undefined,
-                }}>
-                  {msg.places.map((place, j) => {
-                    const catCfg = TYPE_CONFIG[place.category] || TYPE_CONFIG.spot;
-                    return (
-                      <div key={j}
-                        onClick={(e) => { e.stopPropagation(); setPlaceView('info'); setSelectedAIPlace({ _isPlace: true, ...place }); }}
-                        style={{ flex: '0 0 140px', scrollSnapAlign: 'start', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer' }}>
-                        {place.image ? (
-                          <img src={place.image} alt="" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
-                        ) : (
-                          <div style={{
-                            width: '100%', aspectRatio: '4/3',
-                            background: 'var(--color-surface-container-lowest)',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            gap: SPACING.xs,
-                            border: '1px dashed var(--color-outline-variant)',
-                          }}>
-                            <Icon name="pin" size={24} style={{ opacity: 0.35, color: 'var(--color-on-surface-variant2)' }} />
-                            <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', opacity: 0.8 }}>이미지 없음</span>
-                          </div>
-                        )}
-                        <div style={{ padding: `${SPACING.ms} ${SPACING.md}` }}>
-                          <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-regular-size)', fontWeight: 600, color: 'var(--color-on-surface)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.name}</p>
-                          {place.rating != null && (
-                            <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--color-on-surface-variant2)' }}>
-                              <span style={{ color: '#F59E0B' }}>&#9733;</span> {Number(place.rating).toFixed(1)}
-                            </p>
-                          )}
-                          {place.description && place.rating == null && (
-                            <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--color-on-surface-variant2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.description}</p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <PlaceCardCarousel
+                  places={msg.places}
+                  hasText={!!msg.text}
+                  onPlaceClick={(place) => { setPlaceView('info'); setSelectedAIPlace({ _isPlace: true, ...place }); }}
+                />
               )}
 
               {/* type: itinerary → 타임라인 리스트 (기존 items 렌더링) */}
@@ -501,12 +542,14 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
               type: selectedAIPlace.type,
               businessStatus: selectedAIPlace.detail?.businessStatus,
             }}
-            onAdd={(item) => {
-              onBulkImport?.([item], 'append');
+            onAdd={(item, dayIdx) => {
+              onBulkImport?.([item], 'append', dayIdx);
               setSelectedAIPlace(null);
               setPlaceView('info');
             }}
             initialTime={selectedAIPlace._isPlace ? undefined : selectedAIPlace.time}
+            allDays={allDays}
+            selectedDayIdx={allDays?.indexOf(currentDay) ?? 0}
           />
         </BottomSheet>
       )}

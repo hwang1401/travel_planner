@@ -391,11 +391,13 @@ export default function FullMapDialog({ days, onClose, onAddItem, initialDay = 0
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1200 }}>
             <AddRAGPlaceSheet
               place={addNearbyPlace}
-              onConfirm={(item) => {
-                onAddItem(selectedDay, item, -1);
+              onConfirm={(item, dayIdx) => {
+                onAddItem(dayIdx ?? selectedDay, item, -1);
                 setAddNearbyPlace(null);
               }}
               onClose={() => setAddNearbyPlace(null)}
+              allDays={days}
+              selectedDayIdx={selectedDay}
             />
           </div>
         )}

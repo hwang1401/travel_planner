@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import BottomSheet from '../common/BottomSheet';
 import Button from '../common/Button';
 import Field from '../common/Field';
 import Icon from '../common/Icon';
+import Tab from '../common/Tab';
 import TimePickerDialog from '../common/TimePickerDialog';
 import { TYPE_LABELS } from '../../styles/tokens';
 import { SPACING, RADIUS } from '../../styles/tokens';
@@ -15,9 +16,16 @@ import { SPACING, RADIUS } from '../../styles/tokens';
  * 매핑: desc ← name_ko, type ← type, detail.image ← image_url,
  *       detail.placeId ← google_place_id, detail.address ← address, detail.lat/lon ← lat/lon
  */
-export default function AddRAGPlaceSheet({ place, onConfirm, onClose }) {
+export default function AddRAGPlaceSheet({ place, onConfirm, onClose, allDays, selectedDayIdx }) {
   const [time, setTime] = useState('12:00');
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [formDayIdx, setFormDayIdx] = useState(selectedDayIdx ?? 0);
+
+  const hasDayTabs = Array.isArray(allDays) && allDays.length > 1;
+  const dayTabItems = useMemo(() => {
+    if (!hasDayTabs) return [];
+    return allDays.map((d, i) => ({ label: `D${d.day ?? i + 1}`, value: i }));
+  }, [allDays, hasDayTabs]);
 
   if (!place) return null;
 
@@ -38,7 +46,7 @@ export default function AddRAGPlaceSheet({ place, onConfirm, onClose }) {
         placeId: place.google_place_id,
       },
     };
-    onConfirm(item);
+    onConfirm(item, formDayIdx);
     onClose();
   };
 
@@ -47,6 +55,24 @@ export default function AddRAGPlaceSheet({ place, onConfirm, onClose }) {
   return (
     <BottomSheet onClose={onClose} maxHeight="85vh" zIndex="var(--z-confirm)" title="일정에 추가">
       <div style={{ padding: SPACING.xxxl, display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
+        {/* Day 선택 */}
+        {hasDayTabs && (
+          <div>
+            <div style={{
+              paddingBottom: 'var(--spacing-sp40, 4px)',
+              minHeight: 'var(--field-label-row-height, 20px)',
+              display: 'flex', alignItems: 'center',
+            }}>
+              <span style={{
+                fontSize: 'var(--typo-caption-2-bold-size)',
+                fontWeight: 'var(--typo-caption-2-bold-weight)',
+                color: 'var(--color-on-surface-variant)',
+              }}>추가할 Day</span>
+            </div>
+            <Tab items={dayTabItems} value={formDayIdx} onChange={setFormDayIdx} variant="pill" size="sm" />
+          </div>
+        )}
+
         {/* 일정명 (프리필, 읽기 전용) */}
         <Field
           label="일정명"

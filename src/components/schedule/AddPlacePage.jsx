@@ -71,7 +71,7 @@ function FitResults({ positions }) {
   return null;
 }
 
-export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) {
+export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId, allDays, selectedDayIdx }) {
   // ── Panel view: list / info only ──
   const [panelView, setPanelView] = useState('list'); // 'list' | 'info'
   const [selectedPlace, setSelectedPlace] = useState(null);
@@ -267,9 +267,9 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
   };
 
   // ── Form submitted ──
-  const handlePlaceAdd = (item) => {
+  const handlePlaceAdd = (item, selectedFormDayIdx) => {
     setFormSheetOpen(false);
-    onSave(item);
+    onSave(item, selectedFormDayIdx);
     onClose();
   };
 
@@ -495,6 +495,8 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
                 onBack={handleInfoBack}
                 onAdd={handlePlaceAdd}
                 tripId={tripId}
+                allDays={allDays}
+                selectedDayIdx={selectedDayIdx}
               />
             </div>
           )}
@@ -510,6 +512,8 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId }) 
             onBack={handleFormClose}
             onAdd={handlePlaceAdd}
             tripId={tripId}
+            allDays={allDays}
+            selectedDayIdx={selectedDayIdx}
           />
         </BottomSheet>
       )}
