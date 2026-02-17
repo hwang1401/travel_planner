@@ -10,6 +10,9 @@ import { uploadImage, generateImagePath } from '../../services/imageService';
 import { generateFullTripSchedule, analyzeScheduleWithAI, formatBookedItemsForPrompt } from '../../services/geminiService';
 import { readFileAsBase64 } from '../../utils/fileReader';
 import { getTypeConfig, COLOR, SPACING, RADIUS } from '../../styles/tokens';
+import BottomSheet from '../common/BottomSheet';
+import PlaceInfoContent from '../place/PlaceInfoContent';
+import { createPortal } from 'react-dom';
 
 /* ── CreateTripWizard ──
  * Full-screen step-by-step wizard for creating a new trip.
@@ -17,6 +20,14 @@ import { getTypeConfig, COLOR, SPACING, RADIUS } from '../../styles/tokens';
  * Step 2: 언제? (full calendar date picker)
  * Step 3: 일정 채우기 (paste info / AI / skip)
  */
+
+const STYLE_CHIPS = [
+  { label: '맛집 위주', template: '맛집 탐방 위주로 구성해줘. 현지인 맛집과 유명 맛집을 골고루 넣어줘' },
+  { label: '관광 중심', template: '주요 관광지와 명소 위주로 구성해줘' },
+  { label: '쇼핑 많이', template: '쇼핑 시간을 넉넉하게 잡아줘. 쇼핑 스팟도 추천해줘' },
+  { label: '여유롭게', template: '여유로운 일정으로 구성해줘. 하루에 너무 많은 곳을 넣지 말아줘' },
+  { label: '알차게', template: '알차게 구성해서 최대한 많은 곳을 효율적으로 돌 수 있게 해줘' },
+];
 
 /* ── Inline Calendar ── */
 function InlineCalendar({ startDate, endDate, onSelect }) {
@@ -194,6 +205,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
   const [pasteText, setPasteText] = useState('');
   const [pasteAttachments, setPasteAttachments] = useState([]); // [{ mimeType, data, name? }]
   const [aiPreferences, setAiPreferences] = useState('');
+  const [selectedStyles, setSelectedStyles] = useState([]);
   const [bookedText, setBookedText] = useState('');
   const [bookedAttachments, setBookedAttachments] = useState([]); // [{ mimeType, data, name? }]
   const [generating, setGenerating] = useState(false);
@@ -202,6 +214,9 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
   const [preview, setPreview] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const abortedRef = useRef(false);
+  const [selectedPlace, setSelectedPlace] = useState(null);
+  const [editingField, setEditingField] = useState(null); // null | 'preferences' | 'booked'
 
   const duration = startDate && endDate
     ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1)
@@ -265,7 +280,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
 
   // Step 3: Generate
   const handleGenerate = async () => {
-    setGenerating(true); setGenError(''); setPreview(null); setGenStatusMsg('');
+    abortedRef.current = false; setGenerating(true); setGenError(''); setPreview(null); setGenStatusMsg('');
     try {
       if (step3Mode === 'paste') {
         if (!canPasteGenerate) { setGenError('텍스트를 붙여넣거나 이미지/PDF를 첨부해 주세요'); setGenerating(false); return; }
@@ -277,7 +292,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
         if (error) { setGenError(error); setGenerating(false); return; }
         // Convert flat items to day structure
         const dayItems = { sections: [{ title: "일정", items }] };
-        setPreview({ days: [{ day: 1, label: "붙여넣기 일정", ...dayItems }] });
+        if (!abortedRef.current) setPreview({ days: [{ day: 1, label: "붙여넣기 일정", ...dayItems }] });
       } else if (step3Mode === 'ai') {
         let bookedItemsStr = '';
         if (hasBookedInput) {
@@ -291,17 +306,19 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
           bookedItemsStr = extractedItems?.length ? formatBookedItemsForPrompt(extractedItems) : bookedText.trim();
         }
         setGenStatusMsg('일정 생성 중...');
+        const styleTemplates = selectedStyles.map(s => STYLE_CHIPS.find(c => c.label === s)?.template).filter(Boolean);
+        const fullPreferences = [...styleTemplates, aiPreferences.trim()].filter(Boolean).join('. ');
         const { days, error } = await generateFullTripSchedule({
           destinations,
           duration: duration || 1,
           startDate,
-          preferences: aiPreferences,
+          preferences: fullPreferences || undefined,
           bookedItems: bookedItemsStr || undefined,
           onStatus: setGenStatusMsg,
         });
         if (error) { setGenError(error); setGenerating(false); return; }
         if (days.length === 0) { setGenError('AI가 일정을 생성하지 못했습니다.'); setGenerating(false); return; }
-        setPreview({ days });
+        if (!abortedRef.current) setPreview({ days });
       }
     } catch (err) { setGenError(err.message); }
     finally { setGenerating(false); setGenStatusMsg(''); }
@@ -662,7 +679,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               </p>
             )}
 
-            {preview && <PreviewAccordion days={preview.days} expandedDay={expandedDay} setExpandedDay={setExpandedDay} />}
+            {preview && <PreviewAccordion days={preview.days} expandedDay={expandedDay} setExpandedDay={setExpandedDay} onItemClick={setSelectedPlace} />}
 
             {preview && (
               <Button variant="primary" size="xlg" fullWidth onClick={() => handleSubmit(true)} disabled={submitting}>
@@ -677,7 +694,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
           <div style={{ padding: `${SPACING.xxxl} ${SPACING.xxl} ${SPACING.xxxxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.xl }}>
             <button
               type="button"
-              onClick={() => { setStep3Mode(null); setPreview(null); setGenError(''); setAiPreferences(''); setBookedText(''); setBookedAttachments([]); }}
+              onClick={() => { setStep3Mode(null); setPreview(null); setGenError(''); setAiPreferences(''); setSelectedStyles([]); setBookedText(''); setBookedAttachments([]); }}
               style={{
                 alignSelf: 'flex-start',
                 display: 'flex', alignItems: 'center', gap: SPACING.sm,
@@ -698,15 +715,187 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               </p>
             </div>
 
-            <Field as="textarea" label="여행 스타일 / 요청사항" size="lg" variant="outlined"
+            {/* Tappable card: 여행 스타일 */}
+            <div
+              onClick={() => setEditingField('preferences')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: SPACING.md,
+                padding: `${SPACING.lx} ${SPACING.lg}`,
+                borderRadius: RADIUS.lg,
+                border: '1px solid var(--color-outline-variant)',
+                cursor: 'pointer',
+                background: 'var(--color-surface-container-lowest)',
+              }}
+            >
+              <Icon name="edit" size={18} style={{ color: 'var(--color-on-surface-variant)', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>
+                  여행 스타일 / 요청사항
+                </p>
+                <p style={{
+                  margin: `${SPACING.xs} 0 0`, fontSize: 'var(--typo-label-2-regular-size)',
+                  color: (selectedStyles.length > 0 || aiPreferences) ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {[selectedStyles.join(', '), aiPreferences.trim()].filter(Boolean).join(' · ') || '탭하여 여행 스타일을 선택하세요'}
+                </p>
+              </div>
+              <Icon name="chevronRight" size={16} style={{ opacity: 0.3, flexShrink: 0 }} />
+            </div>
+
+            {/* Tappable card: 예약 정보 */}
+            <div
+              onClick={() => setEditingField('booked')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: SPACING.md,
+                padding: `${SPACING.lx} ${SPACING.lg}`,
+                borderRadius: RADIUS.lg,
+                border: '1px solid var(--color-outline-variant)',
+                cursor: 'pointer',
+                background: 'var(--color-surface-container-lowest)',
+              }}
+            >
+              <Icon name="bookmark" size={18} style={{ color: 'var(--color-on-surface-variant)', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-bold-size)', fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>
+                  예약 정보 (선택)
+                </p>
+                <p style={{
+                  margin: `${SPACING.xs} 0 0`, fontSize: 'var(--typo-label-2-regular-size)',
+                  color: hasBookedInput ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant2)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {bookedText.trim()
+                    ? bookedText
+                    : bookedAttachments.length > 0
+                      ? `${bookedAttachments.length}건 첨부됨`
+                      : '예약 확인 메일·바우처 텍스트 붙여넣기'}
+                </p>
+              </div>
+              <Icon name="chevronRight" size={16} style={{ opacity: 0.3, flexShrink: 0 }} />
+            </div>
+
+            <Button variant="primary" size="lg" fullWidth iconLeft="flash"
+              onClick={handleGenerate} disabled={generating}>
+              {generating ? 'AI가 일정을 만들고 있어요...' : preview ? 'AI 일정 재생성' : 'AI 일정 생성하기'}
+            </Button>
+
+            {generating && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm, padding: SPACING.lg, background: 'var(--color-primary-container)', borderRadius: RADIUS.md }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+                  <div style={{ display: 'flex', gap: '3px' }}>
+                    {[0, 1, 2].map((d) => (
+                      <div key={d} style={{ width: '5px', height: '5px', borderRadius: RADIUS.full, background: 'var(--color-primary)', animation: `bounce 1.2s infinite ${d * 0.2}s` }} />
+                    ))}
+                  </div>
+                  <span style={{ flex: 1, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)' }}>
+                    {genStatusMsg || '일정을 생성하고 있습니다...'}
+                  </span>
+                  <Button variant="ghost-danger" size="xsm" onClick={() => { abortedRef.current = true; setGenerating(false); setGenStatusMsg(''); }}>
+                    취소
+                  </Button>
+                </div>
+                <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)', opacity: 0.9 }}>
+                  1~2분 정도 걸려요. 화면을 켜둔 채로 기다려 주세요!
+                </span>
+              </div>
+            )}
+
+            {genError && (
+              <p style={{ margin: 0, padding: `${SPACING.ml} ${SPACING.lg}`, background: 'var(--color-error-container)', borderRadius: RADIUS.md, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
+                {genError}
+              </p>
+            )}
+
+            {preview && <PreviewAccordion days={preview.days} expandedDay={expandedDay} setExpandedDay={setExpandedDay} onItemClick={setSelectedPlace} />}
+
+            {preview && (
+              <Button variant="primary" size="xlg" fullWidth onClick={() => handleSubmit(true)} disabled={submitting}>
+                {submitting ? '생성 중...' : `AI 일정으로 여행 만들기 (${preview.days.length}일)`}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom action bar (Step 1 & 2 only) */}
+      {step < 3 && (
+        <div style={{
+          padding: `${SPACING.lx} ${SPACING.xxl} var(--safe-area-bottom, 0px)`,
+          borderTop: '1px solid var(--color-outline-variant)',
+          flexShrink: 0,
+        }}>
+          <Button variant="primary" size="xlg" fullWidth onClick={handleNext}
+            disabled={step === 1 ? !canStep1 : !canStep2}>
+            다음
+          </Button>
+        </div>
+      )}
+
+      {toast && <Toast message={toast.message} icon={toast.icon} onDone={() => setToast(null)} />}
+
+      {selectedPlace && createPortal(
+        <BottomSheet maxHeight="70vh" zIndex={9600} onClose={() => setSelectedPlace(null)}>
+          <PlaceInfoContent
+            view="info"
+            place={{
+              name: selectedPlace.desc,
+              address: selectedPlace.detail?.address,
+              lat: selectedPlace.detail?.lat,
+              lon: selectedPlace.detail?.lon,
+              image: selectedPlace.detail?.image,
+              rating: selectedPlace.detail?.rating,
+              reviewCount: selectedPlace.detail?.reviewCount,
+              hours: selectedPlace.detail?.hours,
+              placeId: selectedPlace.detail?.placeId,
+              tip: selectedPlace.sub,
+              type: selectedPlace.type,
+              businessStatus: selectedPlace.detail?.businessStatus,
+            }}
+          />
+        </BottomSheet>,
+        document.body
+      )}
+
+      {editingField === 'preferences' && createPortal(
+        <BottomSheet title="여행 스타일 / 요청사항" zIndex={9500} onClose={() => setEditingField(null)}>
+          <div style={{ padding: `${SPACING.lg} ${SPACING.xxl} ${SPACING.xxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms }}>
+              {STYLE_CHIPS.map(({ label }) => {
+                const active = selectedStyles.includes(label);
+                return (
+                  <button key={label}
+                    onClick={() => setSelectedStyles(prev => active ? prev.filter(s => s !== label) : [...prev, label])}
+                    style={{
+                      padding: `6px ${SPACING.lg}`, borderRadius: '100px',
+                      border: `1px solid ${active ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
+                      background: active ? 'var(--color-primary-container)' : 'var(--color-surface-container-lowest)',
+                      fontSize: 'var(--typo-caption-2-regular-size)',
+                      fontWeight: active ? 600 : 400,
+                      color: active ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant)',
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >{label}</button>
+                );
+              })}
+            </div>
+            <Field as="textarea" size="lg" variant="outlined"
               value={aiPreferences} onChange={(e) => setAiPreferences(e.target.value)}
-              placeholder="예: 맛집 위주로, 쇼핑도 좀, 너무 빡빡하지 않게"
-              rows={2}
+              placeholder="추가 요청사항이 있으면 자유롭게 적어주세요"
+              rows={5}
             />
-            <Field as="textarea" label="예약 정보 (선택)" size="lg" variant="outlined"
+          </div>
+        </BottomSheet>,
+        document.body
+      )}
+
+      {editingField === 'booked' && createPortal(
+        <BottomSheet title="예약 정보" zIndex={9500} onClose={() => setEditingField(null)}>
+          <div style={{ padding: `${SPACING.lg} ${SPACING.xxl} ${SPACING.xxl}`, display: 'flex', flexDirection: 'column', gap: SPACING.xl }}>
+            <Field as="textarea" size="lg" variant="outlined"
               value={bookedText} onChange={(e) => setBookedText(e.target.value)}
-              placeholder="예약 확인 메일·바우처 텍스트 붙여넣기 또는 아래에서 이미지/PDF 첨부"
-              rows={2}
+              placeholder="예약 확인 메일·바우처 텍스트 붙여넣기"
+              rows={6}
             />
             <label style={{
               display: 'flex', alignItems: 'center', gap: SPACING.md,
@@ -717,7 +906,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
               background: 'var(--color-surface-container-lowest)',
             }}>
               <Icon name="document" size={16} style={{ opacity: 0.6 }} />
-              <span>이미지/PDF 첨부 (바우처, 확인 메일 등) {bookedAttachments.length > 0 && `· ${bookedAttachments.length}개 선택됨`}</span>
+              <span>이미지/PDF 첨부 {bookedAttachments.length > 0 && `· ${bookedAttachments.length}개 선택됨`}</span>
               <input type="file" accept="image/*,application/pdf" multiple onChange={async (e) => {
                 const files = Array.from(e.target.files || []);
                 if (!files.length) return;
@@ -751,77 +940,10 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
                 ))}
               </div>
             )}
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.ms }}>
-              {['맛집 위주', '관광 중심', '쇼핑 많이', '여유롭게', '알차게'].map((chip) => (
-                <button key={chip}
-                  onClick={() => setAiPreferences((prev) => prev ? `${prev}, ${chip}` : chip)}
-                  style={{
-                    padding: `5px ${SPACING.lg}`, borderRadius: '100px',
-                    border: '1px solid var(--color-outline-variant)',
-                    background: 'var(--color-surface-container-lowest)',
-                    fontSize: 'var(--typo-caption-2-regular-size)',
-                    color: 'var(--color-on-surface-variant)', cursor: 'pointer',
-                  }}
-                >{chip}</button>
-              ))}
-            </div>
-
-            <Button variant="primary" size="lg" fullWidth iconLeft="flash"
-              onClick={handleGenerate} disabled={generating}>
-              {generating ? 'AI가 일정을 만들고 있어요...' : 'AI 일정 생성하기'}
-            </Button>
-
-            {generating && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm, padding: SPACING.lg, background: 'var(--color-primary-container)', borderRadius: RADIUS.md }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
-                  <div style={{ display: 'flex', gap: '3px' }}>
-                    {[0, 1, 2].map((d) => (
-                      <div key={d} style={{ width: '5px', height: '5px', borderRadius: RADIUS.full, background: 'var(--color-primary)', animation: `bounce 1.2s infinite ${d * 0.2}s` }} />
-                    ))}
-                  </div>
-                  <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)' }}>
-                    {genStatusMsg || '일정을 생성하고 있습니다...'}
-                  </span>
-                </div>
-                <span style={{ fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-primary-container)', opacity: 0.9 }}>
-                  1~2분 걸릴 수 있어요. 화면을 끄지 마세요.
-                </span>
-              </div>
-            )}
-
-            {genError && (
-              <p style={{ margin: 0, padding: `${SPACING.ml} ${SPACING.lg}`, background: 'var(--color-error-container)', borderRadius: RADIUS.md, fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-error)' }}>
-                {genError}
-              </p>
-            )}
-
-            {preview && <PreviewAccordion days={preview.days} expandedDay={expandedDay} setExpandedDay={setExpandedDay} />}
-
-            {preview && (
-              <Button variant="primary" size="xlg" fullWidth onClick={() => handleSubmit(true)} disabled={submitting}>
-                {submitting ? '생성 중...' : `AI 일정으로 여행 만들기 (${preview.days.length}일)`}
-              </Button>
-            )}
           </div>
-        )}
-      </div>
-
-      {/* Bottom action bar (Step 1 & 2 only) */}
-      {step < 3 && (
-        <div style={{
-          padding: `${SPACING.lx} ${SPACING.xxl} var(--safe-area-bottom, 0px)`,
-          borderTop: '1px solid var(--color-outline-variant)',
-          flexShrink: 0,
-        }}>
-          <Button variant="primary" size="xlg" fullWidth onClick={handleNext}
-            disabled={step === 1 ? !canStep1 : !canStep2}>
-            다음
-          </Button>
-        </div>
+        </BottomSheet>,
+        document.body
       )}
-
-      {toast && <Toast message={toast.message} icon={toast.icon} onDone={() => setToast(null)} />}
 
       <style>{`@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }`}</style>
     </PageTransition>
@@ -829,7 +951,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
 }
 
 /* ── Preview Accordion ── */
-function PreviewAccordion({ days, expandedDay, setExpandedDay }) {
+function PreviewAccordion({ days, expandedDay, setExpandedDay, onItemClick }) {
   return (
     <div style={{
       border: '1px solid var(--color-outline-variant)', borderRadius: '12px', overflow: 'hidden',
@@ -866,15 +988,25 @@ function PreviewAccordion({ days, expandedDay, setExpandedDay }) {
               {isOpen && (
                 <div style={{ padding: `0 ${SPACING.lx} ${SPACING.ml}` }}>
                   {allItems.map((it, j) => (
-                    <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: SPACING.md, padding: `${SPACING.ms} 0`, borderBottom: j < allItems.length - 1 ? '1px solid var(--color-surface-dim)' : 'none' }}>
+                    <div key={j}
+                      onClick={() => it.detail && onItemClick?.(it)}
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: SPACING.md,
+                        padding: `${SPACING.ml} 0`,
+                        borderBottom: j < allItems.length - 1 ? '1px solid var(--color-surface-dim)' : 'none',
+                        cursor: it.detail && onItemClick ? 'pointer' : 'default',
+                      }}>
                       <span style={{ width: '36px', flexShrink: 0, textAlign: 'right', fontSize: '11px', fontWeight: 600, color: 'var(--color-on-surface-variant2)', fontVariantNumeric: 'tabular-nums', lineHeight: '18px' }}>
                         {it.time || ''}
                       </span>
                       <div style={{ width: '3px', flexShrink: 0, borderRadius: RADIUS.xs, background: getTypeConfig(it.type).text, alignSelf: 'stretch', minHeight: '16px' }} />
                       <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 500, color: 'var(--color-on-surface)', lineHeight: '18px' }}>{it.desc}</p>
-                        {it.sub && <p style={{ margin: '1px 0 0', fontSize: '11px', color: 'var(--color-on-surface-variant2)' }}>{it.sub}</p>}
+                        <p style={{ margin: 0, fontSize: 'var(--typo-label-2-medium-size)', fontWeight: 500, color: 'var(--color-on-surface)', lineHeight: '18px' }}>{it.desc}</p>
+                        {it.sub && <p style={{ margin: '1px 0 0', fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)' }}>{it.sub}</p>}
                       </div>
+                      {it.detail && onItemClick && (
+                        <Icon name="chevronRight" size={14} style={{ opacity: 0.3, flexShrink: 0, marginTop: '2px' }} />
+                      )}
                     </div>
                   ))}
                 </div>

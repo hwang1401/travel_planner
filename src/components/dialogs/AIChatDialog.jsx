@@ -295,6 +295,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
                   scrollSnapType: 'x mandatory',
                   display: 'flex', gap: '8px',
                   msOverflowStyle: 'none', scrollbarWidth: 'none',
+                  touchAction: 'pan-x', overscrollBehaviorX: 'contain',
                   maskImage: msg.places.length > 2 ? 'linear-gradient(to right, black calc(100% - 24px), transparent)' : undefined,
                   WebkitMaskImage: msg.places.length > 2 ? 'linear-gradient(to right, black calc(100% - 24px), transparent)' : undefined,
                 }}>
@@ -516,8 +517,11 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
           conflicts={importPreview.conflicts}
           dayLabel={currentDay?.label || 'Day'}
           existingCount={currentDay?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0}
-          onAppend={(selectedItems) => { onBulkImport?.(selectedItems, 'append'); setImportPreview(null); onClose(); }}
+          allDays={allDays}
+          initialDayIdx={allDays?.indexOf(currentDay) ?? 0}
+          onAppend={(selectedItems, dayIdx) => { onBulkImport?.(selectedItems, 'append', dayIdx); setImportPreview(null); onClose(); }}
           onCancel={() => setImportPreview(null)}
+          onItemClick={(item) => { setPlaceView('info'); setSelectedAIPlace(item); }}
         />
       )}
     </>,

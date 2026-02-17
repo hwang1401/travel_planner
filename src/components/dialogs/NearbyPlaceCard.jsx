@@ -33,13 +33,12 @@ export default function NearbyPlaceCard({ place, onSelect, onAddToSchedule }) {
       onClick={() => onSelect?.(place)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(place); } }}
       style={{
-        flexShrink: 0,
-        width: '140px',
+        flex: `0 0 calc((100% - 2 * ${SPACING.lg}) / 3)`,
+        minWidth: 0,
         cursor: onSelect ? 'pointer' : 'default',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
-        scrollSnapAlign: 'start',
       }}
     >
       {/* Image / 플레이스홀더 (이미지 없을 때 통일된 placeholder) */}

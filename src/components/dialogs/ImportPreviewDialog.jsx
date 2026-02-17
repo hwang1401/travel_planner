@@ -1,24 +1,166 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useBackClose } from '../../hooks/useBackClose';
 import Icon from "../common/Icon";
 import Button from "../common/Button";
+import Tab from "../common/Tab";
 import { getTypeConfig, SPACING, RADIUS } from "../../styles/tokens";
-import { TYPE_LABELS } from "../../utils/scheduleParser";
+import { TYPE_LABELS, detectConflicts } from "../../utils/scheduleParser";
+
+/* ── helpers ── */
+function getDayExistingItems(day) {
+  if (!day?.sections) return [];
+  return day.sections.flatMap((sec) => sec.items || []);
+}
+
+function hasPlaceInfo(item) {
+  if (!item) return false;
+  const d = item.detail;
+  return !!(d && (d.address || d.tip || d.timetable || d.image || d.placeId || d.lat));
+}
+
+/* ── Shared row component matching PlaceCard layout ── */
+function ItemRow({ item, isLast, canClick, onClick, right, conflictInfo }) {
+  const cfg = getTypeConfig(item.type);
+  const placeName = item.detail?.name || item.desc || "";
+  const tipText = item.detail?.tip || item.sub || "";
+  const subInfo = tipText ? tipText.split('\n')[0] : "";
+  const hasConflict = !!conflictInfo;
+
+  return (
+    <div
+      onClick={canClick ? onClick : undefined}
+      style={{
+        display: "flex", alignItems: "flex-start",
+        gap: "var(--spacing-sp80)",
+        padding: `${SPACING.ml} 0`,
+        margin: hasConflict ? `0 -${SPACING.lg}` : undefined,
+        paddingLeft: hasConflict ? SPACING.lg : undefined,
+        paddingRight: hasConflict ? SPACING.lg : undefined,
+        background: hasConflict ? "color-mix(in srgb, var(--color-error) 6%, transparent)" : "transparent",
+        borderBottom: isLast ? "none" : `1px solid ${hasConflict ? "color-mix(in srgb, var(--color-error) 12%, transparent)" : "var(--color-surface-dim)"}`,
+        cursor: canClick ? "pointer" : "default",
+        userSelect: "none",
+      }}
+    >
+      {right}
+
+      {/* 시간 */}
+      <span style={{
+        width: "38px", flexShrink: 0, textAlign: "right",
+        fontSize: "var(--typo-caption-1-medium-size)",
+        fontWeight: "var(--typo-caption-1-medium-weight)",
+        color: hasConflict ? "var(--color-error)" : "var(--color-on-surface-variant)",
+        fontVariantNumeric: "tabular-nums",
+        lineHeight: "20px",
+      }}>
+        {item.time || "--:--"}
+      </span>
+
+      {/* 컬러바 */}
+      <div style={{
+        width: "3px", flexShrink: 0,
+        borderRadius: "var(--radius-xsm)",
+        background: hasConflict ? "var(--color-error)" : cfg.text,
+        opacity: hasConflict ? 0.8 : 0.6,
+        alignSelf: "stretch", minHeight: "20px",
+      }} />
+
+      {/* 콘텐츠 */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          display: "flex", alignItems: "center",
+          gap: "var(--spacing-sp40)", minHeight: "20px",
+        }}>
+          <p style={{
+            margin: 0,
+            fontSize: "var(--typo-label-2-medium-size)",
+            fontWeight: "var(--typo-label-2-medium-weight)",
+            color: "var(--color-on-surface)",
+            lineHeight: "20px",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            flex: 1, minWidth: 0,
+          }}>
+            {placeName}
+          </p>
+          {canClick && (
+            <Icon name="chevronRight" size={12}
+              style={{ opacity: 0.3, flexShrink: 0, color: "var(--color-on-surface-variant2)" }}
+            />
+          )}
+        </div>
+        {subInfo && !hasConflict && (
+          <p style={{
+            margin: "var(--spacing-sp20) 0 0",
+            fontSize: "var(--typo-caption-2-regular-size)",
+            fontWeight: "var(--typo-caption-2-regular-weight)",
+            color: "var(--color-on-surface-variant2)",
+            lineHeight: "var(--typo-caption-2-regular-line-height)",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {subInfo}
+          </p>
+        )}
+        {hasConflict && (
+          <p style={{
+            margin: "var(--spacing-sp20) 0 0",
+            fontSize: "var(--typo-caption-2-regular-size)",
+            fontWeight: "var(--typo-caption-2-regular-weight)",
+            color: "var(--color-error)",
+            lineHeight: "var(--typo-caption-2-regular-line-height)",
+            display: "flex", alignItems: "center", gap: "3px",
+          }}>
+            기존 '{conflictInfo.existingDescs[0]}' ({conflictInfo.time})과 시간 겹침
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ── Import Preview Dialog ── */
 export default function ImportPreviewDialog({
   items,          // parsed items
   errors,         // parse errors
-  conflicts,      // { internal, external }
-  dayLabel,       // e.g. "Day 1"
-  existingCount,  // number of existing items in the day
-  onAppend,       // append selected items
+  conflicts: initialConflicts,  // { internal, external }
+  dayLabel,       // e.g. "Day 1" (fallback)
+  existingCount,  // (legacy, unused when allDays provided)
+  onAppend,       // (selectedItems, dayIdx) => void
   onCancel,
+  onItemClick,    // (item) => void — open PlaceInfoContent
+  allDays,        // 전체 Day 배열 (display order)
+  initialDayIdx,  // 초기 선택 Day 인덱스
 }) {
   useBackClose(true, onCancel);
   const [selected, setSelected] = useState(() => new Set(items.map((_, i) => i)));
-  const [expandedIndex, setExpandedIndex] = useState(null);
+  const [selectedDayIdx, setSelectedDayIdx] = useState(initialDayIdx ?? 0);
+  const [showExisting, setShowExisting] = useState(false);
+
+  const hasDayTabs = Array.isArray(allDays) && allDays.length > 1;
+  const currentDay = hasDayTabs ? allDays[selectedDayIdx] : null;
+
+  // Tab items for Day selector
+  const tabItems = useMemo(() => {
+    if (!hasDayTabs) return [];
+    return allDays.map((d, i) => ({
+      label: `D${d.day ?? i + 1}`,
+      value: i,
+    }));
+  }, [allDays, hasDayTabs]);
+
+  // Existing items for the selected day
+  const existingItems = useMemo(() => {
+    if (!currentDay) return [];
+    return getDayExistingItems(currentDay);
+  }, [currentDay]);
+
+  const existingItemCount = hasDayTabs ? existingItems.length : (existingCount || 0);
+
+  // Recalculate conflicts when day changes
+  const conflicts = useMemo(() => {
+    if (!hasDayTabs) return initialConflicts;
+    return detectConflicts(items, currentDay);
+  }, [items, currentDay, hasDayTabs, initialConflicts]);
 
   const allSelected = selected.size === items.length;
 
@@ -38,7 +180,7 @@ export default function ImportPreviewDialog({
 
   const handleAppend = () => {
     const selectedItems = items.filter((_, i) => selected.has(i));
-    if (selectedItems.length > 0) onAppend(selectedItems);
+    if (selectedItems.length > 0) onAppend(selectedItems, selectedDayIdx);
   };
 
   // Build a map: item index → external conflict info
@@ -47,6 +189,8 @@ export default function ImportPreviewDialog({
     const idx = items.findIndex((it) => it.time === c.time && it.desc === c.newDesc);
     if (idx >= 0) externalConflictMap.set(idx, c);
   }
+
+  const buttonDayLabel = `D${currentDay?.day ?? selectedDayIdx + 1}`;
 
   return createPortal(
     <div
@@ -84,35 +228,68 @@ export default function ImportPreviewDialog({
             </h3>
             <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onCancel} />
           </div>
-          <div style={{
-            margin: `${SPACING.sm} 0 0`,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}>
-            <p style={{
-              margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
-              color: "var(--color-on-surface-variant2)",
-            }}>
-              {dayLabel} · {items.length}개 일정 인식
-              {existingCount > 0 && ` · 기존 ${existingCount}개`}
-            </p>
-            <label style={{
-              display: "flex", alignItems: "center", gap: SPACING.ms,
-              fontSize: "var(--typo-caption-2-regular-size)",
-              color: "var(--color-on-surface-variant2)",
-              cursor: "pointer", userSelect: "none",
-            }}>
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={toggleAll}
-                style={{
-                  width: 16, height: 16, margin: 0, cursor: "pointer",
-                  accentColor: "var(--color-primary)",
-                }}
+
+          {/* Day Tab Selector */}
+          {hasDayTabs && (
+            <div style={{ margin: `${SPACING.md} 0 0`, overflowX: "auto" }}>
+              <Tab
+                items={tabItems}
+                value={selectedDayIdx}
+                onChange={setSelectedDayIdx}
+                variant="pill"
+                size="sm"
               />
-              전체 선택
-            </label>
-          </div>
+            </div>
+          )}
+
+          {/* Existing items accordion */}
+          {existingItemCount > 0 && (
+            <div style={{ marginTop: SPACING.sm }}>
+              <button
+                type="button"
+                onClick={() => setShowExisting((v) => !v)}
+                style={{
+                  display: "flex", alignItems: "center", gap: SPACING.sm,
+                  margin: 0, padding: `${SPACING.sm} 0`,
+                  border: "none", background: "none", cursor: "pointer",
+                  fontSize: "var(--typo-caption-2-bold-size)",
+                  fontWeight: "var(--typo-caption-2-bold-weight)",
+                  color: "var(--color-on-surface-variant2)",
+                  fontFamily: "inherit",
+                }}
+              >
+                <Icon
+                  name="chevronRight"
+                  size={12}
+                  style={{
+                    transition: "transform 0.15s",
+                    transform: showExisting ? "rotate(90deg)" : "rotate(0deg)",
+                  }}
+                />
+                기존 일정 ({existingItemCount}개)
+              </button>
+              {showExisting && (
+                <div style={{
+                  borderRadius: RADIUS.md,
+                  border: "1px solid var(--color-outline-variant)",
+                  overflow: "hidden",
+                  background: "var(--color-surface-container-low)",
+                  maxHeight: "150px",
+                  overflowY: "auto",
+                  padding: `0 ${SPACING.lg}`,
+                }}>
+                  {existingItems.map((item, i) => (
+                    <ItemRow
+                      key={i}
+                      item={item}
+                      isLast={i === existingItems.length - 1}
+                      canClick={false}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Parse errors */}
@@ -128,155 +305,70 @@ export default function ImportPreviewDialog({
           </div>
         )}
 
-        {/* Item list preview */}
+        {/* Scrollable content */}
         <div style={{
           flex: 1, overflowY: "auto", padding: `${SPACING.lg} ${SPACING.xxl}`,
         }}>
+          {/* Select all */}
+          <label style={{
+            display: "flex", alignItems: "center", gap: SPACING.ms,
+            fontSize: "var(--typo-caption-2-regular-size)",
+            color: "var(--color-on-surface-variant2)",
+            cursor: "pointer", userSelect: "none",
+            marginBottom: SPACING.lg,
+          }}>
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              style={{
+                width: 16, height: 16, margin: 0, cursor: "pointer",
+                accentColor: "var(--color-primary)",
+              }}
+            />
+            전체 선택
+          </label>
+
+          {/* New items */}
           <div style={{
             borderRadius: RADIUS.md,
             border: "1px solid var(--color-outline-variant)",
             overflow: "hidden",
+            padding: `0 ${SPACING.lg}`,
           }}>
             {items.map((item, i) => {
-              const cfg = getTypeConfig(item.type);
               const isLast = i === items.length - 1;
               const isChecked = selected.has(i);
               const conflictInfo = externalConflictMap.get(i);
-              const hasDetail = item.detail && (item.detail.address || item.detail.tip || item.detail.timetable);
-              const isExpanded = expandedIndex === i;
+              const canShowInfo = hasPlaceInfo(item);
               return (
                 <div
                   key={i}
                   style={{
-                    borderBottom: isLast ? "none" : "1px solid var(--color-surface-dim)",
-                    background: conflictInfo ? "var(--color-error-container)" : "transparent",
-                    opacity: isChecked ? 1 : 0.4,
+                    opacity: isChecked ? 1 : 0.35,
                     transition: "opacity 0.15s",
-                    ...(conflictInfo ? { borderLeft: "3px solid var(--color-error)" } : {}),
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex", alignItems: "flex-start", gap: SPACING.md,
-                      padding: `${SPACING.md} ${SPACING.lg}`,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleItem(i)}
-                      style={{
-                        width: 16, height: 16, margin: 0, marginTop: 2,
-                        cursor: "pointer", flexShrink: 0,
-                        accentColor: "var(--color-primary)",
-                      }}
-                    />
-                    <span style={{
-                      width: "36px", flexShrink: 0, textAlign: "right",
-                      fontSize: "var(--typo-caption-2-bold-size)",
-                      fontWeight: "var(--typo-caption-2-bold-weight)",
-                      color: "var(--color-on-surface-variant2)",
-                      fontVariantNumeric: "tabular-nums",
-                      lineHeight: "var(--typo-caption-2-bold-line-height, 1.25)",
-                      paddingTop: "2px",
-                    }}>
-                      {item.time || "--:--"}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{
-                        margin: 0, fontSize: "var(--typo-caption-2-regular-size)",
-                        fontWeight: "var(--typo-caption-2-bold-weight)",
-                        color: "var(--color-on-surface)",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>
-                        {item.desc}
-                      </p>
-                      {(item.sub || item.detail) && (
-                        <p style={{
-                          margin: 0, fontSize: "var(--typo-caption-3-regular-size)",
-                          color: "var(--color-on-surface-variant2)",
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>
-                          {item.sub}
-                          {item.sub && item.detail ? " · " : ""}
-                          {item.detail && (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setExpandedIndex(isExpanded ? null : i); }}
-                              style={{
-                                margin: 0, padding: 0, border: "none", background: "none",
-                                color: "var(--color-primary)", cursor: "pointer",
-                                fontSize: "inherit", fontFamily: "inherit",
-                                textDecoration: "underline",
-                                textUnderlineOffset: "2px",
-                              }}
-                            >
-                              {[
-                                item.detail.address && "주소",
-                                item.detail.timetable && "영업시간",
-                                item.detail.tip && "상세정보",
-                              ].filter(Boolean).join(" · ")}
-                            </button>
-                          )}
-                        </p>
-                      )}
-                      {conflictInfo && (
-                        <p style={{
-                          margin: `${SPACING.xs} 0 0`, fontSize: "var(--typo-caption-3-regular-size)",
-                          color: "var(--color-error)",
-                          display: "flex", alignItems: "center", gap: "3px",
-                        }}>
-                          <span>⚡</span>
-                          <span>기존 '{conflictInfo.existingDescs[0]}' ({conflictInfo.time})과 시간 겹침</span>
-                        </p>
-                      )}
-                    </div>
-                    <span style={{
-                      fontSize: "var(--typo-caption-3-regular-size)",
-                      color: cfg.text, flexShrink: 0,
-                      lineHeight: "var(--typo-caption-2-regular-line-height, 1.25)",
-                      paddingTop: "2px",
-                    }}>
-                      {TYPE_LABELS[item.type] || "정보"}
-                    </span>
-                  </div>
-                  {hasDetail && isExpanded && (
-                    <div
-                      style={{
-                        padding: `${SPACING.sm} ${SPACING.lg} ${SPACING.md}`,
-                        paddingLeft: `calc(16px + 36px + ${SPACING.md} * 2 + ${SPACING.lg})`,
-                        background: "var(--color-surface-container-low)",
-                        borderTop: "1px solid var(--color-outline-variant)",
-                        fontSize: "var(--typo-caption-2-regular-size)",
-                        color: "var(--color-on-surface-variant2)",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {item.detail.address && (
-                        <p style={{ margin: "0 0 6px", fontWeight: 600, color: "var(--color-on-surface)" }}>주소</p>
-                      )}
-                      {item.detail.address && (
-                        <p style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{item.detail.address}</p>
-                      )}
-                      {item.detail.tip && (
-                        <>
-                          <p style={{ margin: "10px 0 6px", fontWeight: 600, color: "var(--color-on-surface)" }}>상세정보</p>
-                          <p style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{item.detail.tip}</p>
-                        </>
-                      )}
-                      {item.detail.timetable && (() => {
-                        const t = item.detail.timetable;
-                        const text = typeof t === "string" ? t : (t.summary || (t.trains?.length ? `열차 ${t.trains.length}편` : null));
-                        if (!text) return null;
-                        return (
-                          <>
-                            <p style={{ margin: "10px 0 6px", fontWeight: 600, color: "var(--color-on-surface)" }}>영업시간</p>
-                            <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{text}</p>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
+                  <ItemRow
+                    item={item}
+                    isLast={isLast}
+                    canClick={canShowInfo}
+                    onClick={() => onItemClick?.(item)}
+                    conflictInfo={conflictInfo}
+                    right={
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleItem(i)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: 16, height: 16, margin: 0, marginTop: 2,
+                          cursor: "pointer", flexShrink: 0,
+                          accentColor: "var(--color-primary)",
+                        }}
+                      />
+                    }
+                  />
                 </div>
               );
             })}
@@ -302,9 +394,11 @@ export default function ImportPreviewDialog({
             disabled={selected.size === 0}
             style={{ flex: 1 }}
           >
-            {existingCount > 0
-              ? `선택 추가 (${selected.size}개)`
-              : `일정 추가 (${selected.size}개)`}
+            {hasDayTabs
+              ? `${buttonDayLabel}에 추가 (${selected.size}개)`
+              : existingItemCount > 0
+                ? `선택 추가 (${selected.size}개)`
+                : `일정 추가 (${selected.size}개)`}
           </Button>
         </div>
       </div>

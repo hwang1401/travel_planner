@@ -675,9 +675,11 @@ export default function PlaceInfoContent({
         </div>
 
         {/* ── "일정 추가하기" button ── */}
-        <div style={{ flexShrink: 0, padding: `${SPACING.md} ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
-          <Button variant="primary" size="xlg" fullWidth onClick={onGoToForm}>일정 추가하기</Button>
-        </div>
+        {onGoToForm && (
+          <div style={{ flexShrink: 0, padding: `${SPACING.md} ${px}`, borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
+            <Button variant="primary" size="xlg" fullWidth onClick={onGoToForm}>일정 추가하기</Button>
+          </div>
+        )}
 
         {/* Toasts & overlays */}
         {copyToast && <Toast message={copyToast.message} onDone={() => setCopyToast(null)} />}

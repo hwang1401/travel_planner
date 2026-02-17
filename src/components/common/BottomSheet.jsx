@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import Button from './Button';
 
@@ -9,6 +9,21 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
   const [isDragging, setIsDragging] = useState(false);
   const startY = useRef(0);
   const currentY = useRef(0);
+
+  // Track visual viewport for keyboard avoidance (iOS)
+  const [vv, setVv] = useState(null);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => setVv({ top: viewport.offsetTop, height: viewport.height });
+    viewport.addEventListener('resize', update);
+    viewport.addEventListener('scroll', update);
+    update();
+    return () => {
+      viewport.removeEventListener('resize', update);
+      viewport.removeEventListener('scroll', update);
+    };
+  }, []);
 
   useScrollLock();
 
@@ -48,7 +63,9 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
       onClick={onClose}
       onTouchMove={handleBackdropTouch}
       style={{
-        position: "fixed", inset: 0, zIndex,
+        position: "fixed", left: 0, right: 0,
+        ...(vv ? { top: vv.top, height: vv.height } : { top: 0, bottom: 0 }),
+        zIndex,
         background: "color-mix(in srgb, var(--color-scrim) 35%, transparent)", backdropFilter: "blur(4px)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
         animation: "fadeIn 0.2s ease",
@@ -59,7 +76,9 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
         onClick={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
         style={{
-          width: "100%", maxWidth: "420px", maxHeight, ...(minHeight ? { minHeight } : {}),
+          width: "100%", maxWidth: "420px",
+          maxHeight: vv ? `min(${maxHeight}, ${Math.floor(vv.height - 20)}px)` : maxHeight,
+          ...(minHeight ? { minHeight } : {}),
           /* 시트 배경: surface-container-lowest. 내부 블록·버튼은 아웃라인 필수, 기본은 --color-outline-variant. */
           background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0",
           overflow: "hidden",

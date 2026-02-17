@@ -1507,9 +1507,10 @@ export default function TravelPlanner() {
   }, [updateCustomData, baseLen, immediateSave, isLegacy, tripId, tripMeta]);
 
   /* ── Bulk Import: replace는 바로 적용, append는 중복 체크 후 적용 또는 DuplicateReviewDialog ── */
-  const handleBulkImport = useCallback((items, mode) => {
+  const handleBulkImport = useCallback((items, mode, targetDisplayIdx) => {
     if (!items || items.length === 0) return;
-    const dayIdx = toOrigIdx(selectedDay);
+    const viewIdx = targetDisplayIdx != null ? targetDisplayIdx : selectedDay;
+    const dayIdx = toOrigIdx(viewIdx);
     const itemsWithIds = items.map((it) => (it._id ? it : { ...it, _id: crypto.randomUUID() }));
 
     if (mode === "replace") {
@@ -1517,8 +1518,8 @@ export default function TravelPlanner() {
       return;
     }
 
-    const currentDay = DAYS[selectedDay];
-    const existingItems = currentDay?.sections?.flatMap((sec) => sec.items || []) || [];
+    const targetDay = DAYS[viewIdx];
+    const existingItems = targetDay?.sections?.flatMap((sec) => sec.items || []) || [];
     const existingKeys = new Set(existingItems.map(getItemKey));
     const duplicates = [];
     const clean = [];
