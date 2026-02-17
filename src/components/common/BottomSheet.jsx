@@ -52,16 +52,20 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
     currentY.current = 0;
   }, [onClose]);
 
-  // Prevent backdrop touch from scrolling underlying content
-  const handleBackdropTouch = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // Prevent backdrop touch from scrolling underlying content (native listener for non-passive)
+  const backdropRef = useRef(null);
+  useEffect(() => {
+    const el = backdropRef.current;
+    if (!el) return;
+    const handler = (e) => { e.preventDefault(); e.stopPropagation(); };
+    el.addEventListener('touchmove', handler, { passive: false });
+    return () => el.removeEventListener('touchmove', handler);
   }, []);
 
   return (
     <div
+      ref={backdropRef}
       onClick={onClose}
-      onTouchMove={handleBackdropTouch}
       style={{
         position: "fixed", left: 0, right: 0,
         ...(vv ? { top: vv.top, height: vv.height } : { top: 0, bottom: 0 }),

@@ -168,7 +168,7 @@ function InlineCalendar({ startDate, endDate, onSelect }) {
                 opacity: past ? 0.4 : 1,
                 borderRadius: isStart ? '8px 0 0 8px' : isEnd ? '0 8px 8px 0' : selected ? '8px' : '0',
                 background: selected ? 'var(--color-primary)' : inRange ? 'var(--color-primary-container)' : 'transparent',
-                color: selected ? '#fff' : isToday(day) ? 'var(--color-primary)' : 'var(--color-on-surface)',
+                color: selected ? 'var(--color-on-primary)' : isToday(day) ? 'var(--color-primary)' : 'var(--color-on-surface)',
                 fontSize: 'var(--typo-label-2-medium-size)', fontWeight: selected || isToday(day) ? 700 : 400,
                 position: 'relative', transition: 'background 0.1s',
               }}

@@ -149,7 +149,7 @@ export function useSnapSheet({ snapPoints = [45, 85], initialSnap = 0 } = {}) {
     zIndex: 10,
     borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
     background: 'var(--color-surface-container-lowest)',
-    boxShadow: '0 -2px 12px rgba(0,0,0,0.08)',
+    boxShadow: 'var(--shadow-normal)',
   }), [height, isDragging]);
 
   const handleProps = useMemo(() => ({

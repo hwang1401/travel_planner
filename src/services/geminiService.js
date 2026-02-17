@@ -1336,7 +1336,7 @@ export async function generateFullTripSchedule({ destinations, duration, startDa
       destinations,
       preferences,
       duration,
-      hintText: [preferences, destStrForHint].filter(Boolean).join(" "),
+      hintText: preferences || "",
     });
     console.log("[RAG] 검색된 장소 수:", rag.placeCount, rag.placeCount === 0 ? "(Supabase rag_places 시드·region 확인)" : "");
     if (rag.placeCount > 0 && rag.placesText) placesText = rag.placesText;

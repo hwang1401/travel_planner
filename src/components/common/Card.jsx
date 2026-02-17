@@ -19,7 +19,7 @@ const VARIANT_STYLES = {
   elevated: {
     background: "var(--color-surface-container-lowest)",
     border: "none",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+    boxShadow: "var(--shadow-normal)",
   },
   outlined: {
     background: "var(--color-surface-container-lowest)",

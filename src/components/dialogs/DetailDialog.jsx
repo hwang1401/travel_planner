@@ -132,6 +132,7 @@ export default function DetailDialog({
   const [overlayPlace, setOverlayPlace] = useState(null);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [showMoveSheet, setShowMoveSheet] = useState(false);
+  const [showTypeSheet, setShowTypeSheet] = useState(false);
   const [showDirectionsConfirm, setShowDirectionsConfirm] = useState(false);
   const [nearbyByType, setNearbyByType] = useState({ food: [], spot: [], shop: [] });
   const [nearbyLoading, setNearbyLoading] = useState(false);
@@ -408,7 +409,12 @@ export default function DetailDialog({
     if (fieldUpdates.time !== undefined) updated.time = fieldUpdates.time;
     if (fieldUpdates.desc !== undefined) updated.desc = fieldUpdates.desc;
     if (fieldUpdates.sub !== undefined) updated.sub = fieldUpdates.sub;
-    if (fieldUpdates.type !== undefined) updated.type = fieldUpdates.type;
+    if (fieldUpdates.type !== undefined) {
+      updated.type = fieldUpdates.type;
+      const catLabel = TYPE_LABELS[fieldUpdates.type] || '정보';
+      if (!updated.detail) updated.detail = {};
+      updated.detail = { ...updated.detail, category: catLabel, categories: [catLabel] };
+    }
     if (fieldUpdates.moveFrom !== undefined) updated.moveFrom = fieldUpdates.moveFrom;
     if (fieldUpdates.moveTo !== undefined) updated.moveTo = fieldUpdates.moveTo;
     if (!updated.detail) updated.detail = { name: updated.desc, category: TYPE_LABELS[updated.type] || '관광' };
@@ -1252,6 +1258,9 @@ export default function DetailDialog({
         if (onMoveToDay && moveDayOptions.length > 1) {
           moreRows.push({ key: 'move', icon: 'pin', label: '다른 Day로 이동', onClick: () => { setShowMoreSheet(false); setShowMoveSheet(true); } });
         }
+        if (canEditInline) {
+          moreRows.push({ key: 'type', icon: 'flash', label: '유형 변경', onClick: () => { setShowMoreSheet(false); setShowTypeSheet(true); } });
+        }
         if (canEditInline && tripId && displayImages.length > 0) {
           moreRows.push({ key: 'image-edit', icon: 'file', label: '이미지 수정', onClick: () => { setShowMoreSheet(false); setShowImageManageDialog(true); } });
         }
@@ -1328,6 +1337,22 @@ export default function DetailDialog({
                   </button>
                 );
               })}
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* ══ 유형 변경 시트 ══ */}
+      {showTypeSheet && (
+        <BottomSheet onClose={() => setShowTypeSheet(false)} maxHeight="auto" zIndex={3100} title="유형 변경">
+          <div style={{ padding: `${SPACING.lg} ${SPACING.xxl} ${SPACING.xxxl}` }}>
+            <ChipSelector
+              items={Object.entries(TYPE_LABELS).map(([value, label]) => ({ label, value }))}
+              value={itemType}
+              onChange={(val) => { saveField({ type: val }); setShowTypeSheet(false); }}
+              variant="pill"
+              size="ms"
+              style={{ gap: SPACING.md, flexWrap: 'wrap' }}
+            />
           </div>
         </BottomSheet>
       )}

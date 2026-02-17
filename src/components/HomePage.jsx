@@ -18,7 +18,7 @@ import { COLOR, SPACING, RADIUS } from '../styles/tokens';
 const MIN_SPLASH_MS = 400;
 
 /* ── Trip Card Component ── */
-function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge, memberCount, onClick, onMore }) {
+function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge, members, onClick, onMore }) {
   const destSummary = destinations?.length > 0
     ? destinations.length === 1
       ? destinations[0]
@@ -109,17 +109,45 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
               }}>
                 {subtitle}
               </span>
-              {memberCount > 1 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.xs }}>
-                  <Icon name="persons" size={13} style={{ opacity: 0.5 }} />
-                  <span style={{
-                    fontSize: 'var(--typo-caption-2-regular-size)',
-                    color: 'var(--color-on-surface-variant2)',
-                  }}>
-                    {memberCount}
-                  </span>
-                </div>
-              )}
+              {members?.length > 1 && (() => {
+                const show = members.slice(0, 3);
+                const extra = members.length - 3;
+                const sz = 24;
+                const overlap = 8;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', position: 'relative', width: sz + (show.length - 1) * (sz - overlap) + (extra > 0 ? sz - overlap : 0), height: sz }}>
+                      {show.map((m, i) => (
+                        <div key={m.id || i} style={{
+                          position: 'absolute', left: i * (sz - overlap),
+                          width: sz, height: sz, borderRadius: '50%',
+                          border: '1.5px solid var(--color-surface-container-lowest)',
+                          background: 'var(--color-surface-container)',
+                          overflow: 'hidden',
+                          zIndex: show.length - i,
+                        }}>
+                          {m.avatarUrl
+                            ? <img src={m.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <span style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--color-on-surface-variant)' }}>{(m.name || '?')[0]}</span>
+                          }
+                        </div>
+                      ))}
+                      {extra > 0 && (
+                        <div style={{
+                          position: 'absolute', left: show.length * (sz - overlap),
+                          width: sz, height: sz, borderRadius: '50%',
+                          border: '1.5px solid var(--color-surface-container-lowest)',
+                          background: 'var(--color-surface-container-high)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          zIndex: 0,
+                        }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--color-on-surface-variant)' }}>+{extra}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -390,7 +418,7 @@ export default function HomePage() {
                   destinations={trip.destinations}
                   coverColor={trip.coverColor}
                   coverImage={trip.coverImage}
-                  memberCount={trip.members?.length || 0}
+                  members={trip.members || []}
                   onClick={() => handleOpenTrip(trip)}
                   onMore={() => setMoreMenu({ trip })}
                 />

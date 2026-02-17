@@ -1,22 +1,5 @@
-export const TYPE_CONFIG = {
-  food: { icon: "fire", bg: "#FFF3EC", border: "#FDDCC8", text: "#C75D20" },
-  spot: { icon: "pin", bg: "#EEF6FF", border: "#C8DFF5", text: "#2B6CB0" },
-  shop: { icon: "shopping", bg: "#F3F0FF", border: "#D5CCF5", text: "#6B46C1" },
-  move: { icon: "navigation", bg: "#F5F5F4", border: "#E0DFDC", text: "#6B6B67" },
-  flight: { icon: "plane", bg: "#E8F4FD", border: "#B8D9F0", text: "#1E6BA8" },
-  stay: { icon: "home", bg: "#F0FAF4", border: "#C6F0D5", text: "#2A7D4F" },
-  info: { icon: "flash", bg: "#FFFDE8", border: "#F0EAAC", text: "#8A7E22" },
-};
-
-export const CATEGORY_COLORS = {
-  "식사": { bg: "#FFF3EC", color: "#C75D20", border: "#FDDCC8" },
-  "관광": { bg: "#EEF6FF", color: "#2B6CB0", border: "#C8DFF5" },
-  "쇼핑": { bg: "#F3F0FF", color: "#6B46C1", border: "#D5CCF5" },
-  "쇼핑 · 간식": { bg: "#F3F0FF", color: "#6B46C1", border: "#D5CCF5" },
-  "숙소": { bg: "#F0FAF4", color: "#2A7D4F", border: "#C6F0D5" },
-  "교통": { bg: "#FFFDE8", color: "#8A7E22", border: "#F0EAAC" },
-  "항공": { bg: "#E8F4FD", color: "#1E6BA8", border: "#B8D9F0" },
-};
+// Re-export from tokens.js (single source of truth)
+export { TYPE_CONFIG, CATEGORY_COLORS } from '../styles/tokens';
 
 /**
  * Filter GUIDE_DATA by trip destinations.

@@ -87,7 +87,7 @@ function PlaceCardCarousel({ places, hasText, onPlaceClick }) {
             <p style={{ margin: 0, fontSize: 'var(--typo-caption-2-regular-size)', fontWeight: 600, color: 'var(--color-on-surface)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.name}</p>
             {place.rating != null && (
               <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--color-on-surface-variant2)' }}>
-                <span style={{ color: '#F59E0B' }}>&#9733;</span> {Number(place.rating).toFixed(1)}
+                <span style={{ color: 'var(--color-warning)' }}>&#9733;</span> {Number(place.rating).toFixed(1)}
               </p>
             )}
             {place.description && place.rating == null && (

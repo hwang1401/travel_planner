@@ -216,7 +216,7 @@ export default function AddressSearch({
                 position: 'absolute', left: 0, right: 0, top: '100%', marginTop: SPACING.sm,
                 background: 'var(--color-surface-container-lowest)',
                 border: '1px solid var(--color-outline-variant)',
-                borderRadius: s.radius, boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                borderRadius: s.radius, boxShadow: 'var(--shadow-strong)',
                 zIndex: 100, maxHeight: '220px', overflowY: 'auto',
               }),
         }}>

@@ -43,13 +43,13 @@ export const RADIUS = {
  * icon   = Icon component name
  */
 export const TYPE_CONFIG = {
-  food: { icon: "fire", bg: "#FFF3EC", border: "#FDDCC8", text: "#C75D20" },
-  spot: { icon: "pin", bg: "#EEF6FF", border: "#C8DFF5", text: "#2B6CB0" },
-  shop: { icon: "shopping", bg: "#F3F0FF", border: "#D5CCF5", text: "#6B46C1" },
-  move: { icon: "navigation", bg: "#F5F5F4", border: "#E0DFDC", text: "#6B6B67" },
-  flight: { icon: "plane", bg: "#E8F4FD", border: "#B8D9F0", text: "#1E6BA8" },
-  stay: { icon: "home", bg: "#F0FAF4", border: "#C6F0D5", text: "#2A7D4F" },
-  info: { icon: "flash", bg: "#FFFDE8", border: "#F0EAAC", text: "#8A7E22" },
+  food: { icon: "fire", bg: "var(--color-type-food-bg)", border: "var(--color-type-food-border)", text: "var(--color-type-food-text)" },
+  spot: { icon: "pin", bg: "var(--color-type-spot-bg)", border: "var(--color-type-spot-border)", text: "var(--color-type-spot-text)" },
+  shop: { icon: "shopping", bg: "var(--color-type-shop-bg)", border: "var(--color-type-shop-border)", text: "var(--color-type-shop-text)" },
+  move: { icon: "navigation", bg: "var(--color-type-move-bg)", border: "var(--color-type-move-border)", text: "var(--color-type-move-text)" },
+  flight: { icon: "plane", bg: "var(--color-type-flight-bg)", border: "var(--color-type-flight-border)", text: "var(--color-type-flight-text)" },
+  stay: { icon: "home", bg: "var(--color-type-stay-bg)", border: "var(--color-type-stay-border)", text: "var(--color-type-stay-text)" },
+  info: { icon: "flash", bg: "var(--color-type-info-bg)", border: "var(--color-type-info-border)", text: "var(--color-type-info-text)" },
 };
 
 /* ── Category Colors ──
@@ -57,14 +57,14 @@ export const TYPE_CONFIG = {
  * Used in DetailDialog, badges, etc.
  */
 export const CATEGORY_COLORS = {
-  "식사": { bg: "#FFF3EC", color: "#C75D20", border: "#FDDCC8" },
-  "관광": { bg: "#EEF6FF", color: "#2B6CB0", border: "#C8DFF5" },
-  "쇼핑": { bg: "#F3F0FF", color: "#6B46C1", border: "#D5CCF5" },
-  "쇼핑 · 간식": { bg: "#F3F0FF", color: "#6B46C1", border: "#D5CCF5" },
-  "숙소": { bg: "#F0FAF4", color: "#2A7D4F", border: "#C6F0D5" },
-  "교통": { bg: "#FFFDE8", color: "#8A7E22", border: "#F0EAAC" },
-  "항공": { bg: "#E8F4FD", color: "#1E6BA8", border: "#B8D9F0" },
-  "정보": { bg: "#FFFDE8", color: "#8A7E22", border: "#F0EAAC" },
+  "식사": { bg: "var(--color-type-food-bg)", color: "var(--color-type-food-text)", border: "var(--color-type-food-border)" },
+  "관광": { bg: "var(--color-type-spot-bg)", color: "var(--color-type-spot-text)", border: "var(--color-type-spot-border)" },
+  "쇼핑": { bg: "var(--color-type-shop-bg)", color: "var(--color-type-shop-text)", border: "var(--color-type-shop-border)" },
+  "쇼핑 · 간식": { bg: "var(--color-type-shop-bg)", color: "var(--color-type-shop-text)", border: "var(--color-type-shop-border)" },
+  "숙소": { bg: "var(--color-type-stay-bg)", color: "var(--color-type-stay-text)", border: "var(--color-type-stay-border)" },
+  "교통": { bg: "var(--color-type-info-bg)", color: "var(--color-type-info-text)", border: "var(--color-type-info-border)" },
+  "항공": { bg: "var(--color-type-flight-bg)", color: "var(--color-type-flight-text)", border: "var(--color-type-flight-border)" },
+  "정보": { bg: "var(--color-type-info-bg)", color: "var(--color-type-info-text)", border: "var(--color-type-info-border)" },
 };
 
 /* ── Type Label Map ── */

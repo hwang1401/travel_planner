@@ -214,6 +214,28 @@ function nameSimilar(a: string, b: string): boolean {
   return false;
 }
 
+/** periods 배열 → "월요일: HH:MM – HH:MM; ..." 한국어 문자열 변환 (weekdayDescriptions 없을 때 fallback) */
+const KO_DAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+function periodsToHoursStr(periods: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }> | undefined | null): string | null {
+  if (!periods?.length) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const byDay: Record<number, string> = {};
+  for (const p of periods) {
+    const d = p.open?.day;
+    if (d == null) continue;
+    if (!p.close || (p.close.day === d && p.close.hour === 0 && p.close.minute === 0 && p.open!.hour === 0 && p.open!.minute === 0)) {
+      byDay[d] = '24시간 영업';
+      continue;
+    }
+    byDay[d] = `${pad(p.open!.hour ?? 0)}:${pad(p.open!.minute ?? 0)} – ${pad(p.close.hour ?? 0)}:${pad(p.close.minute ?? 0)}`;
+  }
+  const parts: string[] = [];
+  for (let d = 0; d < 7; d++) {
+    parts.push(`${KO_DAYS[d]}: ${byDay[d] ?? '휴무'}`);
+  }
+  return parts.join('; ');
+}
+
 type PlaceResult = {
   id: string | null;
   displayName: string;
@@ -265,16 +287,17 @@ async function searchPlaces(
     location?: { latitude?: number; longitude?: number };
     rating?: number;
     userRatingCount?: number;
-    regularOpeningHours?: { weekdayDescriptions?: string[] };
+    regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }> };
     businessStatus?: string;
   }> };
   if (!data?.places) return [];
   return data.places.map((p) => {
     const loc = p.location;
-    const wdDesc = p.regularOpeningHours?.weekdayDescriptions;
-    const hoursStr = Array.isArray(wdDesc) && wdDesc.length > 0
+    const oh = p.regularOpeningHours;
+    const wdDesc = oh?.weekdayDescriptions;
+    const hoursStr = (Array.isArray(wdDesc) && wdDesc.length > 0)
       ? wdDesc.join('; ')
-      : null;
+      : periodsToHoursStr(oh?.periods);
     return {
       id: p.id ?? null,
       displayName: p.displayName?.text ?? "",
@@ -375,16 +398,20 @@ async function enrichCachedPlace(
     const data = (await res.json()) as {
       rating?: number; userRatingCount?: number;
       photos?: Array<{ name: string; widthPx?: number; heightPx?: number }>;
-      regularOpeningHours?: { weekdayDescriptions?: string[] };
+      regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }> };
     };
 
     if (needsRating && data.rating != null) { rating = data.rating; updates.rating = rating; }
     if (needsRating && data.userRatingCount != null) { reviewCount = data.userRatingCount; updates.review_count = reviewCount; }
 
-    if (needsHours && data.regularOpeningHours?.weekdayDescriptions?.length) {
-      const hoursStr = data.regularOpeningHours.weekdayDescriptions.join('; ');
-      openingHours = hoursStr;
-      updates.opening_hours = hoursStr;
+    if (needsHours && data.regularOpeningHours) {
+      const oh = data.regularOpeningHours;
+      const hoursStr = (oh.weekdayDescriptions?.length ? oh.weekdayDescriptions.join('; ') : null)
+        || periodsToHoursStr(oh.periods);
+      if (hoursStr) {
+        openingHours = hoursStr;
+        updates.opening_hours = hoursStr;
+      }
     }
 
     if (needsImage && data.photos?.length) {
@@ -764,7 +791,7 @@ Deno.serve(async (req) => {
       console.warn("[verify-and-register] photo skip:", (e as Error).message);
     }
 
-    // Text Search에서 hours가 없으면 Place Details API로 보완
+    // Text Search에서 hours가 없으면 Place Details API로 보완 (weekdayDescriptions + periods fallback)
     let openingHours = finalResult.openingHours ?? null;
     if (!openingHours && finalResult.id) {
       try {
@@ -773,9 +800,12 @@ Deno.serve(async (req) => {
           { headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "regularOpeningHours" } }
         );
         if (hRes.ok) {
-          const hData = (await hRes.json()) as { regularOpeningHours?: { weekdayDescriptions?: string[] } };
-          if (hData.regularOpeningHours?.weekdayDescriptions?.length) {
-            openingHours = hData.regularOpeningHours.weekdayDescriptions.join('; ');
+          const hData = (await hRes.json()) as { regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }> } };
+          const oh = hData.regularOpeningHours;
+          const hoursStr = (oh?.weekdayDescriptions?.length ? oh.weekdayDescriptions.join('; ') : null)
+            || periodsToHoursStr(oh?.periods);
+          if (hoursStr) {
+            openingHours = hoursStr;
             await supabase.from("rag_places").update({ opening_hours: openingHours }).eq("id", rowId);
           }
         }

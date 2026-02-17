@@ -76,7 +76,7 @@ export default function DraggableSheet({
         height: `${height}vh`,
         background: 'var(--color-surface-container-lowest)',
         borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
-        boxShadow: '0 -2px 12px rgba(0,0,0,0.08)',
+        boxShadow: 'var(--shadow-normal)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',

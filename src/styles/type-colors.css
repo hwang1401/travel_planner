@@ -1,0 +1,76 @@
+/* ══ Type / Category Colors (light & dark) ══ */
+/* Schedule item types: food, spot, shop, move, flight, stay, info */
+
+:root {
+  /* food (coral/orange) */
+  --color-type-food-bg: #FFF3EC;
+  --color-type-food-border: #FDDCC8;
+  --color-type-food-text: #C75D20;
+
+  /* spot (blue) */
+  --color-type-spot-bg: #EEF6FF;
+  --color-type-spot-border: #C8DFF5;
+  --color-type-spot-text: #2B6CB0;
+
+  /* shop (purple) */
+  --color-type-shop-bg: #F3F0FF;
+  --color-type-shop-border: #D5CCF5;
+  --color-type-shop-text: #6B46C1;
+
+  /* move (gray) */
+  --color-type-move-bg: #F5F5F4;
+  --color-type-move-border: #E0DFDC;
+  --color-type-move-text: #6B6B67;
+
+  /* flight (cyan-blue) */
+  --color-type-flight-bg: #E8F4FD;
+  --color-type-flight-border: #B8D9F0;
+  --color-type-flight-text: #1E6BA8;
+
+  /* stay (green) */
+  --color-type-stay-bg: #F0FAF4;
+  --color-type-stay-border: #C6F0D5;
+  --color-type-stay-text: #2A7D4F;
+
+  /* info (yellow) */
+  --color-type-info-bg: #FFFDE8;
+  --color-type-info-border: #F0EAAC;
+  --color-type-info-text: #8A7E22;
+}
+
+:root[data-theme="dark"] {
+  /* food (coral/orange) */
+  --color-type-food-bg: var(--palette-coral-15);
+  --color-type-food-border: var(--palette-coral-30);
+  --color-type-food-text: var(--palette-coral-70);
+
+  /* spot (blue) */
+  --color-type-spot-bg: var(--palette-cyan-10);
+  --color-type-spot-border: var(--palette-cyan-30);
+  --color-type-spot-text: var(--palette-cyan-70);
+
+  /* shop (purple) */
+  --color-type-shop-bg: var(--palette-purple-10);
+  --color-type-shop-border: var(--palette-purple-30);
+  --color-type-shop-text: var(--palette-purple-70);
+
+  /* move (gray) */
+  --color-type-move-bg: var(--palette-gray-15);
+  --color-type-move-border: var(--palette-gray-30);
+  --color-type-move-text: var(--palette-gray-70);
+
+  /* flight (cyan-blue) */
+  --color-type-flight-bg: var(--palette-cyan-10);
+  --color-type-flight-border: var(--palette-cyan-30);
+  --color-type-flight-text: var(--palette-cyan-70);
+
+  /* stay (green) */
+  --color-type-stay-bg: var(--palette-green-10);
+  --color-type-stay-border: var(--palette-green-30);
+  --color-type-stay-text: var(--palette-green-70);
+
+  /* info (yellow) */
+  --color-type-info-bg: var(--palette-yellow-10);
+  --color-type-info-border: var(--palette-yellow-30);
+  --color-type-info-text: var(--palette-yellow-70);
+}
