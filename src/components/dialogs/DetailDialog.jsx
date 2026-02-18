@@ -294,15 +294,16 @@ export default function DetailDialog({
     if (existingCount >= 3) { setRagImages([]); return; }
     const name = effectiveDetail.name || item?.desc || '';
     const address = effectiveDetail.address || '';
-    if (!name.trim() && !address.trim()) { setRagImages([]); return; }
+    const placeId = effectiveDetail.placeId || '';
+    if (!name.trim() && !address.trim() && !placeId) { setRagImages([]); return; }
     let cancelled = false;
-    getPlaceByNameOrAddress({ name, address }).then((place) => {
+    getPlaceByNameOrAddress({ name, address, placeId }).then((place) => {
       if (cancelled) return;
       const urls = place?.image_urls?.length ? place.image_urls : (place?.image_url ? [place.image_url] : []);
       setRagImages(urls);
     }).catch(() => { if (!cancelled) setRagImages([]); });
     return () => { cancelled = true; };
-  }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?._imageRemovedByUser, item?.desc, mainImage, imagesArray]);
+  }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?.placeId, effectiveDetail?._imageRemovedByUser, item?.desc, mainImage, imagesArray]);
 
   /* ── RAG short_address 보충 (이미지 조회와 독립적으로 항상 실행) ── */
   useEffect(() => {
