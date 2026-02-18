@@ -1609,6 +1609,39 @@ export default function TravelPlanner() {
             {tripSubtitle}
           </p>
         </div>
+        {/* 온라인 멤버 아바타 (홈 카드 스타일 겹침 + 온라인 인디케이터) */}
+        {onlineUsers.length > 0 && (() => {
+          const show = onlineUsers.slice(0, 3);
+          const sz = 24;
+          const overlap = 8;
+          return (
+            <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+              <div style={{ position: "relative", width: sz + (show.length - 1) * (sz - overlap), height: sz }}>
+                {show.map((ou, i) => (
+                  <div key={ou.id} style={{
+                    position: "absolute", left: i * (sz - overlap),
+                    width: sz, height: sz, borderRadius: "50%",
+                    border: "1.5px solid var(--color-surface-container-lowest)",
+                    background: "var(--color-surface-container)",
+                    overflow: "hidden",
+                    zIndex: show.length - i,
+                  }}>
+                    {ou.avatarUrl ? (
+                      <img src={ou.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <span style={{ display: "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--color-on-surface-variant)" }}>{(ou.name || "?")[0]}</span>
+                    )}
+                    <div style={{
+                      position: "absolute", bottom: -1, right: -1,
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: "var(--color-success)", border: "1.5px solid var(--color-surface-container-lowest)",
+                    }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {/* Share button */}
         <Button variant="ghost-neutral" size="md" iconOnly="share"
           onClick={() => setShowShareSheet(true)}
