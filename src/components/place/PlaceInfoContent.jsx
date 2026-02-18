@@ -225,7 +225,7 @@ export default function PlaceInfoContent({
     if (!name.trim() && !address.trim()) { setRagImages([]); setRagEnriched(null); return; }
     let cancelled = false;
 
-    getPlaceByNameOrAddress({ name, address }).then((p) => {
+    getPlaceByNameOrAddress({ name, address, placeId: place?.placeId }).then((p) => {
       if (cancelled) return;
       if (!p) {
         setRagImages([]);
@@ -237,6 +237,7 @@ export default function PlaceInfoContent({
       if (imgs.length > 0) setRagImages(imgs);
       const enriched = {};
       if (!place?.address && p.address) enriched.address = p.address;
+      if (!place?.shortAddress && p.short_address) enriched.shortAddress = p.short_address;
       if (place?.rating == null && p.rating != null) enriched.rating = p.rating;
       if (place?.reviewCount == null && p.review_count != null) enriched.reviewCount = p.review_count;
       if (p.opening_hours && !place?.hours) enriched.hours = p.opening_hours;
@@ -475,9 +476,10 @@ export default function PlaceInfoContent({
         );
       }
 
-      /* ── Address: minimap 80x80 + tap to copy ── */
+      /* ── Address: minimap 80x80 + tap to copy (full address) ── */
       if (row.field === 'address') {
         const epHasCoords = ep?.lat != null && ep?.lon != null;
+        const displayAddr = ep?.shortAddress || ep?.address;
         const copyAddr = () => {
           if (!ep?.address) return;
           navigator.clipboard.writeText(ep.address).then(() => {
@@ -491,7 +493,7 @@ export default function PlaceInfoContent({
             <Icon name="pin" size={20} style={{ color: 'var(--color-on-surface-variant2)', flexShrink: 0, marginTop: SPACING.xs }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 'var(--typo-caption-1-bold-size)', fontWeight: 600, color: 'var(--color-on-surface-variant2)', marginBottom: SPACING.xs }}>주소</div>
-              <div style={{ fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface)', wordBreak: 'break-word' }}>{ep.address}</div>
+              <div style={{ fontSize: 'var(--typo-label-1-n---regular-size)', lineHeight: 'var(--typo-label-1-n---regular-line-height)', color: 'var(--color-on-surface)', wordBreak: 'break-word' }}>{displayAddr}</div>
             </div>
             {epHasCoords && (
               <div key={`minimap-${ep.lat}-${ep.lon}`} style={{ width: 80, height: 80, borderRadius: RADIUS.md, overflow: 'hidden', flexShrink: 0 }}>
@@ -680,9 +682,9 @@ export default function PlaceInfoContent({
               {place.name}
             </p>
           )}
-          {place?.address && (
+          {(place?.shortAddress || place?.address) && (
             <p style={{ margin: '1px 0 0', fontSize: 'var(--typo-caption-2-regular-size)', color: 'var(--color-on-surface-variant2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {place.address}
+              {place.shortAddress || place.address}
             </p>
           )}
         </div>

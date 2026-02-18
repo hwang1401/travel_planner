@@ -1289,6 +1289,7 @@ async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
 
         // 검증된 데이터로 업데이트
         if (verified.address) item.detail.address = verified.address;
+        if (verified.short_address) item.detail.shortAddress = verified.short_address;
         if (verified.lat != null) item.detail.lat = verified.lat;
         if (verified.lon != null) item.detail.lon = verified.lon;
         if (verified.image_url) item.detail.image = verified.image_url;

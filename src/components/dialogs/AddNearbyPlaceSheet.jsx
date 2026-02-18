@@ -30,7 +30,7 @@ export default function AddNearbyPlaceSheet({ place, onConfirm, onClose }) {
   };
 
   const name = place.name_ko || '장소';
-  const address = place.address || '';
+  const address = place.short_address || place.address || '';
 
   return (
     <BottomSheet onClose={onClose} maxHeight="70vh" zIndex="var(--z-confirm)" title="일정에 추가">

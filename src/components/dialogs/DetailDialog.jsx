@@ -167,6 +167,7 @@ export default function DetailDialog({
   const [selectedForDelete, setSelectedForDelete] = useState(() => new Set());
   const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined, photoUrl: undefined, rating: undefined, reviewCount: undefined, hours: undefined, priceLevel: undefined });
   const [loadedImageIndices, setLoadedImageIndices] = useState(() => new Set());
+  const [ragShortAddress, setRagShortAddress] = useState(null);
 
   // visualViewport
   const [viewportRect, setViewportRect] = useState(null);
@@ -302,6 +303,21 @@ export default function DetailDialog({
     }).catch(() => { if (!cancelled) setRagImages([]); });
     return () => { cancelled = true; };
   }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?._imageRemovedByUser, item?.desc, mainImage, imagesArray]);
+
+  /* ── RAG short_address 보충 (이미지 조회와 독립적으로 항상 실행) ── */
+  useEffect(() => {
+    if (effectiveDetail.shortAddress) { setRagShortAddress(null); return; }
+    const name = effectiveDetail.name || item?.desc || '';
+    const address = effectiveDetail.address || '';
+    const placeId = effectiveDetail.placeId || '';
+    if (!name.trim() && !address.trim() && !placeId) return;
+    let cancelled = false;
+    getPlaceByNameOrAddress({ name, address, placeId }).then((place) => {
+      if (cancelled) return;
+      if (place?.short_address) setRagShortAddress(place.short_address);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?.shortAddress, effectiveDetail?.placeId, item?.desc]);
 
   // placeId가 있으면 Google Places에서 최대 3장 사진 fetch (가드 조건으로 불필요한 API 호출 방지)
   useEffect(() => {
@@ -606,7 +622,7 @@ export default function DetailDialog({
   /* ── 콘텐츠 렌더 (칩별) ── */
   const infoRows = [
     { field: 'hours', icon: 'clock', label: isStay ? '체크인·체크아웃' : '영업시간', value: isStay ? effectiveDetail.hours : sanitizeHoursForDisplay(effectiveDetail.hours), placeholder: isStay ? '체크인·체크아웃 입력' : '영업시간 입력', onClick: () => openTextEdit('hours', isStay ? '체크인·체크아웃' : '영업시간', effectiveDetail.hours) },
-    { icon: 'pin', label: '주소', value: effectiveDetail.address, placeholder: '장소 검색', onClick: () => setShowAddressSearchDialog(true), miniMap: true, copyable: true },
+    { icon: 'pin', label: '주소', value: effectiveDetail.shortAddress || ragShortAddress || effectiveDetail.address, fullAddress: effectiveDetail.address, placeholder: '장소 검색', onClick: () => setShowAddressSearchDialog(true), miniMap: true, copyable: true },
     { icon: 'pricetag', label: '가격', value: effectiveDetail.price, placeholder: '가격 입력', onClick: () => openTextEdit('price', '가격', effectiveDetail.price) },
     { icon: 'bulb', label: '메모', value: effectiveDetail.tip, placeholder: '메모를 입력하세요', onClick: () => openTextEdit('tip', '메모', effectiveDetail.tip, true), multiline: true },
   ];
@@ -751,7 +767,7 @@ export default function DetailDialog({
         ? row.onClick
         : (row.copyable && row.value)
           ? () => {
-              navigator.clipboard.writeText(row.value).then(() => {
+              navigator.clipboard.writeText(row.fullAddress || row.value).then(() => {
                 setCopyToast({ message: '주소가 복사되었습니다' });
               }).catch(() => {});
             }
@@ -1678,6 +1694,7 @@ export default function DetailDialog({
             if (changed && addressSearchPending.address) {
               const fields = {
                 address: addressSearchPending.address || '',
+                shortAddress: null,
                 lat: addressSearchPending.lat,
                 lon: addressSearchPending.lon,
                 placeId: addressSearchPending.placeId ?? null,

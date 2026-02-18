@@ -162,12 +162,12 @@ export default function AddRAGPlaceSheet({ place, onConfirm, onClose, allDays, s
         />
 
         {/* 주소 (읽기 전용) */}
-        {place.address && (
+        {(place.short_address || place.address) && (
           <Field
             label="주소"
             size="lg"
             variant="outlined"
-            value={place.address}
+            value={place.short_address || place.address}
             disabled
             style={{ background: 'var(--color-surface-container-lowest)' }}
           />

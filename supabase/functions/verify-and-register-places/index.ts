@@ -441,7 +441,7 @@ async function downloadPhoto(photoName: string, apiKey: string, maxWidth = 1600)
  * 한 번 채워놓으면 다음부터 완전한 캐시 히트.
  */
 async function enrichCachedPlace(
-  row: { id: string; google_place_id: string | null; rating: number | null; review_count: number | null; image_url: string | null; image_urls?: string[] | null; opening_hours?: string | null; region?: string | null },
+  row: { id: string; google_place_id: string | null; rating: number | null; review_count: number | null; image_url: string | null; image_urls?: string[] | null; opening_hours?: string | null; short_address?: string | null; region?: string | null },
   apiKey: string,
   supabase: ReturnType<typeof createClient>,
   bucket: string,
@@ -452,7 +452,8 @@ async function enrichCachedPlace(
   // image_url은 있지만 image_urls가 비어있는 기존 데이터는 rag-enrich.js 배치로 백필.
   const needsImage = !row.image_url;
   const needsHours = !isValidKoHours(row.opening_hours);
-  if ((!needsRating && !needsImage && !needsHours) || !row.google_place_id) {
+  const needsShortAddress = !row.short_address;
+  if ((!needsRating && !needsImage && !needsHours && !needsShortAddress) || !row.google_place_id) {
     return { rating: row.rating, reviewCount: row.review_count, image_url: row.image_url, image_urls: existingImageUrls, opening_hours: row.opening_hours ?? null };
   }
 
@@ -468,8 +469,9 @@ async function enrichCachedPlace(
     if (needsRating) fields.push("rating", "userRatingCount");
     if (needsImage) fields.push("photos");
     if (needsHours) fields.push("regularOpeningHours");
+    if (needsShortAddress) fields.push("shortFormattedAddress");
 
-    const langParam = needsHours ? '?languageCode=ko' : '';
+    const langParam = (needsHours || needsShortAddress) ? '?languageCode=ko' : '';
     const url = `https://places.googleapis.com/v1/places/${row.google_place_id}${langParam}`;
     const res = await fetch(url, {
       headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fields.join(",") },
@@ -480,6 +482,7 @@ async function enrichCachedPlace(
       rating?: number; userRatingCount?: number;
       photos?: Array<{ name: string; widthPx?: number; heightPx?: number }>;
       regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }> };
+      shortFormattedAddress?: string;
     };
 
     if (needsRating && data.rating != null) { rating = data.rating; updates.rating = rating; }
@@ -498,6 +501,10 @@ async function enrichCachedPlace(
       } else {
         console.log(`[enrichCachedPlace] Place Details returned no hours for ${row.google_place_id}`);
       }
+    }
+
+    if (needsShortAddress && data.shortFormattedAddress) {
+      updates.short_address = data.shortFormattedAddress;
     }
 
     if (needsImage && data.photos?.length) {
@@ -590,7 +597,7 @@ Deno.serve(async (req) => {
 
   const processOne = async (
     place: { desc: string; type: string; address?: string; region?: string }
-  ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; image_urls?: string[]; placeId: string | null; rating: number | null; reviewCount: number | null; opening_hours: string | null; business_status?: string | null } }> => {
+  ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; short_address?: string | null; lat: number | null; lon: number | null; image_url: string | null; image_urls?: string[]; placeId: string | null; rating: number | null; reviewCount: number | null; opening_hours: string | null; business_status?: string | null } }> => {
     // ── 0. DB 먼저 조회: 이미 등록된 장소면 Text Search 스킵 ──
     const regionKey = place.region
       ? (LABEL_TO_REGION[place.region] || place.region.toLowerCase())
@@ -606,7 +613,7 @@ Deno.serve(async (req) => {
     if (possibleRegions.length > 0) {
       const { data: cached } = await supabase
         .from("rag_places")
-        .select("id, confidence, address, lat, lon, image_url, image_urls, google_place_id, rating, review_count, region, opening_hours")
+        .select("id, confidence, address, short_address, lat, lon, image_url, image_urls, google_place_id, rating, review_count, region, opening_hours")
         .eq("name_ko", place.desc)
         .in("region", possibleRegions)
         .maybeSingle();
@@ -618,6 +625,7 @@ Deno.serve(async (req) => {
           data: {
             desc: place.desc,
             address: cached.address || null,
+            short_address: cached.short_address || null,
             lat: cached.lat || null,
             lon: cached.lon || null,
             image_url: enriched.image_url,
@@ -775,7 +783,7 @@ Deno.serve(async (req) => {
     // ── 2. google_place_id로 기존 데이터 조회 (Text Search 결과 기반) ──
     const { data: existing } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, image_urls, google_place_id, rating, review_count, region, opening_hours")
+      .select("id, confidence, address, short_address, lat, lon, image_url, image_urls, google_place_id, rating, review_count, region, opening_hours")
       .eq("google_place_id", finalResult.id)
       .maybeSingle();
 
@@ -790,6 +798,7 @@ Deno.serve(async (req) => {
         data: {
           desc: place.desc,
           address: existing.address || null,
+          short_address: existing.short_address || null,
           lat: existing.lat || finalResult.location?.latitude || null,
           lon: existing.lon || finalResult.location?.longitude || null,
           image_url: enriched.image_url,
@@ -806,7 +815,7 @@ Deno.serve(async (req) => {
     // region+name_ko 기준 verified 데이터가 있으면 덮어쓰지 않음
     const { data: existingByName } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, image_urls, google_place_id, rating, review_count, region, opening_hours")
+      .select("id, confidence, address, short_address, lat, lon, image_url, image_urls, google_place_id, rating, review_count, region, opening_hours")
       .eq("region", region)
       .eq("name_ko", place.desc)
       .maybeSingle();
@@ -820,6 +829,7 @@ Deno.serve(async (req) => {
         data: {
           desc: place.desc,
           address: existingByName.address || null,
+          short_address: existingByName.short_address || null,
           lat: existingByName.lat || finalResult.location?.latitude || null,
           lon: existingByName.lon || finalResult.location?.longitude || null,
           image_url: enriched.image_url,
@@ -839,6 +849,7 @@ Deno.serve(async (req) => {
     let detailReviewCount: number | null = null;
     let detailHours: string | null = null;
     let detailAddress: string | null = null;
+    let detailShortAddress: string | null = null;
     let detailBusinessStatus: string | null = finalResult.businessStatus ?? null;
     let topPhotoNames: string[] = [];
 
@@ -848,7 +859,7 @@ Deno.serve(async (req) => {
         {
           headers: {
             "X-Goog-Api-Key": apiKey,
-            "X-Goog-FieldMask": "rating,userRatingCount,regularOpeningHours,photos,formattedAddress,businessStatus",
+            "X-Goog-FieldMask": "rating,userRatingCount,regularOpeningHours,photos,formattedAddress,shortFormattedAddress,businessStatus",
           },
         }
       );
@@ -859,11 +870,13 @@ Deno.serve(async (req) => {
           regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }> };
           photos?: Array<{ name: string; widthPx?: number; heightPx?: number }>;
           formattedAddress?: string;
+          shortFormattedAddress?: string;
           businessStatus?: string;
         };
         detailRating = detail.rating ?? null;
         detailReviewCount = detail.userRatingCount ?? null;
         detailAddress = detail.formattedAddress ?? null;
+        detailShortAddress = detail.shortFormattedAddress ?? null;
         if (detail.businessStatus) detailBusinessStatus = detail.businessStatus;
 
         const oh = detail.regularOpeningHours;
@@ -887,6 +900,7 @@ Deno.serve(async (req) => {
       type: place.type,
       description: null as string | null,
       address: detailAddress,
+      short_address: detailShortAddress,
       lat: finalResult.location?.latitude ?? null,
       lon: finalResult.location?.longitude ?? null,
       confidence: "auto_verified",
@@ -913,6 +927,7 @@ Deno.serve(async (req) => {
       data: {
         desc: place.desc,
         address: detailAddress,
+        short_address: detailShortAddress,
         lat: finalResult.location?.latitude || null,
         lon: finalResult.location?.longitude || null,
         image_url: null,
@@ -944,6 +959,7 @@ Deno.serve(async (req) => {
       data: {
         desc: place.desc,
         address: detailAddress,
+        short_address: detailShortAddress,
         lat: finalResult.location?.latitude || null,
         lon: finalResult.location?.longitude || null,
         image_url: imageUrl,
@@ -961,6 +977,7 @@ Deno.serve(async (req) => {
   const results: Array<{
     desc: string;
     address: string | null;
+    short_address?: string | null;
     lat: number | null;
     lon: number | null;
     image_url: string | null;
@@ -969,6 +986,7 @@ Deno.serve(async (req) => {
     rating: number | null;
     reviewCount: number | null;
     opening_hours: string | null;
+    business_status?: string | null;
   }> = [];
 
   for (const place of toProcess) {

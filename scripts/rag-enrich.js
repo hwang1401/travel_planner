@@ -3,7 +3,7 @@
  * Only targets rows that have google_place_id but are missing rating OR image_url OR valid opening_hours.
  *
  * Usage:
- *   node scripts/rag-enrich.js [--region kumamoto] [--limit 50] [--dry-run] [--rating-only] [--photo-only] [--hours-only]
+ *   node scripts/rag-enrich.js [--region kumamoto] [--limit 50] [--dry-run] [--rating-only] [--photo-only] [--hours-only] [--address-only]
  *
  * Env: .env or .env.local
  *   GOOGLE_PLACES_API_KEY
@@ -70,7 +70,7 @@ function periodsToHoursStr(periods) {
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const opts = { region: null, limit: null, dryRun: false, ratingOnly: false, photoOnly: false, hoursOnly: false };
+  const opts = { region: null, limit: null, dryRun: false, ratingOnly: false, photoOnly: false, hoursOnly: false, addressOnly: false };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--region' && args[i + 1]) opts.region = args[++i];
     else if (args[i] === '--limit' && args[i + 1]) opts.limit = parseInt(args[++i], 10);
@@ -78,6 +78,7 @@ function parseArgs() {
     else if (args[i] === '--rating-only') opts.ratingOnly = true;
     else if (args[i] === '--photo-only') opts.photoOnly = true;
     else if (args[i] === '--hours-only') opts.hoursOnly = true;
+    else if (args[i] === '--address-only') opts.addressOnly = true;
   }
   return opts;
 }
@@ -85,14 +86,15 @@ function parseArgs() {
 /**
  * Single Google Places API call to fetch rating + photos + hours (combined FieldMask).
  */
-async function fetchPlaceData(placeId, { needsRating, needsPhoto, needsHours }) {
+async function fetchPlaceData(placeId, { needsRating, needsPhoto, needsHours, needsAddress }) {
   const fields = [];
   if (needsRating) fields.push('rating', 'userRatingCount');
   if (needsPhoto) fields.push('photos');
   if (needsHours) fields.push('regularOpeningHours');
+  if (needsAddress) fields.push('shortFormattedAddress');
   if (fields.length === 0) return null;
 
-  const langParam = needsHours ? '?languageCode=ko' : '';
+  const langParam = (needsHours || needsAddress) ? '?languageCode=ko' : '';
   const url = `https://places.googleapis.com/v1/places/${placeId}${langParam}`;
   const res = await fetch(url, {
     headers: {
@@ -133,11 +135,13 @@ async function main() {
   // Query: google_place_id 있고 (rating IS NULL OR image_url IS NULL OR opening_hours 무효)
   let query = supabase
     .from('rag_places')
-    .select('id, region, name_ko, google_place_id, rating, review_count, image_url, image_urls, opening_hours')
+    .select('id, region, name_ko, google_place_id, rating, review_count, image_url, image_urls, opening_hours, short_address')
     .not('google_place_id', 'is', null)
     .order('region');
 
-  if (opts.ratingOnly) {
+  if (opts.addressOnly) {
+    query = query.is('short_address', null);
+  } else if (opts.ratingOnly) {
     query = query.is('rating', null);
   } else if (opts.photoOnly) {
     // image_url 없거나 image_urls < 3장인 장소 (JS에서 필터)
@@ -187,11 +191,12 @@ async function main() {
   const needRating = places.filter(p => p.rating == null).length;
   const needImage = places.filter(p => (Array.isArray(p.image_urls) ? p.image_urls.filter(Boolean) : []).length < 3).length;
   const needHours = places.filter(p => !isValidKoHours(p.opening_hours)).length;
-  console.log(`Found ${places.length} places to enrich (rating: ${needRating}, images<3: ${needImage}, hours: ${needHours})${opts.region ? ` [region: ${opts.region}]` : ''}`);
+  const needAddr = places.filter(p => !p.short_address).length;
+  console.log(`Found ${places.length} places to enrich (rating: ${needRating}, images<3: ${needImage}, hours: ${needHours}, short_addr: ${needAddr})${opts.region ? ` [region: ${opts.region}]` : ''}`);
   if (opts.dryRun) {
     for (const p of places) {
       const imgCount = (Array.isArray(p.image_urls) ? p.image_urls.filter(Boolean) : []).length;
-      const missing = [p.rating == null ? 'rating' : null, imgCount < 3 ? `images(${imgCount}/3)` : null, !isValidKoHours(p.opening_hours) ? 'hours' : null].filter(Boolean).join('+');
+      const missing = [p.rating == null ? 'rating' : null, imgCount < 3 ? `images(${imgCount}/3)` : null, !isValidKoHours(p.opening_hours) ? 'hours' : null, !p.short_address ? 'short_addr' : null].filter(Boolean).join('+');
       console.log(`  ${p.region}/${p.name_ko} — needs ${missing} ${p.opening_hours && !isValidKoHours(p.opening_hours) ? `(current: "${p.opening_hours}")` : ''}`);
     }
     console.log('[DRY RUN] Exiting.');
@@ -204,19 +209,20 @@ async function main() {
 
   for (let i = 0; i < places.length; i++) {
     const p = places[i];
-    const needsRating = p.rating == null && !opts.photoOnly && !opts.hoursOnly;
+    const needsRating = p.rating == null && !opts.photoOnly && !opts.hoursOnly && !opts.addressOnly;
     const existingImageUrls = Array.isArray(p.image_urls) ? p.image_urls.filter(Boolean) : [];
-    const needsPhoto = (existingImageUrls.length < 3) && !opts.ratingOnly && !opts.hoursOnly;
-    const needsHours = !isValidKoHours(p.opening_hours) && !opts.ratingOnly && !opts.photoOnly;
+    const needsPhoto = (existingImageUrls.length < 3) && !opts.ratingOnly && !opts.hoursOnly && !opts.addressOnly;
+    const needsHours = !isValidKoHours(p.opening_hours) && !opts.ratingOnly && !opts.photoOnly && !opts.addressOnly;
+    const needsAddress = !p.short_address && !opts.ratingOnly && !opts.photoOnly && !opts.hoursOnly;
     const label = `[${i + 1}/${places.length}] ${p.region}/${p.name_ko}`;
 
-    if (!needsRating && !needsPhoto && !needsHours) { skipped++; continue; }
+    if (!needsRating && !needsPhoto && !needsHours && !needsAddress) { skipped++; continue; }
 
     try {
       await sleep(INTERVAL_MS);
 
-      // Single API call for rating + photos + hours
-      const data = await fetchPlaceData(p.google_place_id, { needsRating, needsPhoto, needsHours });
+      // Single API call for rating + photos + hours + address
+      const data = await fetchPlaceData(p.google_place_id, { needsRating, needsPhoto, needsHours, needsAddress });
       if (!data) { skipped++; continue; }
 
       const updates = {};
@@ -253,6 +259,14 @@ async function main() {
         } else {
           parts.push('no-hours');
         }
+      }
+
+      // Short address
+      if (needsAddress && data.shortFormattedAddress) {
+        updates.short_address = data.shortFormattedAddress;
+        parts.push(`short_addr="${data.shortFormattedAddress.slice(0, 40)}"`);
+      } else if (needsAddress) {
+        parts.push('no-short-addr');
       }
 
       // Photos (up to 3)

@@ -286,7 +286,7 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
     }
     if (regions.length === 0) return result;
 
-    const selectCols = 'id, region, name_ko, type, description, tags, price_range, opening_hours, image_url, google_place_id, address, lat, lon, rating, review_count, business_status';
+    const selectCols = 'id, region, name_ko, type, description, tags, price_range, opening_hours, image_url, google_place_id, address, short_address, lat, lon, rating, review_count, business_status';
     const tags = extractTagsFromPreferences(preferences || '');
     const confidenceOr = 'confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null';
 
@@ -393,15 +393,25 @@ export async function getRAGContext({ destinations, preferences, duration, hintT
  * @param {{ name?: string, address?: string }} params
  * @returns {Promise<{ image_url: string, name_ko: string, ... } | null>}
  */
-export async function getPlaceByNameOrAddress({ name, address }) {
+export async function getPlaceByNameOrAddress({ name, address, placeId }) {
   const n = (name || '').trim();
   const a = (address || '').trim();
-  if (!n && !a) return null;
+  const pid = (placeId || '').trim();
+  if (!n && !a && !pid) return null;
   try {
-    const cols = 'id, name_ko, address, image_url, image_urls, region, type, lat, lon, rating, review_count, google_place_id, opening_hours, business_status';
+    const cols = 'id, name_ko, address, short_address, image_url, image_urls, region, type, lat, lon, rating, review_count, google_place_id, opening_hours, business_status';
     const confidenceOr = 'confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null';
     let rows = [];
-    if (n) {
+    // placeId가 있으면 가장 정확한 매칭 우선
+    if (pid) {
+      const { data, error } = await supabase
+        .from('rag_places')
+        .select(cols)
+        .eq('google_place_id', pid)
+        .limit(1);
+      if (!error && data?.length) rows = data;
+    }
+    if (rows.length === 0 && n) {
       const { data, error } = await supabase
         .from('rag_places')
         .select(cols)
@@ -428,7 +438,7 @@ export async function getPlaceByNameOrAddress({ name, address }) {
   }
 }
 
-const NEARBY_SELECT = 'id, region, name_ko, type, description, image_url, address, lat, lon, rating, google_place_id, price_range, opening_hours, tags, business_status';
+const NEARBY_SELECT = 'id, region, name_ko, type, description, image_url, address, short_address, lat, lon, rating, google_place_id, price_range, opening_hours, tags, business_status';
 const NEARBY_TYPES = ['food', 'spot', 'shop', 'stay'];
 const MAX_NEARBY_PER_TYPE = 5;
 const NEARBY_FETCH_LIMIT = 80;
@@ -561,6 +571,7 @@ export async function upsertPlaceToRAG(item, destinations) {
       name_ko: d.name,
       google_place_id: d.placeId,
       address: d.address || null,
+      short_address: d.shortAddress || null,
       lat: d.lat ?? null,
       lon: d.lon ?? null,
       rating: d.rating ?? null,
