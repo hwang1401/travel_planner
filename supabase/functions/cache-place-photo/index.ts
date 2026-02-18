@@ -1,5 +1,5 @@
-// Cache a Google Places photo into rag_places.image_url via Supabase Storage.
-// Called fire-and-forget from DetailDialog when a place has no cached image.
+// Cache Google Places photos (up to 3) into rag_places via Supabase Storage.
+// Called fire-and-forget from PlaceInfoContent when a place has no cached images.
 
 declare const Deno: {
   serve: (handler: (req: Request) => Promise<Response>) => void;
@@ -17,29 +17,13 @@ const CORS_HEADERS = {
 
 const BUCKET = "images";
 
-async function getBestPhotoName(placeId: string, apiKey: string): Promise<string | null> {
-  const url = `https://places.googleapis.com/v1/places/${placeId}`;
-  const res = await fetch(url, {
-    headers: {
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": "photos",
-    },
-  });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { photos?: Array<{ name: string; widthPx?: number; heightPx?: number }> };
-  const photos = data?.photos;
-  if (!photos?.length) return null;
-  let best = photos[0];
-  let bestPixels = (best.widthPx ?? 0) * (best.heightPx ?? 0);
-  for (let i = 1; i < photos.length; i++) {
-    const p = photos[i];
-    const pixels = (p.widthPx ?? 0) * (p.heightPx ?? 0);
-    if (pixels > bestPixels) {
-      best = p;
-      bestPixels = pixels;
-    }
-  }
-  return best.name;
+/** Pick top N photo names, preferring widthPx >= 400 with fallback */
+function pickTopPhotoNames(photos: Array<{ name: string; widthPx?: number; heightPx?: number }>, count = 3): string[] {
+  if (!photos?.length) return [];
+  const sorted = [...photos].sort((a, b) => ((b.widthPx ?? 0) * (b.heightPx ?? 0)) - ((a.widthPx ?? 0) * (a.heightPx ?? 0)));
+  const wide = sorted.filter((p) => (p.widthPx ?? 0) >= 400);
+  const pool = wide.length > 0 ? wide : sorted;
+  return pool.slice(0, count).map((p) => p.name);
 }
 
 async function downloadPhoto(photoName: string, apiKey: string, maxWidth = 1600): Promise<ArrayBuffer> {
@@ -89,10 +73,10 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // 1. rag_places 조회 — 레코드 없거나 이미 image_url 있으면 스킵
+  // 1. rag_places 조회 — image_url 있으면 스킵 (image_urls 백필은 rag-enrich.js에서)
   const { data: existing } = await supabase
     .from("rag_places")
-    .select("id, region, image_url")
+    .select("id, region, image_url, image_urls")
     .eq("google_place_id", placeId)
     .maybeSingle();
 
@@ -109,39 +93,62 @@ Deno.serve(async (req) => {
     });
   }
 
-  // 2. Google Places에서 사진 다운로드 → Storage 업로드 → rag_places 업데이트
+  // 2. Google Places에서 사진 최대 3장 다운로드 → Storage 업로드 → rag_places 업데이트
   try {
-    const photoName = await getBestPhotoName(placeId, apiKey);
-    if (!photoName) {
+    const detailRes = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+      headers: {
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "photos",
+      },
+    });
+    if (!detailRes.ok) {
+      return new Response(JSON.stringify({ ok: true, skipped: true, reason: "places_api_error" }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+    const detailData = (await detailRes.json()) as { photos?: Array<{ name: string; widthPx?: number; heightPx?: number }> };
+    const photoNames = pickTopPhotoNames(detailData?.photos || [], 3);
+    if (photoNames.length === 0) {
       return new Response(JSON.stringify({ ok: true, skipped: true, reason: "no_photo" }), {
         status: 200,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
     }
 
-    const buf = await downloadPhoto(photoName, apiKey);
-    const storagePath = `rag/${existing.region || "unknown"}/${placeId}.jpg`;
-    const { error: uploadErr } = await supabase.storage
-      .from(BUCKET)
-      .upload(storagePath, buf, { contentType: "image/jpeg", upsert: true });
+    const region = existing.region || "unknown";
+    const urls: string[] = [];
+    for (let i = 0; i < photoNames.length; i++) {
+      try {
+        if (i > 0) await new Promise((r) => setTimeout(r, 80));
+        const buf = await downloadPhoto(photoNames[i], apiKey);
+        const suffix = i === 0 ? '' : `_${i + 1}`;
+        const storagePath = `rag/${region}/${placeId}${suffix}.jpg`;
+        const { error: uploadErr } = await supabase.storage
+          .from(BUCKET)
+          .upload(storagePath, buf, { contentType: "image/jpeg", upsert: true });
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+          urls.push(urlData.publicUrl);
+        }
+      } catch (e) {
+        console.warn(`[cache-place-photo] photo ${i + 1} skip:`, (e as Error).message);
+      }
+    }
 
-    if (uploadErr) {
-      console.warn("[cache-place-photo] upload error:", uploadErr.message);
-      return new Response(JSON.stringify({ ok: false, error: "upload_failed" }), {
+    if (urls.length === 0) {
+      return new Response(JSON.stringify({ ok: false, error: "all_uploads_failed" }), {
         status: 500,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
     }
 
-    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-    const imageUrl = urlData.publicUrl;
-
     await supabase
       .from("rag_places")
-      .update({ image_url: imageUrl })
+      .update({ image_url: urls[0], image_urls: urls })
       .eq("id", existing.id);
 
-    return new Response(JSON.stringify({ ok: true, image_url: imageUrl }), {
+    return new Response(JSON.stringify({ ok: true, image_url: urls[0], image_urls: urls }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });

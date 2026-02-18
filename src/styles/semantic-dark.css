@@ -2,8 +2,8 @@
 /* Source: tokens/semantic/dark.json */
 /* Semantic tokens reference Foundation palette via var() */
 :root[data-theme="dark"] {
-  /* Primary — 대표색(primary)만 라이트와 동일, on-primary·primary-container는 다크 유지 */
-  --color-primary: var(--palette-blue-60);
+  /* Primary */
+  --color-primary: var(--palette-blue-20);
   --color-on-primary: var(--palette-blue-90);
   --color-primary-container: var(--palette-blue-10);
   --color-on-primary-container: var(--palette-blue-80);
@@ -42,10 +42,10 @@
   --color-warning-container: var(--palette-orange-30);
   --color-on-warning-container: var(--palette-orange-90);
 
-  /* Neutral — 아이콘·구분선 가독성 위해 variant 계열 밝게 */
+  /* Neutral */
   --color-surface: var(--palette-gray-5);
   --color-on-surface: var(--palette-gray-90);
-  --color-on-surface-variant: var(--palette-gray-90);
+  --color-on-surface-variant: var(--palette-gray-80);
   --color-surface-dim: var(--palette-gray-5);
   --color-surface-bright: var(--palette-gray-25);
   --color-surface-container-lowest: var(--palette-gray-0);
@@ -54,7 +54,7 @@
   --color-surface-container-high: var(--palette-gray-15);
   --color-surface-container-highest: var(--palette-gray-20);
   --color-outline: var(--palette-gray-60);
-  --color-outline-variant: var(--palette-gray-50);
+  --color-outline-variant: var(--palette-gray-30);
   --color-surface-variant: var(--palette-gray-30);
   --color-inverse-surface: var(--palette-gray-90);
   --color-on-inverse-surface: var(--palette-gray-20);

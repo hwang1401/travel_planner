@@ -54,6 +54,17 @@ const REGION_CENTERS: Record<string, [number, number]> = {
   shimoda: [34.68, 138.95],
   kinosaki: [35.63, 134.81],
   ibusuki: [31.23, 130.64],
+  // 한국
+  seoul: [37.57, 126.98],
+  busan: [35.18, 129.08],
+  jeju: [33.5, 126.53],
+  // 기타 아시아
+  taipei: [25.03, 121.57],
+  bangkok: [13.76, 100.5],
+  singapore: [1.35, 103.82],
+  hongkong: [22.32, 114.17],
+  danang: [16.05, 108.22],
+  hanoi: [21.03, 105.85],
 };
 
 const REGION_JA_NAMES: Record<string, string> = {
@@ -95,6 +106,16 @@ const REGION_JA_NAMES: Record<string, string> = {
   shimoda: "下田",
   kinosaki: "城崎",
   ibusuki: "指宿",
+  // 비일본: 현지어 검색 키워드 (Text Search 정확도 향상)
+  seoul: "서울",
+  busan: "부산",
+  jeju: "제주",
+  taipei: "台北",
+  bangkok: "Bangkok",
+  singapore: "Singapore",
+  hongkong: "Hong Kong",
+  danang: "Da Nang",
+  hanoi: "Hanoi",
 };
 
 const LABEL_TO_REGION: Record<string, string> = {
@@ -125,6 +146,24 @@ const LABEL_TO_REGION: Record<string, string> = {
   osaka: "osaka",
   tokyo: "tokyo",
   kyoto: "kyoto",
+  // 한국
+  서울: "seoul",
+  부산: "busan",
+  제주: "jeju",
+  제주도: "jeju",
+  seoul: "seoul",
+  busan: "busan",
+  jeju: "jeju",
+  // 기타 아시아
+  타이베이: "taipei",
+  대만: "taipei",
+  방콕: "bangkok",
+  태국: "bangkok",
+  싱가포르: "singapore",
+  홍콩: "hongkong",
+  다낭: "danang",
+  하노이: "hanoi",
+  베트남: "hanoi",
 };
 
 function geoDistance(
@@ -158,7 +197,7 @@ function findRegionByCoords(lat: number | null, lon: number | null): string | nu
   return bestDist <= 50 ? best : null;
 }
 
-function getRegionHintCenter(regionHint: string): [number, number] {
+function getRegionHintCenter(regionHint: string): [number, number] | null {
   const lower = regionHint.trim().toLowerCase();
   for (const [label, region] of Object.entries(LABEL_TO_REGION)) {
     if (lower.includes(label.toLowerCase())) {
@@ -166,7 +205,9 @@ function getRegionHintCenter(regionHint: string): [number, number] {
       if (center) return center;
     }
   }
-  return REGION_CENTERS.fukuoka;
+  // REGION_CENTERS에 직접 키로 있는지도 확인
+  if (REGION_CENTERS[lower]) return REGION_CENTERS[lower];
+  return null;
 }
 
 function katakanaToHiragana(s: string): string {
@@ -180,6 +221,26 @@ function normalizeForMatch(s: string): string {
   if (!s || typeof s !== "string") return "";
   const t = s.replace(/\s/g, "").replace(/[・．.]/g, "").toLowerCase();
   return katakanaToHiragana(t);
+}
+
+/** 두 문자열의 최장 공통 부분 문자열 길이 */
+function longestCommonSubstring(a: string, b: string): number {
+  if (!a || !b) return 0;
+  const m = a.length, n = b.length;
+  let max = 0;
+  // 메모리 절약: 1차원 DP
+  const prev = new Array(n + 1).fill(0);
+  for (let i = 1; i <= m; i++) {
+    const curr = new Array(n + 1).fill(0);
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        curr[j] = prev[j - 1] + 1;
+        if (curr[j] > max) max = curr[j];
+      }
+    }
+    for (let j = 0; j <= n; j++) prev[j] = curr[j];
+  }
+  return max;
 }
 
 function nameSimilar(a: string, b: string): boolean {
@@ -211,7 +272,20 @@ function nameSimilar(a: string, b: string): boolean {
     }
   }
 
+  // LCS 매칭: "남산서울타워" vs "n서울타워" → "서울타워" (3자) 공통
+  // 짧은 쪽 이름의 60% 이상이 공통이면 매칭 (최소 3자)
+  const shorter = Math.min(na.length, nb.length);
+  if (shorter >= 3) {
+    const lcs = longestCommonSubstring(na, nb);
+    if (lcs >= 3 && lcs >= shorter * 0.6) return true;
+  }
+
   return false;
+}
+
+/** 한국어 요일 포맷의 유효한 영업시간인지 확인 ("월요일: ...; 화요일: ..." 등) */
+function isValidKoHours(h: string | null | undefined): boolean {
+  return !!h && /[월화수목금토일]요일/.test(h);
 }
 
 /** periods 배열 → "월요일: HH:MM – HH:MM; ..." 한국어 문자열 변환 (weekdayDescriptions 없을 때 fallback) */
@@ -239,18 +313,15 @@ function periodsToHoursStr(periods: Array<{ open?: { day?: number; hour?: number
 type PlaceResult = {
   id: string | null;
   displayName: string;
-  formattedAddress: string | null;
   location: { latitude: number; longitude: number } | null;
-  rating: number | null;
   userRatingCount: number | null;
-  openingHours: string | null;
   businessStatus: string | null;
 };
 
 async function searchPlaces(
   textQuery: string,
-  lat: number,
-  lng: number,
+  lat: number | null,
+  lng: number | null,
   apiKey: string,
   languageCode = "ja",
   includedType?: string,
@@ -260,14 +331,16 @@ async function searchPlaces(
   const body: Record<string, unknown> = {
     textQuery: String(textQuery),
     languageCode,
-    locationBias: {
+    maxResultCount,
+  };
+  if (lat != null && lng != null) {
+    body.locationBias = {
       circle: {
         center: { latitude: lat, longitude: lng },
         radius: 50000,
       },
-    },
-    maxResultCount,
-  };
+    };
+  }
   if (includedType) body.includedType = includedType;
   const res = await fetch(url, {
     method: "POST",
@@ -275,7 +348,7 @@ async function searchPlaces(
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.regularOpeningHours,places.businessStatus",
+        "places.id,places.displayName,places.location,places.userRatingCount,places.businessStatus",
     },
     body: JSON.stringify(body),
   });
@@ -283,32 +356,21 @@ async function searchPlaces(
   const data = (await res.json()) as { places?: Array<{
     id?: string;
     displayName?: { text?: string };
-    formattedAddress?: string;
     location?: { latitude?: number; longitude?: number };
-    rating?: number;
     userRatingCount?: number;
-    regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }> };
     businessStatus?: string;
   }> };
   if (!data?.places) return [];
   return data.places.map((p) => {
     const loc = p.location;
-    const oh = p.regularOpeningHours;
-    const wdDesc = oh?.weekdayDescriptions;
-    const hoursStr = (Array.isArray(wdDesc) && wdDesc.length > 0)
-      ? wdDesc.join('; ')
-      : periodsToHoursStr(oh?.periods);
     return {
       id: p.id ?? null,
       displayName: p.displayName?.text ?? "",
-      formattedAddress: p.formattedAddress ?? null,
       location:
         loc?.latitude != null && loc?.longitude != null
           ? { latitude: loc.latitude, longitude: loc.longitude }
           : null,
-      rating: p.rating ?? null,
       userRatingCount: p.userRatingCount ?? null,
-      openingHours: hoursStr,
       businessStatus: p.businessStatus ?? null,
     };
   });
@@ -327,29 +389,44 @@ async function searchPlace(
   return results[0] ?? null;
 }
 
-async function getBestPhotoName(placeId: string, apiKey: string): Promise<string | null> {
-  const url = `https://places.googleapis.com/v1/places/${placeId}`;
-  const res = await fetch(url, {
-    headers: {
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": "photos",
-    },
-  });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { photos?: Array<{ name: string; widthPx?: number; heightPx?: number }> };
-  const photos = data?.photos;
-  if (!photos?.length) return null;
-  let best = photos[0];
-  let bestPixels = (best.widthPx ?? 0) * (best.heightPx ?? 0);
-  for (let i = 1; i < photos.length; i++) {
-    const p = photos[i];
-    const pixels = (p.widthPx ?? 0) * (p.heightPx ?? 0);
-    if (pixels > bestPixels) {
-      best = p;
-      bestPixels = pixels;
+/** Pick top N photo names from photos array, sorted by pixel area desc.
+ *  Prefers widthPx >= 400 but falls back to all photos if filter yields nothing. */
+function pickTopPhotoNames(photos: Array<{ name: string; widthPx?: number; heightPx?: number }>, count = 3): string[] {
+  if (!photos?.length) return [];
+  const sorted = [...photos].sort((a, b) => ((b.widthPx ?? 0) * (b.heightPx ?? 0)) - ((a.widthPx ?? 0) * (a.heightPx ?? 0)));
+  const wide = sorted.filter((p) => (p.widthPx ?? 0) >= 400);
+  const pool = wide.length > 0 ? wide : sorted; // fallback: widthPx 없거나 모두 작으면 전체 사용
+  return pool.slice(0, count).map((p) => p.name);
+}
+
+/** Download up to 3 photos → upload to Storage → return public URLs */
+async function downloadAndUploadPhotos(
+  photoNames: string[],
+  apiKey: string,
+  supabase: ReturnType<typeof createClient>,
+  bucket: string,
+  region: string,
+  placeId: string,
+): Promise<string[]> {
+  const urls: string[] = [];
+  for (let i = 0; i < photoNames.length; i++) {
+    try {
+      if (i > 0) await new Promise((r) => setTimeout(r, 80));
+      const buf = await downloadPhoto(photoNames[i], apiKey);
+      const suffix = i === 0 ? '' : `_${i + 1}`;
+      const storagePath = `rag/${region}/${placeId}${suffix}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from(bucket)
+        .upload(storagePath, buf, { contentType: "image/jpeg", upsert: true });
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(storagePath);
+        urls.push(urlData.publicUrl);
+      }
+    } catch (e) {
+      console.warn(`[verify-and-register] photo ${i + 1} skip:`, (e as Error).message);
     }
   }
-  return best.name;
+  return urls;
 }
 
 async function downloadPhoto(photoName: string, apiKey: string, maxWidth = 1600): Promise<ArrayBuffer> {
@@ -364,23 +441,27 @@ async function downloadPhoto(photoName: string, apiKey: string, maxWidth = 1600)
  * 한 번 채워놓으면 다음부터 완전한 캐시 히트.
  */
 async function enrichCachedPlace(
-  row: { id: string; google_place_id: string | null; rating: number | null; review_count: number | null; image_url: string | null; opening_hours?: string | null; region?: string | null },
+  row: { id: string; google_place_id: string | null; rating: number | null; review_count: number | null; image_url: string | null; image_urls?: string[] | null; opening_hours?: string | null; region?: string | null },
   apiKey: string,
   supabase: ReturnType<typeof createClient>,
   bucket: string,
-): Promise<{ rating: number | null; reviewCount: number | null; image_url: string | null; opening_hours: string | null }> {
+): Promise<{ rating: number | null; reviewCount: number | null; image_url: string | null; image_urls: string[]; opening_hours: string | null }> {
+  const existingImageUrls = Array.isArray(row.image_urls) ? row.image_urls.filter(Boolean) : [];
   const needsRating = row.rating == null;
+  // image_url 자체가 없을 때만 사진 다운로드 (타임아웃 방지).
+  // image_url은 있지만 image_urls가 비어있는 기존 데이터는 rag-enrich.js 배치로 백필.
   const needsImage = !row.image_url;
-  const needsHours = !row.opening_hours;
+  const needsHours = !isValidKoHours(row.opening_hours);
   if ((!needsRating && !needsImage && !needsHours) || !row.google_place_id) {
-    return { rating: row.rating, reviewCount: row.review_count, image_url: row.image_url, opening_hours: row.opening_hours ?? null };
+    return { rating: row.rating, reviewCount: row.review_count, image_url: row.image_url, image_urls: existingImageUrls, opening_hours: row.opening_hours ?? null };
   }
 
   const updates: Record<string, unknown> = {};
   let rating = row.rating;
   let reviewCount = row.review_count;
   let imageUrl = row.image_url;
-  let openingHours = row.opening_hours ?? null;
+  let imageUrls = existingImageUrls;
+  let openingHours = isValidKoHours(row.opening_hours) ? row.opening_hours : null;
 
   try {
     const fields: string[] = [];
@@ -393,7 +474,7 @@ async function enrichCachedPlace(
     const res = await fetch(url, {
       headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fields.join(",") },
     });
-    if (!res.ok) return { rating, reviewCount, image_url: imageUrl, opening_hours: openingHours };
+    if (!res.ok) return { rating, reviewCount, image_url: imageUrl, image_urls: imageUrls, opening_hours: openingHours };
 
     const data = (await res.json()) as {
       rating?: number; userRatingCount?: number;
@@ -404,37 +485,31 @@ async function enrichCachedPlace(
     if (needsRating && data.rating != null) { rating = data.rating; updates.rating = rating; }
     if (needsRating && data.userRatingCount != null) { reviewCount = data.userRatingCount; updates.review_count = reviewCount; }
 
-    if (needsHours && data.regularOpeningHours) {
-      const oh = data.regularOpeningHours;
-      const hoursStr = (oh.weekdayDescriptions?.length ? oh.weekdayDescriptions.join('; ') : null)
-        || periodsToHoursStr(oh.periods);
-      if (hoursStr) {
-        openingHours = hoursStr;
-        updates.opening_hours = hoursStr;
+    if (needsHours) {
+      if (data.regularOpeningHours) {
+        const oh = data.regularOpeningHours;
+        const hoursStr = (oh.weekdayDescriptions?.length ? oh.weekdayDescriptions.join('; ') : null)
+          || periodsToHoursStr(oh.periods);
+        if (hoursStr) {
+          openingHours = hoursStr;
+          updates.opening_hours = hoursStr;
+          console.log(`[enrichCachedPlace] hours updated for ${row.google_place_id}: "${hoursStr?.slice(0, 40)}..."`);
+        }
+      } else {
+        console.log(`[enrichCachedPlace] Place Details returned no hours for ${row.google_place_id}`);
       }
     }
 
     if (needsImage && data.photos?.length) {
-      let best = data.photos[0];
-      let bestPx = (best.widthPx ?? 0) * (best.heightPx ?? 0);
-      for (let i = 1; i < data.photos.length; i++) {
-        const p = data.photos[i];
-        const px = (p.widthPx ?? 0) * (p.heightPx ?? 0);
-        if (px > bestPx) { best = p; bestPx = px; }
-      }
-      try {
-        const buf = await downloadPhoto(best.name, apiKey);
-        const storagePath = `rag/${row.region || "unknown"}/${row.google_place_id}.jpg`;
-        const { error: upErr } = await supabase.storage
-          .from(bucket)
-          .upload(storagePath, buf, { contentType: "image/jpeg", upsert: true });
-        if (!upErr) {
-          const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(storagePath);
-          imageUrl = urlData.publicUrl;
+      const topNames = pickTopPhotoNames(data.photos, 3);
+      if (topNames.length > 0) {
+        const uploaded = await downloadAndUploadPhotos(topNames, apiKey, supabase, bucket, row.region || "unknown", row.google_place_id);
+        if (uploaded.length > 0) {
+          imageUrls = uploaded;
+          imageUrl = uploaded[0];
           updates.image_url = imageUrl;
+          updates.image_urls = imageUrls;
         }
-      } catch (e) {
-        console.warn("[verify-and-register] enrich photo skip:", (e as Error).message);
       }
     }
 
@@ -445,7 +520,7 @@ async function enrichCachedPlace(
     console.warn("[verify-and-register] enrich failed:", (e as Error).message);
   }
 
-  return { rating, reviewCount, image_url: imageUrl, opening_hours: openingHours };
+  return { rating, reviewCount, image_url: imageUrl, image_urls: imageUrls, opening_hours: openingHours };
 }
 
 Deno.serve(async (req) => {
@@ -508,12 +583,14 @@ Deno.serve(async (req) => {
     );
   }
 
-  const [lat, lng] = getRegionHintCenter(regionHint || "후쿠오카");
+  const defaultCenter = regionHint ? getRegionHintCenter(regionHint) : null;
+  const lat = defaultCenter?.[0] ?? null;
+  const lng = defaultCenter?.[1] ?? null;
   const BUCKET = "images";
 
   const processOne = async (
     place: { desc: string; type: string; address?: string; region?: string }
-  ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; placeId: string | null; rating: number | null; reviewCount: number | null; opening_hours: string | null } }> => {
+  ): Promise<{ ok: boolean; data?: { desc: string; address: string | null; lat: number | null; lon: number | null; image_url: string | null; image_urls?: string[]; placeId: string | null; rating: number | null; reviewCount: number | null; opening_hours: string | null; business_status?: string | null } }> => {
     // ── 0. DB 먼저 조회: 이미 등록된 장소면 Text Search 스킵 ──
     const regionKey = place.region
       ? (LABEL_TO_REGION[place.region] || place.region.toLowerCase())
@@ -529,7 +606,7 @@ Deno.serve(async (req) => {
     if (possibleRegions.length > 0) {
       const { data: cached } = await supabase
         .from("rag_places")
-        .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region, opening_hours")
+        .select("id, confidence, address, lat, lon, image_url, image_urls, google_place_id, rating, review_count, region, opening_hours")
         .eq("name_ko", place.desc)
         .in("region", possibleRegions)
         .maybeSingle();
@@ -544,6 +621,7 @@ Deno.serve(async (req) => {
             lat: cached.lat || null,
             lon: cached.lon || null,
             image_url: enriched.image_url,
+            image_urls: enriched.image_urls,
             placeId: cached.google_place_id,
             rating: enriched.rating,
             reviewCount: enriched.reviewCount,
@@ -554,11 +632,14 @@ Deno.serve(async (req) => {
     }
 
     // ── 1. Text Search (DB에 없을 때만) ──
-    const jaCity = regionKey ? REGION_JA_NAMES[regionKey] : null;
-    const query = `${place.desc.trim()} ${jaCity || '日本'}`;
-    const [pLat, pLng] = place.region
-      ? getRegionHintCenter(place.region)
-      : [lat, lng];
+    const cityName = regionKey ? REGION_JA_NAMES[regionKey] : null;
+    // 일본 지역이면 일본어 도시명, 비일본이면 현지어 도시명, 둘 다 없으면 빈 문자열 (장소명만으로 검색)
+    const locationSuffix = cityName || '';
+    const query = locationSuffix ? `${place.desc.trim()} ${locationSuffix}` : place.desc.trim();
+    const placeCenter = place.region ? getRegionHintCenter(place.region) : null;
+    const pLat = placeCenter?.[0] ?? lat;
+    const pLng = placeCenter?.[1] ?? lng;
+    console.log(`[verify-search] ${place.desc} → query="${query}", regionKey=${regionKey}, center=${pLat},${pLng}`);
 
     // 복수 결과(최대 5개)를 가져와서 이름 매칭되는 것을 선택
     // 1) JA 검색 → nameSimilar 매칭
@@ -651,18 +732,41 @@ Deno.serve(async (req) => {
       return { ok: false };
     }
 
-    // 영업시간: JA(月曜日 형식)는 클라이언트 파싱 불가 → KO(월요일 형식) 우선 사용
-    if (finalResult.id) {
-      const koMatch = koResults.find((kr) => kr.id === finalResult!.id);
-      if (koMatch?.openingHours) {
-        finalResult = { ...finalResult, openingHours: koMatch.openingHours };
+    // region 검증: 매칭된 장소가 regionHint에서 너무 멀면 reject (서울 여행인데 대전 숙소 방지)
+    if (finalResult.location && regionHint) {
+      const hintCenter = getRegionHintCenter(regionHint);
+      if (hintCenter) {
+        const distFromHint = geoDistance(
+          finalResult.location.latitude, finalResult.location.longitude,
+          hintCenter[0], hintCenter[1]
+        );
+        if (distFromHint > 100) {
+          console.warn(`[verify-and-register] "${place.desc}" matched to place ${distFromHint.toFixed(0)}km from ${regionHint}, rejecting`);
+          return { ok: false };
+        }
       }
     }
 
-    const region =
+    let region =
       finalResult.location != null
         ? findRegionByCoords(finalResult.location.latitude, finalResult.location.longitude)
         : null;
+    // region 감지 실패 시 regionHint/place.region에서 추론
+    if (!region) {
+      region = regionKey || (regionHint ? (LABEL_TO_REGION[regionHint] || null) : null);
+    }
+    if (!region) {
+      // 좌표 기반으로 가장 가까운 region 사용 (50km 제한 해제)
+      if (finalResult.location) {
+        let best: string | null = null;
+        let bestDist = Infinity;
+        for (const [r, [cLat, cLon]] of Object.entries(REGION_CENTERS)) {
+          const d = geoDistance(finalResult.location.latitude, finalResult.location.longitude, cLat, cLon);
+          if (d < bestDist) { bestDist = d; best = r; }
+        }
+        region = best;
+      }
+    }
     if (!region) {
       console.warn(`[verify-and-register] no region for coords: ${place.desc}`);
       return { ok: false };
@@ -671,7 +775,7 @@ Deno.serve(async (req) => {
     // ── 2. google_place_id로 기존 데이터 조회 (Text Search 결과 기반) ──
     const { data: existing } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region, opening_hours")
+      .select("id, confidence, address, lat, lon, image_url, image_urls, google_place_id, rating, review_count, region, opening_hours")
       .eq("google_place_id", finalResult.id)
       .maybeSingle();
 
@@ -685,14 +789,15 @@ Deno.serve(async (req) => {
         ok: true,
         data: {
           desc: place.desc,
-          address: existing.address || finalResult.formattedAddress,
+          address: existing.address || null,
           lat: existing.lat || finalResult.location?.latitude || null,
           lon: existing.lon || finalResult.location?.longitude || null,
           image_url: enriched.image_url,
+          image_urls: enriched.image_urls,
           placeId: existing.google_place_id || finalResult.id,
-          rating: enriched.rating ?? finalResult.rating ?? null,
+          rating: enriched.rating,
           reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
-          opening_hours: enriched.opening_hours || finalResult.openingHours || null,
+          opening_hours: enriched.opening_hours || null,
           business_status: finalResult.businessStatus || null,
         }
       };
@@ -701,7 +806,7 @@ Deno.serve(async (req) => {
     // region+name_ko 기준 verified 데이터가 있으면 덮어쓰지 않음
     const { data: existingByName } = await supabase
       .from("rag_places")
-      .select("id, confidence, address, lat, lon, image_url, google_place_id, rating, review_count, region, opening_hours")
+      .select("id, confidence, address, lat, lon, image_url, image_urls, google_place_id, rating, review_count, region, opening_hours")
       .eq("region", region)
       .eq("name_ko", place.desc)
       .maybeSingle();
@@ -714,18 +819,66 @@ Deno.serve(async (req) => {
         ok: true,
         data: {
           desc: place.desc,
-          address: existingByName.address || finalResult.formattedAddress,
+          address: existingByName.address || null,
           lat: existingByName.lat || finalResult.location?.latitude || null,
           lon: existingByName.lon || finalResult.location?.longitude || null,
           image_url: enriched.image_url,
+          image_urls: enriched.image_urls,
           placeId: existingByName.google_place_id || finalResult.id,
-          rating: enriched.rating ?? finalResult.rating ?? null,
+          rating: enriched.rating,
           reviewCount: enriched.reviewCount ?? finalResult.userRatingCount ?? null,
-          opening_hours: enriched.opening_hours || finalResult.openingHours || null,
+          opening_hours: enriched.opening_hours || null,
           business_status: finalResult.businessStatus || null,
         },
       };
     }
+
+    // ── Place Details 1회 호출 (languageCode=ko) — 완전한 데이터 수집 ──
+    console.log(`[verify-new] ${place.desc} → placeId=${finalResult.id}, region=${region}, loc=${finalResult.location?.latitude},${finalResult.location?.longitude}`);
+    let detailRating: number | null = null;
+    let detailReviewCount: number | null = null;
+    let detailHours: string | null = null;
+    let detailAddress: string | null = null;
+    let detailBusinessStatus: string | null = finalResult.businessStatus ?? null;
+    let topPhotoNames: string[] = [];
+
+    try {
+      const detailRes = await fetch(
+        `https://places.googleapis.com/v1/places/${finalResult.id}?languageCode=ko`,
+        {
+          headers: {
+            "X-Goog-Api-Key": apiKey,
+            "X-Goog-FieldMask": "rating,userRatingCount,regularOpeningHours,photos,formattedAddress,businessStatus",
+          },
+        }
+      );
+      if (detailRes.ok) {
+        const detail = (await detailRes.json()) as {
+          rating?: number;
+          userRatingCount?: number;
+          regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }> };
+          photos?: Array<{ name: string; widthPx?: number; heightPx?: number }>;
+          formattedAddress?: string;
+          businessStatus?: string;
+        };
+        detailRating = detail.rating ?? null;
+        detailReviewCount = detail.userRatingCount ?? null;
+        detailAddress = detail.formattedAddress ?? null;
+        if (detail.businessStatus) detailBusinessStatus = detail.businessStatus;
+
+        const oh = detail.regularOpeningHours;
+        const hoursStr = (oh?.weekdayDescriptions?.length ? oh.weekdayDescriptions.join('; ') : null)
+          || periodsToHoursStr(oh?.periods);
+        if (hoursStr) detailHours = hoursStr;
+
+        if (detail.photos?.length) {
+          topPhotoNames = pickTopPhotoNames(detail.photos, 3);
+        }
+      }
+    } catch (e) {
+      console.warn("[verify-and-register] Place Details error:", (e as Error).message);
+    }
+    console.log(`[verify-new] ${place.desc} → detail: rating=${detailRating}, hours=${detailHours?.slice(0, 30)}, photos=${topPhotoNames.length}, addr=${detailAddress?.slice(0, 30)}`);
 
     const row = {
       region,
@@ -733,16 +886,16 @@ Deno.serve(async (req) => {
       name_ja: finalResult.displayName || null,
       type: place.type,
       description: null as string | null,
-      address: finalResult.formattedAddress ?? null,
+      address: detailAddress,
       lat: finalResult.location?.latitude ?? null,
       lon: finalResult.location?.longitude ?? null,
       confidence: "auto_verified",
       source: "api",
       google_place_id: finalResult.id,
-      rating: finalResult.rating ?? null,
-      review_count: finalResult.userRatingCount ?? null,
-      opening_hours: finalResult.openingHours ?? null,
-      business_status: finalResult.businessStatus ?? null,
+      rating: detailRating,
+      review_count: detailReviewCount,
+      opening_hours: detailHours,
+      business_status: detailBusinessStatus,
     };
 
     const { data: upserted, error: upsertErr } = await supabase
@@ -759,58 +912,30 @@ Deno.serve(async (req) => {
       ok: true,
       data: {
         desc: place.desc,
-        address: finalResult.formattedAddress,
+        address: detailAddress,
         lat: finalResult.location?.latitude || null,
         lon: finalResult.location?.longitude || null,
         image_url: null,
         placeId: finalResult.id,
-        rating: finalResult.rating ?? null,
-        reviewCount: finalResult.userRatingCount ?? null,
-        opening_hours: finalResult.openingHours ?? null,
-        business_status: finalResult.businessStatus || null,
+        rating: detailRating,
+        reviewCount: detailReviewCount,
+        opening_hours: detailHours,
+        business_status: detailBusinessStatus,
       }
     };
 
     let imageUrl: string | null = null;
-    try {
-      const photoName = await getBestPhotoName(finalResult.id, apiKey);
-      if (photoName) {
-        await new Promise((r) => setTimeout(r, 120));
-        const buf = await downloadPhoto(photoName, apiKey);
-        const storagePath = `rag/${region}/${finalResult.id}.jpg`;
-        const { error: uploadErr } = await supabase.storage
-          .from(BUCKET)
-          .upload(storagePath, buf, { contentType: "image/jpeg", upsert: true });
-        if (!uploadErr) {
-          const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-          imageUrl = urlData.publicUrl;
-          await supabase.from("rag_places").update({ image_url: imageUrl }).eq("id", rowId);
-        }
-      }
-    } catch (e) {
-      console.warn("[verify-and-register] photo skip:", (e as Error).message);
-    }
-
-    // Text Search에서 hours가 없으면 Place Details API로 보완 (weekdayDescriptions + periods fallback)
-    let openingHours = finalResult.openingHours ?? null;
-    if (!openingHours && finalResult.id) {
+    let imageUrls: string[] = [];
+    if (topPhotoNames.length > 0) {
       try {
-        const hRes = await fetch(
-          `https://places.googleapis.com/v1/places/${finalResult.id}?languageCode=ko`,
-          { headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "regularOpeningHours" } }
-        );
-        if (hRes.ok) {
-          const hData = (await hRes.json()) as { regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }> } };
-          const oh = hData.regularOpeningHours;
-          const hoursStr = (oh?.weekdayDescriptions?.length ? oh.weekdayDescriptions.join('; ') : null)
-            || periodsToHoursStr(oh?.periods);
-          if (hoursStr) {
-            openingHours = hoursStr;
-            await supabase.from("rag_places").update({ opening_hours: openingHours }).eq("id", rowId);
-          }
+        await new Promise((r) => setTimeout(r, 120));
+        imageUrls = await downloadAndUploadPhotos(topPhotoNames, apiKey, supabase, BUCKET, region, finalResult.id!);
+        if (imageUrls.length > 0) {
+          imageUrl = imageUrls[0];
+          await supabase.from("rag_places").update({ image_url: imageUrl, image_urls: imageUrls }).eq("id", rowId);
         }
       } catch (e) {
-        console.warn("[verify-and-register] hours enrichment skip:", (e as Error).message);
+        console.warn("[verify-and-register] photo skip:", (e as Error).message);
       }
     }
 
@@ -818,15 +943,16 @@ Deno.serve(async (req) => {
       ok: true,
       data: {
         desc: place.desc,
-        address: finalResult.formattedAddress,
+        address: detailAddress,
         lat: finalResult.location?.latitude || null,
         lon: finalResult.location?.longitude || null,
         image_url: imageUrl,
+        image_urls: imageUrls,
         placeId: finalResult.id,
-        rating: finalResult.rating ?? null,
-        reviewCount: finalResult.userRatingCount ?? null,
-        opening_hours: openingHours,
-        business_status: finalResult.businessStatus || null,
+        rating: detailRating,
+        reviewCount: detailReviewCount,
+        opening_hours: detailHours,
+        business_status: detailBusinessStatus,
       }
     };
   };
@@ -838,6 +964,7 @@ Deno.serve(async (req) => {
     lat: number | null;
     lon: number | null;
     image_url: string | null;
+    image_urls?: string[];
     placeId: string | null;
     rating: number | null;
     reviewCount: number | null;

@@ -24,36 +24,45 @@ export default function Toast({ message, icon, duration, onDone, actionLabel, on
   };
 
   const hasAction = actionLabel && onAction;
+  const horizontalPadding = 24; // 좌우 동일 패딩 (앱/웹 일관, 빡빡함 방지)
+  const edgeInset = 24; // 뷰포트 좌우 최소 여백 (앱에서 화면에 붙지 않도록)
   return (
     <div style={{
       position: "fixed",
       bottom: "calc(32px + var(--safe-area-bottom, 0px))",
       left: "50%",
       transform: `translateX(-50%) translateY(${exiting ? "20px" : "0"})`,
+      width: "max-content",
+      maxWidth: `calc(100vw - ${edgeInset * 2}px)`,
       zIndex: "var(--z-toast)",
       background: "var(--color-inverse-surface)",
       color: "var(--color-on-inverse-surface)",
-      padding: `${SPACING.ml} ${SPACING.xxl} ${SPACING.ml} ${hasAction ? SPACING.xxxxl : SPACING.xxl}`,
+      padding: `${SPACING.lg}px ${horizontalPadding}px ${SPACING.lg}px ${horizontalPadding}px`,
       borderRadius: "var(--radius-md, 8px)",
       boxShadow: "var(--shadow-heavy)",
       display: "flex",
       alignItems: "center",
-      gap: SPACING.md,
+      gap: SPACING.lg,
       fontSize: "var(--typo-label-2-medium-size)",
       fontWeight: "var(--typo-label-2-medium-weight)",
       opacity: exiting ? 0 : 1,
       transition: "opacity var(--transition-slow), transform var(--transition-slow)",
       pointerEvents: onAction ? "auto" : "none",
       whiteSpace: "nowrap",
+      boxSizing: "border-box",
     }}>
-      {icon && <Icon name={icon} size={16} style={{ filter: "brightness(0) invert(1)" }} />}
+      {icon && (
+        <span className="toast-icon" style={{ display: "flex" }}>
+          <Icon name={icon} size={16} />
+        </span>
+      )}
       <span style={{ flex: 1 }}>{message}</span>
       {hasAction && (
         <button
           type="button"
           onClick={handleAction}
           style={{
-            background: "rgba(255,255,255,0.2)",
+            background: "var(--toast-action-bg, rgba(255,255,255,0.2))",
             color: "inherit",
             border: "none",
             borderRadius: "var(--radius-sm, 6px)",

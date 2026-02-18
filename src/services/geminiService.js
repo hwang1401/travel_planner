@@ -571,7 +571,7 @@ rag_id: [참고 장소] 목록에서 고른 장소는 해당 rag_id를 넣으세
 - food: 식사, 카페, 간식
 - spot: 관광지, 명소, 전망
 - shop: 쇼핑, 기념품, 드럭스토어
-- move: 이동 (전철, 버스, 택시, 도보). 비행기/항공은 type: flight로 구분하세요.
+- move: 도시 간·권역 간 주요 이동만 포함 (신칸센, 특급열차, 장거리 버스, 페리 등). 같은 도시 내 장소 간 도보·택시·단거리 전철 이동은 넣지 마세요. 비행기/항공은 type: flight로 구분하세요.
 - flight: 항공 (비행기)
 - stay: 숙소 체크인/아웃
 - info: 기타 정보
@@ -994,6 +994,7 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 - 목록에서 고른 장소의 desc는 목록의 name_ko를 그대로 사용하세요 (변형 금지). 예: 목록에 "이치란 라멘 도톤보리점"이 있으면 desc도 "이치란 라멘 도톤보리점"으로 쓰세요.
 - 목록에서 고른 장소의 address는 목록에 있는 주소를 그대로 복사하세요. 주소를 변형하거나 새로 만들지 마세요.
 - 장소명 옆에 [임시 휴업] 또는 [폐업] 태그가 있으면 해당 장소를 일정에 포함하지 마세요. 대체 장소를 추천하세요.
+- 반드시 사용자가 지정한 여행지(도시/국가)에 있는 장소만 추천하세요. 다른 나라나 관련 없는 도시의 장소를 절대 포함하지 마세요. 예: 서울 여행이면 서울 장소만, 도쿄 여행이면 도쿄 장소만.
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
 
@@ -1037,7 +1038,7 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 - food: 식사, 카페, 간식
 - spot: 관광지, 명소, 전망
 - shop: 쇼핑, 기념품, 드럭스토어
-- move: 이동 (전철, 버스, 택시, 도보). 비행기/항공은 type: flight로 구분하세요. move 타입은 반드시 최상위에 "moveFrom"(출발지명)과 "moveTo"(도착지명) 필드를 추가하세요.
+- move: 도시 간·권역 간 주요 이동만 포함 (신칸센, 특급열차, 장거리 버스, 페리 등). 같은 도시 내 장소 간 도보·택시·단거리 전철 이동은 넣지 마세요 — 앱에 루트 기능이 없어 "도보 5분" 같은 항목은 의미가 없습니다. 비행기/항공은 type: flight로 구분하세요. move 타입은 반드시 최상위에 "moveFrom"(출발지명)과 "moveTo"(도착지명) 필드를 추가하세요.
 - flight: 항공 (비행기)
 - stay: 숙소 체크인/아웃
 - info: 기타 정보
@@ -1058,7 +1059,7 @@ const TRIP_GEN_SYSTEM_PROMPT = `당신은 여행 일정 기획 전문가입니�
 13. 참고 장소에 [rag_id:숫자] 형태가 있으면, 그 목록에서 고를 때만 rag_id 필드에 그 숫자(문자열)를 넣어주세요. 직접 추천 시에는 rag_id를 생략하세요.
 14. 사용자 요청에 "구마모토역 점심", "바사시 먹을거야", "하카타 저녁"처럼 구체적 장소·지역·메뉴가 있으면, 참고 목록에서 조건에 맞는 **실제 장소**를 골라 desc에 그 이름을 넣고 rag_id를 붙이세요. "OO 근처", "시내에서"처럼 모호하게만 쓰지 말고 반드시 구체적 장소명을 사용하세요.
 15. detail.address: 참고 목록에서 고른 장소(rag_id 있음)는 목록에 있는 주소를 **그대로** 복사하세요. 주소를 변형하거나 새로 만들지 마세요. rag_id 없거나 "호텔 조식", "구마모토 시내", "시내", "근처" 같은 지도 검색 불가 표현은 address에 넣지 말고 비워두세요.
-16. 직접 추천 시(rag_id 없음) desc에 반드시 실존하는 구체적 상호명을 사용하세요. '근처 식당', 'OO역 맛집', 'OO 에리어' 같은 모호한 표현은 금지합니다.
+16. 직접 추천 시(rag_id 없음) desc에 반드시 실존하는 구체적 상호명을 사용하세요. '근처 식당', 'OO역 맛집', 'OO 에리어', '호텔 조식', '호텔 조식 또는 근처 카페', '근처 편의점' 같은 모호한 표현은 금지합니다. 아침이라도 반드시 실제 존재하는 식당·카페 이름을 사용하세요.
 17. 각 food 타입은 대표 메뉴명과 가격대를, spot 타입은 볼거리/체험을, shop 타입은 주력 상품을 tip에 구체적으로 넣으세요.`;
 
 /**
@@ -1114,7 +1115,7 @@ function injectRAGData(days, ragPlaces) {
           }
           if (match.rating != null) item.detail.rating = match.rating;
           if (match.review_count != null) item.detail.reviewCount = match.review_count;
-          if (match.opening_hours) item.detail.hours = match.opening_hours;
+          if (match.opening_hours && /[월화수목금토일]요일/.test(match.opening_hours)) item.detail.hours = match.opening_hours;
         } else {
           // RAG 미매칭이면 Gemini가 넣은 주소는 신뢰 불가 → 전부 제거
           if (item.detail?.address) {
@@ -1226,7 +1227,7 @@ async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
         const desc = (item.desc || '').trim();
         if (!desc || seenDesc.has(desc)) continue;
         const ragMatch = findRAGMatch(item, ragPlaces || []);
-        if (ragMatch && ragMatch.image_url && ragMatch.rating != null && ragMatch.google_place_id && ragMatch.opening_hours) continue;
+        if (ragMatch && ragMatch.image_url && ragMatch.rating != null && ragMatch.google_place_id && ragMatch.opening_hours && /[월화수목금토일]요일/.test(ragMatch.opening_hours)) continue;
         seenDesc.add(desc);
         const entry = { desc, type, address: item.detail?.address || '', region: regionHint || '' };
         if (ragMatch) {
@@ -1291,6 +1292,7 @@ async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
         if (verified.lat != null) item.detail.lat = verified.lat;
         if (verified.lon != null) item.detail.lon = verified.lon;
         if (verified.image_url) item.detail.image = verified.image_url;
+        if (verified.image_urls?.length) item.detail.images = verified.image_urls;
         if (verified.placeId) item.detail.placeId = verified.placeId;
         if (verified.rating != null) item.detail.rating = verified.rating;
         if (verified.reviewCount != null) item.detail.reviewCount = verified.reviewCount;

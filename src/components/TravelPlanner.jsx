@@ -11,7 +11,7 @@ import { COLOR, SPACING, RADIUS, TYPE_LABELS, getTypeConfig } from "../styles/to
 import { getTrip, updateTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
 import { loadSchedule, saveSchedule, subscribeToSchedule, createDebouncedSave } from "../services/scheduleService";
 import { getMyRole, getShareLink } from "../services/memberService";
-import { getRegionsFromItems, getRegionCodesFromDestinations, getRegionDisplayName } from "../services/ragService";
+import { getRegionsFromItems, getRegionCodesFromDestinations, getRegionDisplayName, upsertPlaceToRAG } from "../services/ragService";
 
 /* Common component imports */
 import Icon from "./common/Icon";
@@ -1100,6 +1100,10 @@ export default function TravelPlanner() {
           : { address: '주소가 변경되었습니다', time: '시간이 변경되었습니다', desc: '이름이 변경되었습니다', tip: '메모가 변경되었습니다', price: '가격이 변경되었습니다', hours: '영업시간이 변경되었습니다', highlights: '포인트가 변경되었습니다', image: '이미지가 변경되었습니다', timetable: '시간표가 변경되었습니다', sub: '부가정보가 변경되었습니다', type: '유형이 변경되었습니다', move: '구간이 변경되었습니다' }[opts.editKind])
       : null;
     setToast({ message: isEdit ? (editToastMsg ?? '일정이 수정되었습니다') : '일정이 추가되었습니다', icon: isEdit ? 'edit' : 'check' });
+    // 수동 추가된 장소를 rag_places에 캐싱 (fire-and-forget, 추가 API 비용 없음)
+    if (!isEdit && newItem?.detail?.placeId) {
+      upsertPlaceToRAG(newItem, tripMeta?.destinations).catch(() => {});
+    }
     // 일정 추가 직후에만: 새 지역이 있으면 "여행지에 추가할까요?" 시트 (직접 추가·AI·붙여넣기 공통)
     if (!isEdit && tripId && Array.isArray(tripMeta?.destinations)) {
       const itemRegions = getRegionsFromItems([newItem]);

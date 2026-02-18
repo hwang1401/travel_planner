@@ -24,6 +24,10 @@ const REGION_CENTERS = {
   otaru: [43.19, 141.0], noboribetsu: [42.46, 141.17], atami: [35.1, 139.07],
   miyazaki: [31.91, 131.42], takachiho: [32.72, 131.31], shimoda: [34.68, 138.95],
   kinosaki: [35.63, 134.81], ibusuki: [31.23, 130.64],
+  // 한국·아시아
+  seoul: [37.57, 126.98], busan: [35.18, 129.08], jeju: [33.5, 126.53],
+  taipei: [25.03, 121.57], bangkok: [13.76, 100.5], singapore: [1.35, 103.82],
+  hongkong: [22.32, 114.17], danang: [16.05, 108.22], hanoi: [21.03, 105.85],
 };
 
 /** Haversine distance (km) between two lat/lon points */
@@ -89,6 +93,16 @@ const DESTINATION_TO_REGION = {
   시모다: 'shimoda', shimoda: 'shimoda',
   기노사키: 'kinosaki', kinosaki: 'kinosaki',
   이부스키: 'ibusuki', ibusuki: 'ibusuki',
+  // 한국·아시아
+  서울: 'seoul', seoul: 'seoul',
+  부산: 'busan', busan: 'busan',
+  제주: 'jeju', 제주도: 'jeju', jeju: 'jeju',
+  타이베이: 'taipei', 대만: 'taipei', taipei: 'taipei',
+  방콕: 'bangkok', bangkok: 'bangkok',
+  싱가포르: 'singapore', singapore: 'singapore',
+  홍콩: 'hongkong', hongkong: 'hongkong',
+  다낭: 'danang', danang: 'danang',
+  하노이: 'hanoi', hanoi: 'hanoi',
 };
 
 /** region 코드 → 한글 표시명 (일정 추가 시 "구마모토를 여행지에 추가할까요?" 등에 사용) */
@@ -384,7 +398,7 @@ export async function getPlaceByNameOrAddress({ name, address }) {
   const a = (address || '').trim();
   if (!n && !a) return null;
   try {
-    const cols = 'id, name_ko, address, image_url, region, type, lat, lon, rating, review_count, google_place_id, opening_hours, business_status';
+    const cols = 'id, name_ko, address, image_url, image_urls, region, type, lat, lon, rating, review_count, google_place_id, opening_hours, business_status';
     const confidenceOr = 'confidence.eq.verified,confidence.eq.auto_verified,confidence.is.null';
     let rows = [];
     if (n) {
@@ -509,6 +523,63 @@ export function getRegionCodesFromDestinations(destinations) {
  */
 export function getRegionDisplayName(region) {
   return REGION_DISPLAY_NAMES[region] || region;
+}
+
+/**
+ * 수동 검색으로 일정에 추가한 장소를 rag_places에 upsert (fire-and-forget).
+ * 이미 Place Details에서 가져온 데이터를 재활용하므로 추가 API 비용 없음.
+ * @param {{ detail: Object, type: string }} item - 스케줄 아이템
+ * @param {string[]} destinations - 여행 destinations (region 결정용)
+ */
+export async function upsertPlaceToRAG(item, destinations) {
+  try {
+    const d = item?.detail;
+    if (!d?.placeId || !d?.name) return;
+
+    // region 결정: 1) 여행지 destinations에서 → 2) 좌표 기반
+    let region = null;
+    if (destinations?.length) {
+      const regions = destinationsToRegions(destinations);
+      region = regions[0] || null;
+    }
+    if (!region && d.lat != null && d.lon != null) {
+      region = findRegionByCoords(d.lat, d.lon);
+    }
+    // findRegionByCoords가 50km 제한이라 못 찾을 수 있음 → 가장 가까운 region fallback
+    if (!region && d.lat != null && d.lon != null) {
+      let best = null, bestDist = Infinity;
+      for (const [r, [cLat, cLon]] of Object.entries(REGION_CENTERS)) {
+        const dist = geoDistance(d.lat, d.lon, cLat, cLon);
+        if (dist < bestDist) { bestDist = dist; best = r; }
+      }
+      region = best;
+    }
+    if (!region) return;
+
+    const row = {
+      region,
+      name_ko: d.name,
+      google_place_id: d.placeId,
+      address: d.address || null,
+      lat: d.lat ?? null,
+      lon: d.lon ?? null,
+      rating: d.rating ?? null,
+      review_count: d.reviewCount ?? null,
+      opening_hours: d.hours || null,
+      image_url: d.image || null,
+      image_urls: d.images?.length ? d.images : (d.image ? [d.image] : []),
+      type: item.type || 'spot',
+      confidence: 'auto_verified',
+      source: 'manual',
+    };
+
+    const { error } = await supabase
+      .from('rag_places')
+      .upsert(row, { onConflict: 'region,name_ko' });
+    if (error) console.warn('[ragService] upsertPlaceToRAG error:', error.message);
+  } catch (err) {
+    console.warn('[ragService] upsertPlaceToRAG:', err);
+  }
 }
 
 /**

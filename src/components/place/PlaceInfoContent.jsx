@@ -122,7 +122,7 @@ export default function PlaceInfoContent({
 
   /* ── Image state ── */
   const [viewImage, setViewImage] = useState(null);
-  const [ragImage, setRagImage] = useState(null);
+  const [ragImages, setRagImages] = useState([]);
   const [placePhotos, setPlacePhotos] = useState([]);
   const [storageImageUrl, setStorageImageUrl] = useState(null);
 
@@ -166,7 +166,7 @@ export default function PlaceInfoContent({
   const placeKey = `${place?.placeId || ''}|${place?.name || ''}|${place?.lat || ''}|${place?.lon || ''}`;
   useEffect(() => {
     setHoursExpanded(false);
-    setRagImage(null);
+    setRagImages([]);
     setRagEnriched(null);
     setPlacePhotos([]);
     setStorageImageUrl(null);
@@ -188,12 +188,18 @@ export default function PlaceInfoContent({
   }, [initialTime]);
 
 
-  /* ── Image computation (same as DetailDialog) ── */
+  /* ── Image computation ── */
   const mainImage = place?.image;
   const displayImages = useMemo(() => {
     const imgs = [];
+    // 1순위: place.image (edge function 대표 이미지)
     if (mainImage) imgs.push(mainImage);
-    if (ragImage && !imgs.includes(ragImage)) imgs.push(ragImage);
+    // 2순위: RAG에서 가져온 image_urls
+    for (const url of ragImages) {
+      if (imgs.length >= 3) break;
+      if (url && !imgs.includes(url)) imgs.push(url);
+    }
+    // 3순위: fallback — RAG에도 없으면 Google에서 직접 (거의 발생 안 함)
     if (imgs.length === 0) {
       for (const url of placePhotos) {
         if (imgs.length >= 3) break;
@@ -201,23 +207,25 @@ export default function PlaceInfoContent({
       }
     }
     return imgs.slice(0, 3);
-  }, [mainImage, ragImage, placePhotos]);
+  }, [mainImage, ragImages, placePhotos]);
 
   /* ── RAG data auto-load ── */
   useEffect(() => {
     const name = place?.name || '';
     const address = place?.address || '';
-    if (!name.trim() && !address.trim()) { setRagImage(null); setRagEnriched(null); return; }
+    if (!name.trim() && !address.trim()) { setRagImages([]); setRagEnriched(null); return; }
     let cancelled = false;
 
     getPlaceByNameOrAddress({ name, address }).then((p) => {
       if (cancelled) return;
       if (!p) {
-        setRagImage(null);
+        setRagImages([]);
         // Don't reset ragEnriched — Google Places effect may have already set data
         return;
       }
-      if (!mainImage && p.image_url) setRagImage(p.image_url);
+      // image_urls 배열 우선, 없으면 image_url 단일값 사용
+      const imgs = p.image_urls?.length ? p.image_urls : (p.image_url ? [p.image_url] : []);
+      if (imgs.length > 0) setRagImages(imgs);
       const enriched = {};
       if (!place?.address && p.address) enriched.address = p.address;
       if (place?.rating == null && p.rating != null) enriched.rating = p.rating;
@@ -231,7 +239,7 @@ export default function PlaceInfoContent({
         const merged = { ...(prev || {}), ...enriched };
         return Object.keys(merged).length > 0 ? merged : null;
       });
-    }).catch(() => { if (!cancelled) { setRagImage(null); setRagEnriched((prev) => prev); } });
+    }).catch(() => { if (!cancelled) { setRagImages([]); setRagEnriched((prev) => prev); } });
     return () => { cancelled = true; };
   }, [place?.name, place?.address, mainImage]);
 
@@ -240,6 +248,12 @@ export default function PlaceInfoContent({
 
   useEffect(() => {
     if (!effectivePlaceId) return;
+    // 이미 핵심 데이터(hours, address, rating)가 있으면 Google API 호출 스킵 (비용 절감)
+    const hasHours = !!(place?.hours || ragEnriched?.hours);
+    const hasAddress = !!(place?.address || ragEnriched?.address);
+    const hasRating = place?.rating != null || ragEnriched?.rating != null;
+    const hasImage = !!(mainImage || ragImages.length > 0);
+    if (hasHours && hasAddress && hasRating && hasImage) return;
     let cancelled = false;
     getPlaceDetails(effectivePlaceId).then((gd) => {
       if (cancelled || !gd) return;
@@ -251,19 +265,19 @@ export default function PlaceInfoContent({
         if (place?.reviewCount == null && !prev?.reviewCount && gd.reviewCount != null) next.reviewCount = gd.reviewCount;
         if (place?.lat == null && !prev?.lat && gd.lat != null) next.lat = gd.lat;
         if (place?.lon == null && !prev?.lon && gd.lon != null) next.lon = gd.lon;
-        if (!mainImage && !ragImage && gd.photoUrl) setRagImage(gd.photoUrl);
+        if (!mainImage && ragImages.length === 0 && gd.photoUrl) setRagImages([gd.photoUrl]);
         return Object.keys(next).length > 0 ? next : null;
       });
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [effectivePlaceId]);
+  }, [effectivePlaceId, place?.hours, place?.address, place?.rating, ragEnriched?.hours, ragEnriched?.address, ragEnriched?.rating, mainImage, ragImages]);
 
-  /* ── placePhotos fetch ── */
+  /* ── placePhotos fetch (fallback: RAG에도 이미지 없을 때만) ── */
   useEffect(() => {
     const pid = place?.placeId || ragEnriched?.placeId;
     if (!pid) { setPlacePhotos([]); return; }
     if (mainImage) return;
-    if (ragImage) return;
+    if (ragImages.length > 0) return;
     let cancelled = false;
     getPlacePhotos(pid, 3).then(async (urls) => {
       if (cancelled || !urls.length) return;
@@ -271,7 +285,7 @@ export default function PlaceInfoContent({
       try { await cachePhotoToRAG(pid); } catch {}
     }).catch(() => { if (!cancelled) setPlacePhotos([]); });
     return () => { cancelled = true; };
-  }, [place?.placeId, ragEnriched?.placeId, mainImage, ragImage]);
+  }, [place?.placeId, ragEnriched?.placeId, mainImage, ragImages]);
 
   /* ── Background: upload Google photo to Storage ── */
   useEffect(() => {
