@@ -32,6 +32,7 @@ import {
   initHoursEditState,
 } from '../../utils/hoursParser';
 import { buildPlaceDetail } from '../../utils/itemBuilder';
+import { openExternalUrl } from '../../utils/openExternal';
 
 /**
  * ── DetailDialog (풀스크린) ──
@@ -1620,7 +1621,7 @@ export default function DetailDialog({
           title="구글맵으로 이동"
           message="구글맵으로 이동합니다"
           confirmLabel="확인"
-          onConfirm={() => { window.open(directionsUrl, '_blank'); setShowDirectionsConfirm(false); }}
+          onConfirm={() => { openExternalUrl(directionsUrl); setShowDirectionsConfirm(false); }}
           onCancel={() => setShowDirectionsConfirm(false)}
         />
       )}

@@ -1,4 +1,5 @@
 import Button from '../common/Button';
+import { openExternalUrl } from '../../utils/openExternal';
 
 /* ── MapButton (external Google Maps link) ── */
 export default function MapButton({ query }) {
@@ -6,7 +7,7 @@ export default function MapButton({ query }) {
     <Button variant="neutral" size="xsm" iconLeft="pin"
       onClick={(e) => {
         e.stopPropagation();
-        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, "_blank");
+        openExternalUrl(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
       }}
       style={{
         padding: "4px 10px", height: "auto", whiteSpace: "nowrap",
