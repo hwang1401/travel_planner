@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import BottomSheet from '../common/BottomSheet';
 import Button from '../common/Button';
 import Icon from '../common/Icon';
+import Skeleton from '../common/Skeleton';
 import TimePickerDialog from '../common/TimePickerDialog';
 import { SPACING, RADIUS } from '../../styles/tokens';
 
@@ -13,6 +14,8 @@ import { SPACING, RADIUS } from '../../styles/tokens';
 export default function AddNearbyPlaceSheet({ place, onConfirm, onClose }) {
   const [time, setTime] = useState('12:00');
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  useEffect(() => { setImageLoaded(false); }, [place?.image_url]);
 
   if (!place) return null;
 
@@ -41,18 +44,22 @@ export default function AddNearbyPlaceSheet({ place, onConfirm, onClose }) {
           border: '1px solid var(--color-outline-variant)',
         }}>
           {place.image_url && (
-            <img
-              src={place.image_url}
-              alt=""
-              style={{
-                width: '100%',
-                height: '120px',
-                objectFit: 'cover',
-                borderRadius: RADIUS.sm,
-                marginBottom: SPACING.md,
-                display: 'block',
-              }}
-            />
+            <div style={{ position: 'relative', width: '100%', height: 120, borderRadius: RADIUS.sm, overflow: 'hidden', marginBottom: SPACING.md }}>
+              {!imageLoaded && <Skeleton style={{ position: 'absolute', inset: 0, borderRadius: RADIUS.sm }} />}
+              <img
+                src={place.image_url}
+                alt=""
+                onLoad={() => setImageLoaded(true)}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                  opacity: imageLoaded ? 1 : 0,
+                  transition: 'opacity 0.2s ease',
+                }}
+              />
+            </div>
           )}
           <p style={{
             margin: 0,

@@ -6,6 +6,7 @@ import Button from '../common/Button';
 import Field from '../common/Field';
 import Tab from '../common/Tab';
 import ImageViewer from '../common/ImageViewer';
+import Skeleton from '../common/Skeleton';
 import Toast from '../common/Toast';
 import TimePickerDialog from '../common/TimePickerDialog';
 import TimetablePreview from '../common/TimetablePreview';
@@ -195,8 +196,11 @@ export default function PlaceInfoContent({
     // 1순위: place.image (edge function 대표 이미지)
     if (mainImage) imgs.push(mainImage);
     // 2순위: RAG에서 가져온 image_urls
-    for (const url of ragImages) {
+    // mainImage가 있으면 ragImages[0] 스킵 (같은 대표 사진의 URL이 다를 수 있어 시각적 중복 방지)
+    const ragStart = (mainImage && ragImages.length > 0) ? 1 : 0;
+    for (let i = ragStart; i < ragImages.length; i++) {
       if (imgs.length >= 3) break;
+      const url = ragImages[i];
       if (url && !imgs.includes(url)) imgs.push(url);
     }
     // 3순위: fallback — RAG에도 없으면 Google에서 직접 (거의 발생 안 함)
@@ -208,6 +212,11 @@ export default function PlaceInfoContent({
     }
     return imgs.slice(0, 3);
   }, [mainImage, ragImages, placePhotos]);
+
+  const [loadedImageIndices, setLoadedImageIndices] = useState(() => new Set());
+  useEffect(() => {
+    setLoadedImageIndices(new Set());
+  }, [placeKey, displayImages.length, displayImages[0]]);
 
   /* ── RAG data auto-load ── */
   useEffect(() => {
@@ -580,13 +589,21 @@ export default function PlaceInfoContent({
             )}
           </div>
 
-          {/* ── Image carousel ── */}
-          {displayImages.length > 0 && (
+          {/* ── Image carousel (모든 이미지 로드 시까지 스켈레톤) ── */}
+          {displayImages.length > 0 && (() => {
+            const allLoaded = loadedImageIndices.size === displayImages.length;
+            return (
             <div style={{ flexShrink: 0, position: 'relative', padding: `${SPACING.sm} ${px} 0` }}>
               {displayImages.length === 1 ? (
                 <div onClick={() => setViewImage(displayImages[0])}
-                  style={{ width: '100%', height: '180px', borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest }}>
-                  <img src={displayImages[0]} alt={place?.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+                  style={{ width: '100%', height: '180px', borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest, position: 'relative' }}>
+                  {!allLoaded && <Skeleton style={{ position: 'absolute', inset: 0, borderRadius: RADIUS.md }} />}
+                  <img
+                    src={displayImages[0]}
+                    alt={place?.name}
+                    onLoad={() => setLoadedImageIndices((prev) => new Set(prev).add(0))}
+                    style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover', opacity: allLoaded ? 1 : 0, transition: 'opacity 0.2s ease' }}
+                  />
                 </div>
               ) : (
                 <div ref={carouselRef} style={{
@@ -594,18 +611,27 @@ export default function PlaceInfoContent({
                   display: 'flex', gap: SPACING.md, scrollSnapType: 'x mandatory',
                   WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', overscrollBehavior: 'contain', paddingBottom: SPACING.sm,
                 }}>
-                  {displayImages.map((img, i) => (
-                    <div key={i} onClick={() => setViewImage(img)} style={{
+                  {displayImages.map((img, i) => {
+                    const loaded = loadedImageIndices.has(i);
+                    return (
+                    <div key={`${img}-${i}`} onClick={() => setViewImage(img)} style={{
                       flexShrink: 0, width: '90%', height: '180px', scrollSnapAlign: 'start',
-                      borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest,
+                      borderRadius: RADIUS.md, overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest, position: 'relative',
                     }}>
-                      <img src={img} alt={`${place?.name} ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      {!loaded && <Skeleton style={{ position: 'absolute', inset: 0, borderRadius: RADIUS.md }} />}
+                      <img
+                        src={img}
+                        alt={`${place?.name} ${i + 1}`}
+                        onLoad={() => setLoadedImageIndices((prev) => new Set(prev).add(i))}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: loaded ? 1 : 0, transition: 'opacity 0.2s ease' }}
+                      />
                     </div>
-                  ))}
+                  );})}
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
         </div>
 

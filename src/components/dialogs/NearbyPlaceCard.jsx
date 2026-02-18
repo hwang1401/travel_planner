@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
+import Skeleton from '../common/Skeleton';
 import { SPACING, RADIUS } from '../../styles/tokens';
 
 /**
@@ -21,8 +23,13 @@ function formatWalkMinutes(distKm) {
 }
 
 export default function NearbyPlaceCard({ place, onSelect, onAddToSchedule }) {
+  const [imageLoaded, setImageLoaded] = useState(false);
   if (!place) return null;
   const { name_ko, image_url, type, _distKm, rating, address } = place;
+
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [image_url]);
 
   const distanceText = _distKm != null ? (formatWalkMinutes(_distKm) || formatDistance(_distKm)) : '';
 
@@ -41,7 +48,7 @@ export default function NearbyPlaceCard({ place, onSelect, onAddToSchedule }) {
         alignItems: 'flex-start',
       }}
     >
-      {/* Image / 플레이스홀더 (이미지 없을 때 통일된 placeholder) */}
+      {/* Image / 플레이스홀더 — 로드 전 스켈레톤 */}
       <div style={{
         width: '100%',
         aspectRatio: '4/3',
@@ -54,13 +61,27 @@ export default function NearbyPlaceCard({ place, onSelect, onAddToSchedule }) {
         overflow: 'hidden',
         borderRadius: RADIUS.sm,
         border: image_url ? undefined : '1px dashed var(--color-outline-variant)',
+        position: 'relative',
       }}>
         {image_url ? (
-          <img
-            src={image_url}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
+          <>
+            {!imageLoaded && (
+              <Skeleton style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: RADIUS.sm }} />
+            )}
+            <img
+              src={image_url}
+              alt=""
+              onLoad={() => setImageLoaded(true)}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+                opacity: imageLoaded ? 1 : 0,
+                transition: 'opacity 0.2s ease',
+              }}
+            />
+          </>
         ) : (
           <>
             <Icon name="pin" size={24} style={{ opacity: 0.35, color: 'var(--color-on-surface-variant2)' }} />

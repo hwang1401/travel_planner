@@ -27,7 +27,9 @@ export default function Toast({ message, icon, duration, onDone, actionLabel, on
   const horizontalPadding = 24; // 좌우 동일 패딩 (앱/웹 일관, 빡빡함 방지)
   const edgeInset = 24; // 뷰포트 좌우 최소 여백 (앱에서 화면에 붙지 않도록)
   return (
-    <div style={{
+    <div
+      className="toast-root"
+      style={{
       position: "fixed",
       bottom: "calc(32px + var(--safe-area-bottom, 0px))",
       left: "50%",
@@ -37,7 +39,7 @@ export default function Toast({ message, icon, duration, onDone, actionLabel, on
       zIndex: "var(--z-toast)",
       background: "var(--color-inverse-surface)",
       color: "var(--color-on-inverse-surface)",
-      padding: `${SPACING.lg}px ${horizontalPadding}px ${SPACING.lg}px ${horizontalPadding}px`,
+      padding: `${SPACING.lg} ${horizontalPadding}px ${SPACING.lg} ${horizontalPadding}px`,
       borderRadius: "var(--radius-md, 8px)",
       boxShadow: "var(--shadow-heavy)",
       display: "flex",

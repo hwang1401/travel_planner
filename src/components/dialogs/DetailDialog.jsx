@@ -124,7 +124,7 @@ export default function DetailDialog({
   if (!detail) return null;
 
   const [viewImage, setViewImage] = useState(null);
-  const [ragImage, setRagImage] = useState(null);
+  const [ragImages, setRagImages] = useState([]);
   const [placePhotos, setPlacePhotos] = useState([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
@@ -165,6 +165,7 @@ export default function DetailDialog({
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState(() => new Set());
   const [addressSearchPending, setAddressSearchPending] = useState({ address: '', lat: undefined, lon: undefined, placeId: undefined, photoUrl: undefined, rating: undefined, reviewCount: undefined, hours: undefined, priceLevel: undefined });
+  const [loadedImageIndices, setLoadedImageIndices] = useState(() => new Set());
 
   // visualViewport
   const [viewportRect, setViewportRect] = useState(null);
@@ -216,7 +217,14 @@ export default function DetailDialog({
         if (img && !imgs.includes(img)) imgs.push(img);
       }
     }
-    if (ragImage && !imgs.includes(ragImage)) imgs.push(ragImage);
+    // RAG 보충: mainImage가 있으면 ragImages[0] 스킵
+    // (같은 대표 사진이 Google URL vs Storage URL로 다를 수 있어 시각적 중복 방지)
+    const ragStart = (mainImage && ragImages.length > 0) ? 1 : 0;
+    for (let i = ragStart; i < ragImages.length; i++) {
+      if (imgs.length >= 3) break;
+      const url = ragImages[i];
+      if (url && !imgs.includes(url)) imgs.push(url);
+    }
     // placePhotos는 사용자/RAG 이미지가 하나도 없을 때만 보충
     if (imgs.length === 0 && !effectiveDetail._imageRemovedByUser) {
       for (const url of placePhotos) {
@@ -225,7 +233,12 @@ export default function DetailDialog({
       }
     }
     return imgs.slice(0, 3);
-  }, [mainImage, imagesArray, ragImage, placePhotos]);
+  }, [mainImage, imagesArray, ragImages, placePhotos]);
+
+  // 다른 아이템으로 전환 시에만 로드 상태 리셋 (RAG 이미지 추가 시 기존 로드 상태 유지)
+  useEffect(() => {
+    setLoadedImageIndices(new Set());
+  }, [curIdx]);
 
   const directionsUrl = effectiveDetail.placeId
     ? `https://www.google.com/maps/dir/?api=1&destination=place_id:${effectiveDetail.placeId}&destination_place_id=${effectiveDetail.placeId}`
@@ -270,20 +283,22 @@ export default function DetailDialog({
   /* ── RAG 이미지 자동 로드 (표시 전용, 저장하지 않음) ── */
   /* 사용자가 의도적으로 이미지 삭제한 경우(_imageRemovedByUser) RAG로 덮어쓰지 않음 */
   useEffect(() => {
-    if (effectiveDetail._imageRemovedByUser) { setRagImage(null); return; }
-    const hasImage = mainImage || (imagesArray && imagesArray.length > 0);
-    if (hasImage) { setRagImage(null); return; }
+    if (effectiveDetail._imageRemovedByUser) { setRagImages([]); return; }
+    // 이미 3장 이상이면 RAG 조회 불필요
+    const existingCount = new Set([
+      ...(mainImage ? [mainImage] : []),
+      ...(imagesArray || []),
+    ].filter(Boolean)).size;
+    if (existingCount >= 3) { setRagImages([]); return; }
     const name = effectiveDetail.name || item?.desc || '';
     const address = effectiveDetail.address || '';
-    if (!name.trim() && !address.trim()) { setRagImage(null); return; }
+    if (!name.trim() && !address.trim()) { setRagImages([]); return; }
     let cancelled = false;
     getPlaceByNameOrAddress({ name, address }).then((place) => {
-      if (cancelled || !place?.image_url) {
-        if (!cancelled) setRagImage(null);
-        return;
-      }
-      setRagImage(place.image_url);
-    }).catch(() => { if (!cancelled) setRagImage(null); });
+      if (cancelled) return;
+      const urls = place?.image_urls?.length ? place.image_urls : (place?.image_url ? [place.image_url] : []);
+      setRagImages(urls);
+    }).catch(() => { if (!cancelled) setRagImages([]); });
     return () => { cancelled = true; };
   }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?._imageRemovedByUser, item?.desc, mainImage, imagesArray]);
 
@@ -294,7 +309,7 @@ export default function DetailDialog({
     if (effectiveDetail._imageRemovedByUser) return;
     const hasImage = mainImage || (imagesArray && imagesArray.length > 0);
     if (hasImage) return;
-    if (ragImage) return;
+    if (ragImages.length > 0) return;
 
     let cancelled = false;
     setPhotosLoading(true);
@@ -312,7 +327,7 @@ export default function DetailDialog({
       if (!cancelled) setPhotosLoading(false);
     });
     return () => { cancelled = true; };
-  }, [effectiveDetail?.placeId, effectiveDetail?._imageRemovedByUser, mainImage, imagesArray, ragImage]);
+  }, [effectiveDetail?.placeId, effectiveDetail?._imageRemovedByUser, mainImage, imagesArray, ragImages]);
 
   useEffect(() => {
     if (!showNearby) return;
@@ -530,7 +545,7 @@ export default function DetailDialog({
       const path = generateImagePath(tripId, 'items');
       const url = await uploadImage(file, path);
       saveField({ image: url });
-      setRagImage(null);
+      setRagImages([]);
     } catch (err) {
       console.error('[DetailDialog] Image upload error:', err);
     } finally {
@@ -546,7 +561,7 @@ export default function DetailDialog({
       const newUrl = await uploadImage(file, path);
       // displayImages 전체에서 교체한 결과를 image+images에 저장 (Google Photos URL도 영속화)
       const updated = displayImages.map((u) => (u === oldUrl ? newUrl : u));
-      if (oldUrl === ragImage) setRagImage(null);
+      if (ragImages.includes(oldUrl)) setRagImages(prev => prev.filter(u => u !== oldUrl));
       saveField({
         image: updated[0] || '',
         images: updated.length > 1 ? updated.slice(1) : [],
@@ -557,7 +572,7 @@ export default function DetailDialog({
       setImageUploading(false);
       setImageToReplace(null);
     }
-  }, [tripId, onSaveField, saveField, displayImages, ragImage]);
+  }, [tripId, onSaveField, saveField, displayImages, ragImages]);
 
   const handleSingleStationSelect = (value) => {
     const isAddress = value && typeof value === 'object' && value.type === 'address';
@@ -1089,11 +1104,13 @@ export default function DetailDialog({
           }}
         />
 
-        {/* 이미지 캐러셀 — 있을 때만 표시, 없으면 영역 자체 제거 */}
-        {displayImages.length > 0 && (
+        {/* 이미지 캐러셀 — 모든 이미지 로드될 때까지 스켈레톤 */}
+        {displayImages.length > 0 && (() => {
+          const markLoaded = (i) => setLoadedImageIndices((prev) => new Set(prev).add(i));
+          const useSingleLayout = displayImages.length === 1;
+          return (
           <div style={{ flexShrink: 0, position: 'relative', padding: `${SPACING.sm} ${px} 0` }}>
-            {/* 1장이면 풀 와이드, 2장 이상이면 캐러셀 */}
-            {displayImages.length === 1 ? (
+            {useSingleLayout ? (
               <div
                 onClick={(e) => { if (!imageUploading && !e.target.closest('button')) setViewImage(displayImages[0]); }}
                 style={{
@@ -1101,10 +1118,23 @@ export default function DetailDialog({
                   borderRadius: RADIUS.md,
                   overflow: 'hidden', cursor: imageUploading ? 'default' : 'zoom-in',
                   background: COLOR.surfaceLowest,
+                  position: 'relative',
                 }}
               >
-                <img src={displayImages[0]} alt={effectiveDetail.name}
-                  style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+                {!loadedImageIndices.has(0) && (
+                  <Skeleton style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: RADIUS.md }} />
+                )}
+                <img
+                  src={displayImages[0]}
+                  alt={effectiveDetail.name}
+                  onLoad={() => markLoaded(0)}
+                  onError={() => markLoaded(0)}
+                  style={{
+                    width: '100%', height: '100%', display: 'block', objectFit: 'cover',
+                    opacity: loadedImageIndices.has(0) ? 1 : 0,
+                    transition: 'opacity 0.2s ease',
+                  }}
+                />
               </div>
             ) : (
               <div
@@ -1129,16 +1159,31 @@ export default function DetailDialog({
                   paddingBottom: SPACING.sm,
                 }}
               >
-                {displayImages.map((img, i) => (
-                  <div key={i} onClick={() => setViewImage(img)} style={{
+                {displayImages.map((img, i) => {
+                  const thisLoaded = loadedImageIndices.has(i);
+                  return (
+                  <div key={`${curIdx}-${img}-${i}`} onClick={() => setViewImage(img)} style={{
                     flexShrink: 0, width: '90%', maxHeight: '40vh', aspectRatio: '16/9',
                     scrollSnapAlign: 'start', borderRadius: RADIUS.md,
                     overflow: 'hidden', cursor: 'zoom-in', background: COLOR.surfaceLowest,
+                    position: 'relative',
                   }}>
-                    <img src={img} alt={`${effectiveDetail.name} ${i + 1}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    {!thisLoaded && (
+                      <Skeleton style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: RADIUS.md }} />
+                    )}
+                    <img
+                      src={img}
+                      alt={`${effectiveDetail.name} ${i + 1}`}
+                      onLoad={() => markLoaded(i)}
+                      onError={() => markLoaded(i)}
+                      style={{
+                        width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                        opacity: thisLoaded ? 1 : 0,
+                        transition: 'opacity 0.2s ease',
+                      }}
+                    />
                   </div>
-                ))}
+                );})}
               </div>
             )}
             {imageUploading && (
@@ -1158,7 +1203,8 @@ export default function DetailDialog({
               </>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* 칩 네비게이션 — 2개 이상일 때만 */}
         {chipItems.length > 1 && (
@@ -1440,16 +1486,24 @@ export default function DetailDialog({
                         </span>
                       </button>
                     ) : null}
+                    {!loadedImageIndices.has(i) && (
+                      <Skeleton style={{ position: 'absolute', inset: 0, borderRadius: RADIUS.md }} />
+                    )}
                     <img
                       src={img}
                       alt={`${effectiveDetail.name} ${i + 1}`}
+                      onLoad={() => setLoadedImageIndices((prev) => new Set(prev).add(i))}
+                      onError={() => setLoadedImageIndices((prev) => new Set(prev).add(i))}
                       style={{
+                        position: 'relative',
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
                         display: 'block',
                         cursor: deleteMode ? 'default' : 'pointer',
                         pointerEvents: deleteMode ? 'none' : 'auto',
+                        opacity: loadedImageIndices.has(i) ? 1 : 0,
+                        transition: 'opacity 0.2s ease',
                       }}
                       onClick={(e) => {
                         if (deleteMode) return;
@@ -1492,7 +1546,7 @@ export default function DetailDialog({
                     disabled={selectedForDelete.size === 0 || imageUploading}
                     onClick={() => {
                       const remaining = displayImages.filter((u) => !selectedForDelete.has(u));
-                      if (selectedForDelete.has(ragImage)) setRagImage(null);
+                      setRagImages(prev => prev.filter(u => !selectedForDelete.has(u)));
                       saveField({
                         image: remaining[0] || '',
                         images: remaining.length > 1 ? remaining.slice(1) : [],

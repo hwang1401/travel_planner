@@ -4,6 +4,7 @@ import L from 'leaflet';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import Tab from '../common/Tab';
+import Skeleton from '../common/Skeleton';
 import DetailDialog from '../dialogs/DetailDialog';
 import AddRAGPlaceSheet from '../dialogs/AddRAGPlaceSheet';
 import { getItemCoords } from '../../data/locations';
@@ -11,6 +12,17 @@ import { getNearbyPlaces } from '../../services/ragService';
 import { TYPE_CONFIG, TYPE_LABELS, SPACING } from '../../styles/tokens';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { useBackClose } from '../../hooks/useBackClose';
+
+/* ── 주변 장소 팝업 썸네일 (로드 전 스켈레톤) ── */
+function PopupThumbnail({ src, alt }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div style={{ position: 'relative', width: '100%', height: 80, borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: SPACING.sm }}>
+      {!loaded && <Skeleton style={{ position: 'absolute', inset: 0, borderRadius: 'var(--radius-sm)' }} />}
+      <img src={src} alt={alt} onLoad={() => setLoaded(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: loaded ? 1 : 0, transition: 'opacity 0.2s ease' }} />
+    </div>
+  );
+}
 
 /* ── Map helper: create numbered day icon ── */
 function createDayIcon(color, label) {
@@ -359,13 +371,7 @@ export default function FullMapDialog({ days, onClose, onAddItem, initialDay = 0
                     minWidth: '140px',
                     maxWidth: '200px',
                   }}>
-                    {p.image_url && (
-                      <img
-                        src={p.image_url}
-                        alt=""
-                        style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: SPACING.sm, display: 'block' }}
-                      />
-                    )}
+                    {p.image_url && <PopupThumbnail src={p.image_url} alt="" />}
                     <strong style={{ display: 'block', marginBottom: SPACING.xs, fontSize: 'var(--typo-label-2-bold-size)' }}>
                       {p.name_ko || '장소'}
                     </strong>

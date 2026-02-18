@@ -5,6 +5,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
 import Button from '../common/Button';
 import BottomSheet from '../common/BottomSheet';
+import Skeleton from '../common/Skeleton';
 import { getAIRecommendation } from '../../services/geminiService';
 import { detectConflicts } from '../../utils/scheduleParser';
 import ImportPreviewDialog from './ImportPreviewDialog';
@@ -18,6 +19,17 @@ import { SPACING, COLOR, TYPE_CONFIG } from '../../styles/tokens';
 
 const PLACE_TYPES = ['food', 'spot', 'shop', 'stay'];
 const CAT_ICONS = { food: 'fire', spot: 'pin', shop: 'shopping' };
+
+/* 썸네일: 로드 전 스켈레톤 */
+function ThumbnailWithSkeleton({ src, alt, style, wrapperStyle }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden', ...wrapperStyle }}>
+      {!loaded && <Skeleton style={{ position: 'absolute', inset: 0, borderRadius: style?.borderRadius || 6 }} />}
+      <img src={src} alt={alt} onLoad={() => setLoaded(true)} style={{ ...style, opacity: loaded ? 1 : 0, transition: 'opacity 0.2s ease' }} />
+    </div>
+  );
+}
 
 /* ── 추천 카드 가로 스크롤 (실제 overflow 감지) ── */
 function PlaceCardCarousel({ places, hasText, onPlaceClick }) {
@@ -70,7 +82,7 @@ function PlaceCardCarousel({ places, hasText, onPlaceClick }) {
           onClick={(e) => { e.stopPropagation(); onPlaceClick(place); }}
           style={{ flex: '0 0 140px', scrollSnapAlign: 'start', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer' }}>
           {place.image ? (
-            <img src={place.image} alt="" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
+            <ThumbnailWithSkeleton src={place.image} alt="" wrapperStyle={{ width: '100%', aspectRatio: '4/3' }} style={{ width: '100%', height: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block', borderRadius: '10px' }} />
           ) : (
             <div style={{
               width: '100%', aspectRatio: '4/3',
@@ -402,7 +414,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
                             cursor: 'pointer',
                           }}>
                           {it.detail?.image && (
-                            <img src={it.detail.image} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+                            <ThumbnailWithSkeleton src={it.detail.image} alt="" wrapperStyle={{ width: 40, height: 40, flexShrink: 0 }} style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', display: 'block' }} />
                           )}
                           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary)', width: '36px', flexShrink: 0 }}>{it.time || '--:--'}</span>
                           <span style={{ flex: 1, color: 'var(--color-on-surface)', fontWeight: 500 }}>{it.desc}</span>

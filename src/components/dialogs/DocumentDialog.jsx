@@ -8,6 +8,7 @@ import Field from '../common/Field';
 import BottomSheet from '../common/BottomSheet';
 import ImageViewer from '../common/ImageViewer';
 import ConfirmDialog from '../common/ConfirmDialog';
+import Skeleton from '../common/Skeleton';
 import { loadDocuments, createDocument, updateDocument, deleteDocument } from '../../services/documentService';
 import { uploadFile, generateImagePath, isPdfUrl } from '../../services/imageService';
 import { SPACING } from '../../styles/tokens';
@@ -24,6 +25,36 @@ const DOC_CATEGORIES = [
 
 function getCategoryIcon(cat) {
   return DOC_CATEGORIES.find((c) => c.value === cat)?.icon || 'file';
+}
+
+/* 문서 이미지 — 로드 전 스켈레톤 */
+function DocumentImageWithSkeleton({ src, alt, onClick }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div onClick={onClick} style={{
+      borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
+      border: "1px solid var(--color-outline-variant)",
+      background: "var(--color-surface-container-lowest)",
+      width: "100%", cursor: "zoom-in",
+      maxHeight: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'relative',
+    }}>
+      {!loaded && <Skeleton style={{ position: 'absolute', inset: 0 }} />}
+      <img src={src} alt={alt} onLoad={() => setLoaded(true)}
+        style={{ width: "100%", maxHeight: '50vh', display: "block", objectFit: "contain", opacity: loaded ? 1 : 0, transition: 'opacity 0.2s ease' }} />
+    </div>
+  );
+}
+
+function DocumentFormImageWithSkeleton({ src }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div style={{ position: 'relative', width: '100%', maxHeight: 200, overflow: 'hidden' }}>
+      {!loaded && <Skeleton style={{ position: 'absolute', inset: 0 }} />}
+      <img src={src} alt="" onLoad={() => setLoaded(true)}
+        style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-container-lowest)', opacity: loaded ? 1 : 0, transition: 'opacity 0.2s ease' }} />
+    </div>
+  );
 }
 
 /* ── Document Dialog ── */
@@ -193,17 +224,8 @@ export default function DocumentDialog({ onClose, tripId }) {
                     </a>
                   </div>
                 ) : (
-                  /* Image viewer */
-                  <div onClick={() => setViewImage(selectedDoc.imageUrl)} style={{
-                    borderRadius: "var(--radius-md, 8px)", overflow: "hidden",
-                    border: "1px solid var(--color-outline-variant)",
-                    background: "var(--color-surface-container-lowest)",
-                    width: "100%", cursor: "zoom-in",
-                    maxHeight: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <img src={selectedDoc.imageUrl} alt={selectedDoc.title}
-                      style={{ width: "100%", maxHeight: '50vh', display: "block", objectFit: "contain" }} />
-                  </div>
+                  /* Image viewer — 로드 전 스켈레톤 */
+                  <DocumentImageWithSkeleton src={selectedDoc.imageUrl} alt={selectedDoc.title} onClick={() => setViewImage(selectedDoc.imageUrl)} />
                 )
               ) : (
                 <div style={{ borderRadius: "var(--radius-md, 8px)", border: "2px dashed var(--color-outline-variant)", padding: `40px ${SPACING.xxl}`, textAlign: "center", background: "var(--color-surface-container-lowest)" }}>
@@ -426,8 +448,8 @@ function DocumentFormPopup({ tripId, doc, onClose, onSaved }) {
                     </div>
                   </div>
                 ) : (
-                  /* Image preview */
-                  <img src={imageUrl} alt="" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-container-lowest)' }} />
+                  /* Image preview — 로드 전 스켈레톤 */
+                  <DocumentFormImageWithSkeleton src={imageUrl} />
                 )}
                 {/* Actions overlay */}
                 <div style={{

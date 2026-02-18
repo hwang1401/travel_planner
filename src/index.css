@@ -157,7 +157,24 @@ body {
   border-radius: var(--radius-sm, 4px);
 }
 
-/* 배포 시 CSS 로드 순서와 관계없이 다크 모드 primary를 라이트와 동일하게 유지 */
+/* 배포 시 CSS 로드 순서와 관계없이 다크 모드 primary·토스트 유지 */
 :root[data-theme="dark"] {
   --color-primary: var(--palette-blue-60);
+}
+
+/* 토스트: 다크모드 배경/글자 통일 */
+[data-theme="dark"] .toast-root {
+  background: var(--palette-gray-20) !important;
+  color: var(--palette-gray-95) !important;
+}
+[data-theme="dark"] .toast-root button {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* 토스트 아이콘: 라이트=흰색, 다크=밝은색 (어두운 토스트 위) */
+.toast-icon img {
+  filter: brightness(0) invert(1);
+}
+[data-theme="dark"] .toast-icon img {
+  filter: brightness(0) invert(1);
 }

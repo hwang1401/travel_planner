@@ -9,6 +9,7 @@ import ConfirmDialog from './common/ConfirmDialog';
 import CreateTripDialog from './dialogs/CreateTripDialog';
 import CreateTripWizard from './trip/CreateTripWizard';
 import TripListSkeleton from './common/TripListSkeleton';
+import Skeleton from './common/Skeleton';
 import { loadTrips, createTrip, updateTrip, deleteTrip, duplicateTrip, getShareCode, formatDateRange } from '../services/tripService';
 import { getShareLink } from '../services/memberService';
 import BottomSheet from './common/BottomSheet';
@@ -19,6 +20,8 @@ const MIN_SPLASH_MS = 400;
 
 /* ── Trip Card Component ── */
 function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge, members, onClick, onMore }) {
+  const [coverLoaded, setCoverLoaded] = useState(false);
+  useEffect(() => { setCoverLoaded(false); }, [coverImage]);
   const destSummary = destinations?.length > 0
     ? destinations.length === 1
       ? destinations[0]
@@ -45,15 +48,21 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
           background: !coverImage && coverColor ? coverColor : undefined,
         }}>
           {coverImage && (
-            <img
-              src={coverImage}
-              alt=""
-              loading="lazy"
-              style={{
-                position: 'absolute', inset: 0, width: '100%', height: '100%',
-                objectFit: 'cover',
-              }}
-            />
+            <>
+              {!coverLoaded && <Skeleton style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />}
+              <img
+                src={coverImage}
+                alt=""
+                loading="lazy"
+                onLoad={() => setCoverLoaded(true)}
+                style={{
+                  position: 'absolute', inset: 0, width: '100%', height: '100%',
+                  objectFit: 'cover',
+                  opacity: coverLoaded ? 1 : 0,
+                  transition: 'opacity 0.2s ease',
+                }}
+              />
+            </>
           )}
         </div>
 

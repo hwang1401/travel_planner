@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import BottomSheet from '../common/BottomSheet';
 import Button from '../common/Button';
 import Field from '../common/Field';
 import Icon from '../common/Icon';
+import Skeleton from '../common/Skeleton';
 import Tab from '../common/Tab';
 import ChipSelector from '../common/ChipSelector';
 import TimePickerDialog from '../common/TimePickerDialog';
@@ -25,6 +26,8 @@ export default function AddRAGPlaceSheet({ place, onConfirm, onClose, allDays, s
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [formDayIdx, setFormDayIdx] = useState(selectedDayIdx ?? 0);
   const [imageRemoved, setImageRemoved] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  useEffect(() => { setImageLoaded(false); }, [place?.image_url]);
 
   const hasDayTabs = Array.isArray(allDays) && allDays.length > 1;
   const dayTabItems = useMemo(() => {
@@ -189,17 +192,22 @@ export default function AddRAGPlaceSheet({ place, onConfirm, onClose, allDays, s
               </span>
               <Button variant="ghost-neutral" size="xs" iconOnly="close" onClick={() => setImageRemoved(true)} title="이미지 제거" />
             </div>
-            <img
-              src={place.image_url}
-              alt=""
-              style={{
-                width: '100%',
-                maxHeight: '160px',
-                objectFit: 'cover',
-                borderRadius: RADIUS.md,
-                border: '1px solid var(--color-outline-variant)',
-              }}
-            />
+            <div style={{ position: 'relative', width: '100%', maxHeight: 160, borderRadius: RADIUS.md, overflow: 'hidden', border: '1px solid var(--color-outline-variant)' }}>
+              {!imageLoaded && <Skeleton style={{ position: 'absolute', inset: 0, borderRadius: RADIUS.md }} />}
+              <img
+                src={place.image_url}
+                alt=""
+                onLoad={() => setImageLoaded(true)}
+                style={{
+                  width: '100%',
+                  maxHeight: '160px',
+                  objectFit: 'cover',
+                  display: 'block',
+                  opacity: imageLoaded ? 1 : 0,
+                  transition: 'opacity 0.2s ease',
+                }}
+              />
+            </div>
           </div>
         )}
 
