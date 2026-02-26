@@ -1627,10 +1627,9 @@ export default function TravelPlanner() {
                     zIndex: show.length - i,
                   }}>
                     {ou.avatarUrl ? (
-                      <img src={ou.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : (
-                      <span style={{ display: "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--color-on-surface-variant)" }}>{(ou.name || "?")[0]}</span>
-                    )}
+                      <img src={ou.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }} />
+                    ) : null}
+                    <span style={{ display: ou.avatarUrl ? "none" : "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--color-on-surface-variant)" }}>{(ou.name || "?")[0]}</span>
                     <div style={{
                       position: "absolute", bottom: -1, right: -1,
                       width: 8, height: 8, borderRadius: "50%",
@@ -2506,18 +2505,17 @@ export default function TravelPlanner() {
                           {m.avatarUrl ? (
                             <img src={m.avatarUrl} alt="" style={{
                               width: "28px", height: "28px", borderRadius: "50%", objectFit: "cover",
-                            }} />
-                          ) : (
-                            <div style={{
-                              width: "28px", height: "28px", borderRadius: "50%",
-                              background: "var(--color-primary-container)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)",
-                              color: "var(--color-on-primary-container)",
-                            }}>
-                              {(m.name || "?").charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                            }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }} />
+                          ) : null}
+                          <div style={{
+                            width: "28px", height: "28px", borderRadius: "50%",
+                            background: "var(--color-primary-container)",
+                            display: m.avatarUrl ? "none" : "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "var(--typo-caption-2-bold-size)", fontWeight: "var(--typo-caption-2-bold-weight)",
+                            color: "var(--color-on-primary-container)",
+                          }}>
+                            {(m.name || "?").charAt(0).toUpperCase()}
+                          </div>
                           {isOnline && (
                             <div style={{
                               position: "absolute", bottom: "-1px", right: "-1px",

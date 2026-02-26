@@ -136,9 +136,9 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
                           zIndex: show.length - i,
                         }}>
                           {m.avatarUrl
-                            ? <img src={m.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <span style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--color-on-surface-variant)' }}>{(m.name || '?')[0]}</span>
-                          }
+                            ? <img src={m.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }} />
+                            : null}
+                          <span style={{ display: m.avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--color-on-surface-variant)' }}>{(m.name || '?')[0]}</span>
                         </div>
                       ))}
                       {extra > 0 && (
@@ -187,10 +187,12 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
 }
 
 /* ── Home Page ── */
-/* ── 채널톡: 홈에서만 표시, 로그인 사용자 정보 연동 ── */
+/* ── 채널톡: 홈에서만 표시, 기본 버튼 숨기고 커스텀 버튼 사용 ── */
 function useChannelTalk(user, profile) {
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
-    // 스크립트 로드
+    // 스크립트 로드 (최초 1회)
     if (!window.ChannelIOInitialized) {
       window.ChannelIOInitialized = true;
       const s = document.createElement('script');
@@ -199,13 +201,23 @@ function useChannelTalk(user, profile) {
       s.src = 'https://cdn.channel.io/plugin/ch-plugin-web.js';
       document.head.appendChild(s);
     }
-    // boot with user profile
-    const ch = function () { ch.c(arguments); };
-    ch.q = [];
-    ch.c = function (args) { ch.q.push(args); };
-    if (!window.ChannelIO) window.ChannelIO = ch;
 
-    const bootOption = { pluginKey: '651d8433-8ef0-42ca-a44a-cdc3edf7ffe7' };
+    // ChannelIO stub
+    if (!window.ChannelIO) {
+      const ch = function () { ch.c(arguments); };
+      ch.q = [];
+      ch.c = function (args) { ch.q.push(args); };
+      window.ChannelIO = ch;
+    }
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const bootOption = {
+      pluginKey: '651d8433-8ef0-42ca-a44a-cdc3edf7ffe7',
+      hideChannelButtonOnBoot: true,
+      appearance: {
+        theme: isDark ? 'dark' : 'light',
+      },
+    };
     if (user) {
       bootOption.memberId = user.id;
       bootOption.profile = {
@@ -214,22 +226,40 @@ function useChannelTalk(user, profile) {
         avatarUrl: profile?.avatar_url || user.user_metadata?.avatar_url || '',
       };
     }
-    window.ChannelIO('boot', bootOption);
+    window.ChannelIO('boot', bootOption, () => setReady(true));
 
     return () => {
-      if (window.ChannelIO) window.ChannelIO('shutdown');
+      setReady(false);
+      try { window.ChannelIO('shutdown'); } catch (e) { /* ignore */ }
     };
   }, [user?.id]);
+
+  const openChat = () => {
+    try { window.ChannelIO('openChat'); } catch (e) { /* ignore */ }
+  };
+
+  return { ready, openChat };
 }
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
-  useChannelTalk(user, profile);
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editTrip, setEditTrip] = useState(null); // trip object for edit mode
+  const { ready: chatReady, openChat } = useChannelTalk(user, profile);
+  const showChatBtn = chatReady && !showCreate && !editTrip;
+  const [pwaPromptVisible, setPwaPromptVisible] = useState(
+    () => document.body.getAttribute('data-pwa-prompt') === '1'
+  );
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      setPwaPromptVisible(document.body.getAttribute('data-pwa-prompt') === '1');
+    });
+    obs.observe(document.body, { attributes: true, attributeFilter: ['data-pwa-prompt'] });
+    return () => obs.disconnect();
+  }, []);
   const [toast, setToast] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [moreMenu, setMoreMenu] = useState(null);
@@ -417,17 +447,17 @@ export default function HomePage() {
                 >
                   {profile.avatar_url ? (
                     <img src={profile.avatar_url} alt=""
-                      style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{
-                      width: '24px', height: '24px', borderRadius: '50%',
-                      background: 'var(--color-primary)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '11px', fontWeight: 700, color: 'var(--color-on-primary)',
-                    }}>
-                      {(profile.name || '?').charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                      style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
+                      onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }} />
+                  ) : null}
+                  <div style={{
+                    width: '24px', height: '24px', borderRadius: '50%',
+                    background: 'var(--color-primary)',
+                    display: profile.avatar_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '11px', fontWeight: 700, color: 'var(--color-on-primary)',
+                  }}>
+                    {(profile.name || '?').charAt(0).toUpperCase()}
+                  </div>
                   <span style={{
                     fontSize: 'var(--typo-caption-1-bold-size)',
                     fontWeight: 'var(--typo-caption-1-bold-weight)',
@@ -546,6 +576,40 @@ export default function HomePage() {
       {/* Toast */}
       {toast && (
         <Toast message={toast.message} icon={toast.icon} onDone={() => setToast(null)} />
+      )}
+
+      {/* 커스텀 채널톡 버튼 — PWA 툴팁 위, 모달 시 숨김 */}
+      {showChatBtn && (
+        <button
+          type="button"
+          onClick={openChat}
+          aria-label="문의하기"
+          style={{
+            position: 'fixed',
+            bottom: pwaPromptVisible
+              ? 'calc(80px + var(--safe-area-bottom, 0px))'
+              : 'calc(20px + var(--safe-area-bottom, 0px))',
+            right: 16,
+            transition: 'bottom 0.3s ease',
+            zIndex: 9999,
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            border: 'none',
+            background: 'var(--color-primary)',
+            color: 'var(--color-on-primary)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z" fill="currentColor"/>
+            <path d="M7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z" fill="currentColor"/>
+          </svg>
+        </button>
       )}
     </div>
   );
