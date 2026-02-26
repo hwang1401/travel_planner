@@ -302,6 +302,7 @@ export default function DetailDialog({
     const address = effectiveDetail.address || '';
     const placeId = effectiveDetail.placeId || '';
     if (!address.trim() && !placeId) { setRagImages([]); return; }
+    setRagImages([]); // 비동기 fetch 전 리셋 — 스와이프 시 이전 이미지 잔류 방지
     let cancelled = false;
     getPlaceByNameOrAddress({ name: '', address, placeId }).then((place) => {
       if (cancelled) return;
@@ -316,6 +317,7 @@ export default function DetailDialog({
     if (effectiveDetail.shortAddress) { setRagShortAddress(null); return; }
     const placeId = effectiveDetail.placeId || '';
     if (!placeId) { setRagShortAddress(null); return; }
+    setRagShortAddress(null); // 비동기 fetch 전 리셋 — 스와이프 시 이전 값 잔류 방지
     let cancelled = false;
     getPlaceByNameOrAddress({ name: '', address: '', placeId }).then((place) => {
       if (cancelled) return;
@@ -333,6 +335,7 @@ export default function DetailDialog({
     if (hasImage) return;
     if (ragImages.length > 0) return;
 
+    setPlacePhotos([]); // 비동기 fetch 전 리셋 — 스와이프 시 이전 사진 잔류 방지
     let cancelled = false;
     setPhotosLoading(true);
     getPlacePhotos(pid, 3).then(async (urls) => {
