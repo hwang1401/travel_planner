@@ -187,9 +187,45 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
 }
 
 /* ── Home Page ── */
+/* ── 채널톡: 홈에서만 표시, 로그인 사용자 정보 연동 ── */
+function useChannelTalk(user, profile) {
+  useEffect(() => {
+    // 스크립트 로드
+    if (!window.ChannelIOInitialized) {
+      window.ChannelIOInitialized = true;
+      const s = document.createElement('script');
+      s.type = 'text/javascript';
+      s.async = true;
+      s.src = 'https://cdn.channel.io/plugin/ch-plugin-web.js';
+      document.head.appendChild(s);
+    }
+    // boot with user profile
+    const ch = function () { ch.c(arguments); };
+    ch.q = [];
+    ch.c = function (args) { ch.q.push(args); };
+    if (!window.ChannelIO) window.ChannelIO = ch;
+
+    const bootOption = { pluginKey: '651d8433-8ef0-42ca-a44a-cdc3edf7ffe7' };
+    if (user) {
+      bootOption.memberId = user.id;
+      bootOption.profile = {
+        name: profile?.display_name || user.user_metadata?.name || '사용자',
+        email: user.email || '',
+        avatarUrl: profile?.avatar_url || user.user_metadata?.avatar_url || '',
+      };
+    }
+    window.ChannelIO('boot', bootOption);
+
+    return () => {
+      if (window.ChannelIO) window.ChannelIO('shutdown');
+    };
+  }, [user?.id]);
+}
+
 export default function HomePage() {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
+  useChannelTalk(user, profile);
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
