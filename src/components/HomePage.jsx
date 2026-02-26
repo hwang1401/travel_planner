@@ -518,8 +518,13 @@ export default function HomePage() {
       {/* FAB: Create Trip (hide if empty state already has button) */}
       {totalTrips > 0 && (
         <div style={{
-          position: 'fixed', bottom: 'calc(24px + var(--safe-area-bottom, 0px))', left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed',
+          bottom: pwaPromptVisible
+            ? 'calc(80px + var(--safe-area-bottom, 0px))'
+            : 'calc(24px + var(--safe-area-bottom, 0px))',
+          left: '50%', transform: 'translateX(-50%)',
           zIndex: 10,
+          transition: 'bottom 0.3s ease',
         }}>
           <Button variant="primary" size="xlg" iconLeft="plus"
             onClick={() => setShowCreate(true)}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import Icon from './Icon';
+import Button from './Button';
+import BottomSheet from './BottomSheet';
 import { SPACING } from '../../styles/tokens';
 
 const STORAGE_KEY = 'pwa-install-dismissed';
@@ -11,133 +11,100 @@ function isInAppBrowser() {
   return /KAKAOTALK|NAVER|LINE|Instagram|FBAN|FBAV/i.test(ua);
 }
 
-/* ── iOS 설치 가이드 오버레이 ── */
-function IosInstallGuide({ onClose }) {
-  const steps = [
-    {
-      icon: (
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 12v6a2 2 0 002 2h12a2 2 0 002-2v-6" />
-          <polyline points="16 6 12 2 8 6" />
-          <line x1="12" y1="2" x2="12" y2="15" />
-        </svg>
-      ),
-      title: '공유 버튼 탭',
-      desc: 'Safari 하단 중앙의 공유 버튼을 눌러주세요',
-    },
-    {
-      icon: (
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="3" />
-          <line x1="12" y1="8" x2="12" y2="16" />
-          <line x1="8" y1="12" x2="16" y2="12" />
-        </svg>
-      ),
-      title: '"홈 화면에 추가" 선택',
-      desc: '공유 메뉴를 아래로 스크롤하여 찾아주세요',
-    },
-    {
-      icon: (
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-          <polyline points="22 4 12 14.01 9 11.01" />
-        </svg>
-      ),
-      title: '오른쪽 상단 "추가" 탭',
-      desc: '홈 화면에 Travelunu 아이콘이 추가됩니다',
-    },
-  ];
+function detectPlatform() {
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  return 'desktop';
+}
 
-  return createPortal(
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 10001,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'center',
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%',
-          maxWidth: 400,
-          background: 'var(--color-surface)',
-          borderRadius: '20px 20px 0 0',
-          padding: `${SPACING.xxl} ${SPACING.xxl}`,
-          paddingBottom: 'calc(var(--spacing-sp120, 12px) + var(--safe-area-bottom, 0px) + 16px)',
-          boxShadow: '0 -8px 30px rgba(0,0,0,0.15)',
-        }}
-      >
-        {/* 헤더 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.xl }}>
-          <h3 style={{ margin: 0, fontSize: 'var(--typo-heading-3-bold-size, 18px)', fontWeight: 'var(--typo-heading-3-bold-weight, 700)', color: 'var(--color-on-surface)' }}>
-            앱 설치 방법
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            style={{
-              padding: SPACING.xs,
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            <Icon name="close" size={22} />
-          </button>
-        </div>
+/** 인앱브라우저에서 외부 브라우저로 열기 */
+function openExternalBrowser() {
+  const url = window.location.href;
+  const ua = navigator.userAgent || '';
 
-        {/* 단계 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
-          {steps.map((step, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: SPACING.lg }}>
-              {/* 번호 + 아이콘 */}
+  // 카카오톡: 공식 외부 브라우저 열기 scheme (Android/iOS 공통)
+  if (/KAKAOTALK/i.test(ua)) {
+    window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+    return;
+  }
+
+  // 네이버 앱
+  if (/NAVER/i.test(ua)) {
+    // 네이버 앱 외부 브라우저 scheme
+    window.location.href = 'naversearchapp://openExternal?url=' + encodeURIComponent(url);
+    return;
+  }
+
+  // LINE
+  if (/Line\//i.test(ua)) {
+    window.open(url + (url.includes('?') ? '&' : '?') + 'openExternalBrowser=1', '_blank');
+    return;
+  }
+
+  // 안드로이드: intent scheme으로 Chrome 열기
+  if (/Android/i.test(ua)) {
+    window.location.href = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`;
+    return;
+  }
+
+  // iOS Instagram/Facebook 등: Safari로 직접 열기 시도
+  window.open(url, '_blank');
+}
+
+const GUIDE = {
+  ios: {
+    steps: [
+      { num: '1', title: '하단의 공유 버튼 탭', desc: 'Safari 하단 중앙의 공유(□↑) 버튼을 눌러주세요' },
+      { num: '2', title: '"홈 화면에 추가" 선택', desc: '공유 메뉴를 아래로 스크롤하면 찾을 수 있어요' },
+      { num: '3', title: '오른쪽 상단 "추가" 탭', desc: '홈 화면에 Travelunu 앱 아이콘이 생겨요' },
+    ],
+    footer: 'Safari 하단 바에서 시작하세요',
+  },
+  android: {
+    steps: [
+      { num: '1', title: 'Chrome 메뉴(⋮) 탭', desc: '오른쪽 상단의 더보기 메뉴를 눌러주세요' },
+      { num: '2', title: '"앱 설치" 또는 "홈 화면에 추가"', desc: '메뉴에서 해당 항목을 선택해주세요' },
+      { num: '3', title: '"설치" 확인', desc: '홈 화면에 Travelunu 앱 아이콘이 생겨요' },
+    ],
+    footer: 'Chrome 오른쪽 상단에서 시작하세요',
+  },
+  desktop: {
+    steps: [
+      { num: '1', title: '브라우저 메뉴(⋮) 열기', desc: 'Chrome/Edge 오른쪽 상단의 메뉴를 열어주세요' },
+      { num: '2', title: '"앱 설치" 또는 "바로가기 만들기"', desc: '메뉴에서 해당 항목을 선택해주세요' },
+      { num: '3', title: '"설치" 확인', desc: '독립 창에서 Travelunu를 사용할 수 있어요' },
+    ],
+    footer: '주소창 오른쪽 설치 아이콘 또는 메뉴에서 시작하세요',
+  },
+};
+
+/* ── 설치 가이드 바텀시트 ── */
+function InstallGuideSheet({ platform, onClose }) {
+  const { steps, footer } = GUIDE[platform] || GUIDE.desktop;
+
+  return (
+    <BottomSheet onClose={onClose} maxHeight="auto" zIndex={10001} title="앱 설치 방법">
+      <div style={{ padding: `${SPACING.xl} ${SPACING.xxl} ${SPACING.xxxl}` }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.xl }}>
+          {steps.map((step) => (
+            <div key={step.num} style={{ display: 'flex', alignItems: 'center', gap: SPACING.lg }}>
               <div style={{
-                flexShrink: 0,
-                width: 56,
-                height: 56,
-                borderRadius: 'var(--radius-lg, 12px)',
-                background: 'var(--color-primary-container, #f0eeff)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
+                flexShrink: 0, width: 24, height: 24, borderRadius: '50%',
+                background: 'var(--color-primary)', color: 'var(--color-on-primary)',
+                fontSize: 'var(--typo-caption-1-bold-size, 12px)',
+                fontWeight: 'var(--typo-caption-1-bold-weight, 600)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {step.icon}
-                <span style={{
-                  position: 'absolute',
-                  top: -4,
-                  left: -4,
-                  width: 20,
-                  height: 20,
-                  borderRadius: '50%',
-                  background: 'var(--color-primary)',
-                  color: 'var(--color-on-primary)',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  {i + 1}
-                </span>
+                {step.num}
               </div>
-              {/* 텍스트 */}
-              <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{
                   margin: 0,
-                  fontSize: 'var(--typo-label-1-bold-size, 15px)',
-                  fontWeight: 'var(--typo-label-1-bold-weight, 600)',
+                  fontSize: 'var(--typo-body-2-n---bold-size, 14px)',
+                  fontWeight: 'var(--typo-body-2-n---bold-weight, 600)',
                   color: 'var(--color-on-surface)',
-                  lineHeight: 1.4,
+                  lineHeight: 1.5,
                 }}>
                   {step.title}
                 </p>
@@ -145,7 +112,7 @@ function IosInstallGuide({ onClose }) {
                   margin: '2px 0 0',
                   fontSize: 'var(--typo-caption-1-regular-size, 13px)',
                   color: 'var(--color-on-surface-variant)',
-                  lineHeight: 1.4,
+                  lineHeight: 1.5,
                 }}>
                   {step.desc}
                 </p>
@@ -153,36 +120,42 @@ function IosInstallGuide({ onClose }) {
             </div>
           ))}
         </div>
-
-        {/* 하단 화살표 (Safari 공유 버튼 위치 가리킴) */}
-        <div style={{
-          marginTop: SPACING.xl,
-          textAlign: 'center',
-          color: 'var(--color-on-surface-variant)',
+        <p style={{
+          margin: `${SPACING.xl} 0 0`, textAlign: 'center',
           fontSize: 'var(--typo-caption-2-regular-size, 12px)',
+          color: 'var(--color-on-surface-variant)',
         }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: 4 }}>
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <polyline points="19 12 12 19 5 12" />
-          </svg>
-          Safari 하단 바에서 시작하세요
-        </div>
+          {footer}
+        </p>
       </div>
-    </div>,
-    document.body,
+    </BottomSheet>
   );
 }
 
-/** PWA로 설치되지 않은 웹 진입 시 하단에 "앱 설치" 툴팁 표시.
- *  카카오 인앱브라우저에서는 외부 브라우저 열기 안내. */
+/* primary 배경 위 흰색 버튼 스타일 오버라이드 */
+const whiteBtnStyle = {
+  background: 'rgba(255,255,255,0.2)',
+  border: '1px solid rgba(255,255,255,0.8)',
+  color: '#fff',
+};
+const whiteGhostStyle = {
+  background: 'transparent',
+  border: 'none',
+  color: '#fff',
+  opacity: 0.9,
+};
+
+/** PWA로 설치되지 않은 웹 진입 시 하단에 "앱 설치" 툴팁 표시. */
 export default function PwaInstallPrompt() {
   const [visible, setVisible] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(true);
   const [inApp, setInApp] = useState(false);
-  const [showIosGuide, setShowIosGuide] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
-  // 다른 컴포넌트에서 PWA 프롬프트 visible 여부를 감지할 수 있도록 body attribute 설정
+  const platform = detectPlatform();
+
+  // body attribute로 visible 여부 공유
   const shown = visible && !isStandalone;
   useEffect(() => {
     document.body.setAttribute('data-pwa-prompt', shown ? '1' : '0');
@@ -197,7 +170,6 @@ export default function PwaInstallPrompt() {
     setIsStandalone(standalone);
     if (standalone) return;
 
-    // 인앱브라우저 감지
     if (isInAppBrowser()) {
       setInApp(true);
       setVisible(true);
@@ -222,18 +194,6 @@ export default function PwaInstallPrompt() {
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') setVisible(false);
       setDeferredPrompt(null);
-    } else {
-      setVisible(false);
-    }
-  };
-
-  const handleOpenExternal = () => {
-    const url = window.location.href;
-    if (/Android/i.test(navigator.userAgent)) {
-      window.location.href = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`;
-    } else {
-      navigator.clipboard?.writeText(url);
-      alert('링크가 복사되었습니다.\nSafari에서 붙여넣기하여 열어주세요.');
     }
   };
 
@@ -245,31 +205,20 @@ export default function PwaInstallPrompt() {
 
   if (!visible || isStandalone) return null;
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  const isAndroid = /Android/.test(navigator.userAgent);
+  // 하단 바 공통 스타일
+  const barStyle = {
+    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 10000,
+    padding: `${SPACING.lg} ${SPACING.xxl}`,
+    paddingBottom: 'calc(var(--spacing-sp120, 12px) + var(--safe-area-bottom, 0px))',
+    background: 'var(--color-primary)', color: 'var(--color-on-primary)',
+    boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
+    display: 'flex', alignItems: 'center', gap: SPACING.lg,
+  };
 
-  // 인앱브라우저: 외부 브라우저로 열기 안내
+  // 인앱브라우저: 외부 브라우저로 열기
   if (inApp) {
     return (
-      <div
-        role="region"
-        aria-label="외부 브라우저 안내"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10000,
-          padding: `${SPACING.lg} ${SPACING.xxl}`,
-          paddingBottom: 'calc(var(--spacing-sp120, 12px) + var(--safe-area-bottom, 0px))',
-          background: 'var(--color-primary)',
-          color: 'var(--color-on-primary)',
-          boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: SPACING.lg,
-        }}
-      >
+      <div role="region" aria-label="외부 브라우저 안내" style={barStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 'var(--typo-label-2-bold-size)', fontWeight: 'var(--typo-label-2-bold-weight)', lineHeight: 1.4 }}>
             외부 브라우저에서 열면 더 편해요
@@ -278,130 +227,46 @@ export default function PwaInstallPrompt() {
             앱 설치 및 전체 기능을 이용할 수 있어요
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleOpenExternal}
-          style={{
-            padding: `${SPACING.sm} ${SPACING.xl}`,
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid rgba(255,255,255,0.8)',
-            background: 'rgba(255,255,255,0.2)',
-            color: 'inherit',
-            fontSize: 'var(--typo-caption-1-bold-size)',
-            fontWeight: 'var(--typo-caption-1-bold-weight)',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          {isAndroid ? '브라우저로 열기' : '링크 복사'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setVisible(false)}
-          aria-label="닫기"
-          style={{
-            padding: SPACING.sm, border: 'none', background: 'transparent',
-            color: 'inherit', cursor: 'pointer', opacity: 0.9,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}
-        >
-          <Icon name="close" size={20} style={{ filter: 'brightness(0) invert(1)' }} />
-        </button>
+        <Button variant="neutral" size="sm" onClick={openExternalBrowser} style={whiteBtnStyle}>
+          브라우저로 열기
+        </Button>
+        <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={() => setVisible(false)}
+          aria-label="닫기" style={whiteGhostStyle} />
       </div>
     );
   }
 
+  // 일반 브라우저
+  const subText = {
+    ios: 'Safari에서 공유 → "홈 화면에 추가"',
+    android: 'Chrome 메뉴 → "앱 설치" 또는 "홈 화면에 추가"',
+    desktop: '브라우저 메뉴에서 이 사이트를 설치할 수 있어요',
+  }[platform];
+
   return (
     <>
-      {showIosGuide && <IosInstallGuide onClose={() => setShowIosGuide(false)} />}
-      <div
-        role="region"
-        aria-label="앱 설치 안내"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10000,
-          padding: `${SPACING.lg} ${SPACING.xxl}`,
-          paddingBottom: 'calc(var(--spacing-sp120, 12px) + var(--safe-area-bottom, 0px))',
-          background: 'var(--color-primary)',
-          color: 'var(--color-on-primary)',
-          boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: SPACING.lg,
-          flexWrap: 'wrap',
-        }}
-      >
+      {showGuide && <InstallGuideSheet platform={platform} onClose={() => setShowGuide(false)} />}
+      <div role="region" aria-label="앱 설치 안내" style={barStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 'var(--typo-label-2-bold-size)', fontWeight: 'var(--typo-label-2-bold-weight)', lineHeight: 1.4 }}>
             앱으로 설치하면 더 편해요
           </p>
           <p style={{ margin: '2px 0 0', fontSize: 'var(--typo-caption-2-regular-size)', opacity: 0.9 }}>
-            {isIOS && 'Safari에서 공유 → "홈 화면에 추가"'}
-            {isAndroid && !deferredPrompt && 'Chrome 메뉴 → "앱 설치" 또는 "홈 화면에 추가"'}
-            {!isIOS && !isAndroid && deferredPrompt && '한 번의 탭으로 설치할 수 있어요'}
-            {!isIOS && !isAndroid && !deferredPrompt && '브라우저 메뉴에서 이 사이트를 설치할 수 있어요'}
+            {deferredPrompt ? '한 번의 탭으로 설치할 수 있어요' : subText}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, flexShrink: 0 }}>
-          {/* iOS: 설치 방법 보기 버튼 */}
-          {isIOS && (
-            <button
-              type="button"
-              onClick={() => setShowIosGuide(true)}
-              style={{
-                padding: `${SPACING.sm} ${SPACING.xl}`,
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid rgba(255,255,255,0.8)',
-                background: 'rgba(255,255,255,0.2)',
-                color: 'inherit',
-                fontSize: 'var(--typo-caption-1-bold-size)',
-                fontWeight: 'var(--typo-caption-1-bold-weight)',
-                cursor: 'pointer',
-              }}
-            >
-              설치 방법 보기
-            </button>
-          )}
-          {/* Android/Desktop: beforeinstallprompt 지원 시 설치하기 */}
-          {deferredPrompt && (
-            <button
-              type="button"
-              onClick={handleInstall}
-              style={{
-                padding: `${SPACING.sm} ${SPACING.xl}`,
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid rgba(255,255,255,0.8)',
-                background: 'rgba(255,255,255,0.2)',
-                color: 'inherit',
-                fontSize: 'var(--typo-caption-1-bold-size)',
-                fontWeight: 'var(--typo-caption-1-bold-weight)',
-                cursor: 'pointer',
-              }}
-            >
+          {deferredPrompt ? (
+            <Button variant="neutral" size="sm" onClick={handleInstall} style={whiteBtnStyle}>
               설치하기
-            </button>
+            </Button>
+          ) : (
+            <Button variant="neutral" size="sm" onClick={() => setShowGuide(true)} style={whiteBtnStyle}>
+              설치 방법 보기
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={() => handleDismiss(false)}
-            aria-label="닫기"
-            style={{
-              padding: SPACING.sm,
-              border: 'none',
-              background: 'transparent',
-              color: 'inherit',
-              cursor: 'pointer',
-              opacity: 0.9,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name="close" size={20} style={{ filter: 'brightness(0) invert(1)' }} />
-          </button>
+          <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={() => handleDismiss(false)}
+            aria-label="닫기" style={whiteGhostStyle} />
         </div>
       </div>
     </>
