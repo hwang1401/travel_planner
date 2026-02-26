@@ -31,7 +31,12 @@ function AppRoutes() {
   if (!splashDone) return <SplashScreen />;
 
   // Not authenticated → login
-  if (!user) return <LoginPage />;
+  if (!user) return (
+    <>
+      <LoginPage />
+      <PwaInstallPrompt />
+    </>
+  );
 
   // Authenticated → app routes + PWA 설치 툴팁 (웹 진입 시만)
   return (
