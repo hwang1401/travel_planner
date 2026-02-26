@@ -7,10 +7,18 @@ import { getRAGContext, extractTagsFromPreferences } from './ragService.js';
 import { matchTimetableRoute, findBestTrain, findRoutesByStations } from '../data/timetable.js';
 import { buildPlaceDetail, buildScheduleItem, ensureDetail } from '../utils/itemBuilder.js';
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const API_URL = API_KEY
-  ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`
+// Gemini API는 Edge Function 프록시를 통해 호출 (API 키 서버 보관)
+// fallback: VITE_GEMINI_API_KEY가 있으면 직접 호출 (로컬 개발용)
+const _DIRECT_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const _SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const _ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const PROXY_URL = _SUPABASE_URL
+  ? `${_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/gemini-proxy`
   : null;
+const DIRECT_URL = _DIRECT_KEY
+  ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${_DIRECT_KEY}`
+  : null;
+const API_URL = PROXY_URL || DIRECT_URL;
 
 /** Convert raw API error to user-friendly Korean message */
 function friendlyError(rawMsg, status) {
@@ -105,8 +113,11 @@ function processFunctionCallResponse(fc) {
  */
 async function fetchWithRetry(body, { maxRetries = 2, onStatus } = {}) {
   if (!API_URL) {
-    return { ok: false, status: 0, _errMsg: "AI API 키가 설정되지 않았습니다. 배포 환경 변수(VITE_GEMINI_API_KEY)를 확인해 주세요." };
+    return { ok: false, status: 0, _errMsg: "AI API 키가 설정되지 않았습니다. Supabase 또는 VITE_GEMINI_API_KEY 환경 변수를 확인해 주세요." };
   }
+  const useProxy = API_URL === PROXY_URL;
+  const headers = { "Content-Type": "application/json" };
+  if (useProxy && _ANON_KEY) headers["Authorization"] = `Bearer ${_ANON_KEY}`;
   let lastNetErr = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let response;
@@ -118,7 +129,7 @@ async function fetchWithRetry(body, { maxRetries = 2, onStatus } = {}) {
       }
       response = await fetch(API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body),
       });
       lastNetErr = null;
@@ -223,8 +234,8 @@ const SYSTEM_PROMPT = `당신은 여행 일정 분석 전문가입니다.
  * @returns {Promise<{ items: Array, error: string|null }>}
  */
 export async function analyzeScheduleWithAI(content, context = "", { onStatus, attachments } = {}) {
-  if (!API_KEY) {
-    return { items: [], error: "Gemini API 키가 설정되지 않았습니다" };
+  if (!API_URL) {
+    return { items: [], error: "Gemini API가 설정되지 않았습니다" };
   }
 
   const hasText = (content || "").trim().length > 0;
@@ -641,8 +652,8 @@ rag_id: [참고 장소] 목록에서 고른 장소는 해당 rag_id를 넣으세
  * @returns {Promise<{ message: string, items: Array, error: string|null }>}
  */
 export async function getAIRecommendation(userMessage, chatHistory = [], dayContext = "", { onStatus, destinations, currentItems, tripScheduleSummary } = {}) {
-  if (!API_KEY) {
-    return { type: 'chat', message: "", places: [], items: [], error: "Gemini API 키가 설정되지 않았습니다" };
+  if (!API_URL) {
+    return { type: 'chat', message: "", places: [], items: [], error: "Gemini API가 설정되지 않았습니다" };
   }
 
   // RAG: 채팅 추천 시에도 실제 장소 매칭을 위해 목적지가 있으면 참고 장소 목록을 먼저 가져와 프롬프트에 넣음
@@ -1328,8 +1339,8 @@ const TRIP_GEN_CHUNK_SYSTEM_PROMPT = `${TRIP_GEN_SYSTEM_PROMPT}
  * @returns {Promise<{ days: Array, error: string|null }>}
  */
 export async function generateFullTripSchedule({ destinations, duration, startDate, preferences, bookedItems, onStatus }) {
-  if (!API_KEY) {
-    return { days: [], error: "Gemini API 키가 설정되지 않았습니다" };
+  if (!API_URL) {
+    return { days: [], error: "Gemini API가 설정되지 않았습니다" };
   }
 
   let placesText = "";

@@ -4,11 +4,14 @@
  * Provides Kakao and Google OAuth login buttons.
  */
 
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { SPACING } from '../styles/tokens';
+import LegalDialog from './common/LegalDialog';
 
 export default function LoginPage() {
   const { signInWithKakao, error } = useAuth();
+  const [legalType, setLegalType] = useState(null); // 'terms' | 'privacy' | null
 
   return (
     <div style={{
@@ -122,9 +125,22 @@ export default function LoginPage() {
           textAlign: 'center',
           lineHeight: 1.5,
         }}>
-          로그인하면 서비스 이용약관 및 개인정보 처리방침에 동의하게 됩니다.
+          로그인하면{' '}
+          <button type="button" onClick={() => setLegalType('terms')} style={linkStyle}>서비스 이용약관</button>
+          {' '}및{' '}
+          <button type="button" onClick={() => setLegalType('privacy')} style={linkStyle}>개인정보 처리방침</button>
+          에 동의하게 됩니다.
         </p>
       </div>
+
+      {legalType && <LegalDialog type={legalType} onClose={() => setLegalType(null)} />}
     </div>
   );
 }
+
+const linkStyle = {
+  background: 'none', border: 'none', padding: 0, margin: 0,
+  fontSize: 'inherit', fontFamily: 'inherit', cursor: 'pointer',
+  color: 'var(--color-primary)', textDecoration: 'underline',
+  textUnderlineOffset: '2px',
+};

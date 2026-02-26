@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Button from './common/Button';
 import ConfirmDialog from './common/ConfirmDialog';
+import LegalDialog from './common/LegalDialog';
 import { getTheme, setTheme, applyTheme } from '../utils/theme';
 import { SPACING, RADIUS } from '../styles/tokens';
 
@@ -32,6 +33,7 @@ export default function SettingsPage() {
   const { signOut } = useAuth();
   const [themeValue, setThemeValue] = useState(getTheme());
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [legalType, setLegalType] = useState(null);
 
   useEffect(() => {
     setThemeValue(getTheme());
@@ -147,6 +149,33 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* 약관 / 정책 */}
+        <section style={{ marginBottom: SPACING.xxxl }}>
+          <h2 style={{
+            margin: `0 0 ${SPACING.lg}`,
+            paddingLeft: SPACING.xl,
+            fontSize: 'var(--typo-caption-1-bold-size)',
+            fontWeight: 'var(--typo-caption-1-bold-weight)',
+            color: 'var(--color-on-surface-variant2)',
+            letterSpacing: '0.5px',
+          }}>
+            약관 및 정책
+          </h2>
+          <div style={{
+            background: 'var(--color-surface-container-lowest)',
+            borderRadius: RADIUS.lg,
+            overflow: 'hidden',
+            border: '1px solid var(--color-outline-variant)',
+          }}>
+            <button type="button" onClick={() => setLegalType('terms')} style={{ ...rowBase, fontFamily: 'inherit' }}>
+              서비스 이용약관
+            </button>
+            <button type="button" onClick={() => setLegalType('privacy')} style={{ ...rowBase, borderTop: '1px solid var(--color-outline-variant)', fontFamily: 'inherit' }}>
+              개인정보 처리방침
+            </button>
+          </div>
+        </section>
+
         {/* 로그아웃 */}
         <section>
           <div style={{
@@ -170,6 +199,8 @@ export default function SettingsPage() {
           </div>
         </section>
       </div>
+
+      {legalType && <LegalDialog type={legalType} onClose={() => setLegalType(null)} />}
 
       {confirmLogout && (
         <ConfirmDialog
