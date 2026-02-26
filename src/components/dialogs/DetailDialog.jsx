@@ -237,6 +237,12 @@ export default function DetailDialog({
     return imgs.slice(0, 3);
   }, [mainImage, imagesArray, ragImages, placePhotos]);
 
+  // async 콜백에서 stale closure 방지용 ref
+  const displayImagesRef = useRef(displayImages);
+  displayImagesRef.current = displayImages;
+  const ragImagesRef = useRef(ragImages);
+  ragImagesRef.current = ragImages;
+
   // 다른 아이템으로 전환 시에만 로드 상태 리셋 (RAG 이미지 추가 시 기존 로드 상태 유지)
   useEffect(() => {
     setLoadedImageIndices(new Set());
@@ -284,6 +290,7 @@ export default function DetailDialog({
 
   /* ── RAG 이미지 자동 로드 (표시 전용, 저장하지 않음) ── */
   /* 사용자가 의도적으로 이미지 삭제한 경우(_imageRemovedByUser) RAG로 덮어쓰지 않음 */
+  /* desc 변경으로 이미지가 바뀌지 않도록 placeId/address 기반만 사용 */
   useEffect(() => {
     if (effectiveDetail._imageRemovedByUser) { setRagImages([]); return; }
     // 이미 3장 이상이면 RAG 조회 불필요
@@ -292,33 +299,30 @@ export default function DetailDialog({
       ...(imagesArray || []),
     ].filter(Boolean)).size;
     if (existingCount >= 3) { setRagImages([]); return; }
-    const name = effectiveDetail.name || item?.desc || '';
     const address = effectiveDetail.address || '';
     const placeId = effectiveDetail.placeId || '';
-    if (!name.trim() && !address.trim() && !placeId) { setRagImages([]); return; }
+    if (!address.trim() && !placeId) { setRagImages([]); return; }
     let cancelled = false;
-    getPlaceByNameOrAddress({ name, address, placeId }).then((place) => {
+    getPlaceByNameOrAddress({ name: '', address, placeId }).then((place) => {
       if (cancelled) return;
       const urls = place?.image_urls?.length ? place.image_urls : (place?.image_url ? [place.image_url] : []);
       setRagImages(urls);
     }).catch(() => { if (!cancelled) setRagImages([]); });
     return () => { cancelled = true; };
-  }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?.placeId, effectiveDetail?._imageRemovedByUser, item?.desc, mainImage, imagesArray]);
+  }, [effectiveDetail?.address, effectiveDetail?.placeId, effectiveDetail?._imageRemovedByUser, mainImage, imagesArray]);
 
-  /* ── RAG short_address 보충 (이미지 조회와 독립적으로 항상 실행) ── */
+  /* ── RAG short_address 보충 (placeId 기반만 — 이름 기반 조회는 오매칭 위험) ── */
   useEffect(() => {
     if (effectiveDetail.shortAddress) { setRagShortAddress(null); return; }
-    const name = effectiveDetail.name || item?.desc || '';
-    const address = effectiveDetail.address || '';
     const placeId = effectiveDetail.placeId || '';
-    if (!name.trim() && !address.trim() && !placeId) return;
+    if (!placeId) { setRagShortAddress(null); return; }
     let cancelled = false;
-    getPlaceByNameOrAddress({ name, address, placeId }).then((place) => {
+    getPlaceByNameOrAddress({ name: '', address: '', placeId }).then((place) => {
       if (cancelled) return;
       if (place?.short_address) setRagShortAddress(place.short_address);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [effectiveDetail?.name, effectiveDetail?.address, effectiveDetail?.shortAddress, effectiveDetail?.placeId, item?.desc]);
+  }, [effectiveDetail?.shortAddress, effectiveDetail?.placeId]);
 
   // placeId가 있으면 Google Places에서 최대 3장 사진 fetch (가드 조건으로 불필요한 API 호출 방지)
   useEffect(() => {
@@ -562,7 +566,13 @@ export default function DetailDialog({
     try {
       const path = generateImagePath(tripId, 'items');
       const url = await uploadImage(file, path);
-      saveField({ image: url });
+      // 현재 표시 중인 모든 이미지(사용자+RAG+Google)에 새 이미지 추가
+      const currentImages = displayImagesRef.current;
+      const allImages = [...currentImages, url];
+      saveField({
+        image: allImages[0] || '',
+        images: allImages.length > 1 ? allImages.slice(1) : [],
+      });
       setRagImages([]);
     } catch (err) {
       console.error('[DetailDialog] Image upload error:', err);
@@ -577,9 +587,10 @@ export default function DetailDialog({
     try {
       const path = generateImagePath(tripId, 'items');
       const newUrl = await uploadImage(file, path);
-      // displayImages 전체에서 교체한 결과를 image+images에 저장 (Google Photos URL도 영속화)
-      const updated = displayImages.map((u) => (u === oldUrl ? newUrl : u));
-      if (ragImages.includes(oldUrl)) setRagImages(prev => prev.filter(u => u !== oldUrl));
+      // ref로 최신 displayImages 참조 (async await 후 stale closure 방지)
+      const currentImages = displayImagesRef.current;
+      const updated = currentImages.map((u) => (u === oldUrl ? newUrl : u));
+      if (ragImagesRef.current.includes(oldUrl)) setRagImages(prev => prev.filter(u => u !== oldUrl));
       saveField({
         image: updated[0] || '',
         images: updated.length > 1 ? updated.slice(1) : [],
@@ -590,7 +601,7 @@ export default function DetailDialog({
       setImageUploading(false);
       setImageToReplace(null);
     }
-  }, [tripId, onSaveField, saveField, displayImages, ragImages]);
+  }, [tripId, onSaveField, saveField]);
 
   const handleSingleStationSelect = (value) => {
     const isAddress = value && typeof value === 'object' && value.type === 'address';

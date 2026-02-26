@@ -151,7 +151,7 @@ export default function DocumentDialog({ onClose, tripId }) {
       {/* Document tabs */}
       {!loading && docs.length > 0 && (
         <>
-          <div style={{ display: "flex", gap: SPACING.ms, padding: `${SPACING.lx} ${SPACING.xxl} 0`, overflowX: 'auto', flexShrink: 0, alignItems: 'center' }}>
+          <div style={{ display: "flex", gap: SPACING.ms, padding: `${SPACING.lx} ${SPACING.xxl} 0`, overflowX: 'auto', flexShrink: 0, alignItems: 'center', minWidth: 0, WebkitOverflowScrolling: 'touch' }}>
             {docs.map((doc) => (
               <Button key={doc.id}
                 variant={selectedDoc?.id === doc.id ? "primary" : "neutral"}

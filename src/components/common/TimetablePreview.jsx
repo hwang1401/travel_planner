@@ -285,6 +285,7 @@ function TimetableDetailDialog({ timetable, accentColor, onClose, onTimeRowClick
       <div style={{
         display: 'flex', alignItems: 'center', gap: SPACING.md,
         padding: `${SPACING.md} ${SPACING.md} ${SPACING.md} ${SPACING.sm}`,
+        paddingTop: 'env(safe-area-inset-top, 0px)',
         borderBottom: '1px solid var(--color-outline-variant)',
         flexShrink: 0,
       }}>

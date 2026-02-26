@@ -1226,6 +1226,8 @@ async function verifyAndApplyUnmatchedPlaces(days, ragPlaces) {
         if (!PLACE_TYPES_FOR_VERIFICATION.includes(type)) continue;
         const desc = (item.desc || '').trim();
         if (!desc || seenDesc.has(desc)) continue;
+        // placeId + 주소가 이미 있는 아이템은 검증 불필요 (수동 설정된 데이터 보호)
+        if (item.detail?.placeId && item.detail?.address) continue;
         const ragMatch = findRAGMatch(item, ragPlaces || []);
         if (ragMatch && ragMatch.image_url && ragMatch.rating != null && ragMatch.google_place_id && ragMatch.opening_hours && /[월화수목금토일]요일/.test(ragMatch.opening_hours)) continue;
         seenDesc.add(desc);

@@ -53,11 +53,16 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
   }, [onClose]);
 
   // Prevent backdrop touch from scrolling underlying content (native listener for non-passive)
+  // 시트 내부 터치는 허용 (가로 스크롤 등 정상 동작 보장)
   const backdropRef = useRef(null);
   useEffect(() => {
     const el = backdropRef.current;
     if (!el) return;
-    const handler = (e) => { e.preventDefault(); e.stopPropagation(); };
+    const handler = (e) => {
+      if (sheetRef.current?.contains(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
     el.addEventListener('touchmove', handler, { passive: false });
     return () => el.removeEventListener('touchmove', handler);
   }, []);
