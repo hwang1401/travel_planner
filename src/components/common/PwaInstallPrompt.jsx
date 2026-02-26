@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Button from './Button';
+import Icon from './Icon';
 import BottomSheet from './BottomSheet';
 import { SPACING } from '../../styles/tokens';
 
@@ -55,7 +56,7 @@ function openExternalBrowser() {
 const GUIDE = {
   ios: {
     steps: [
-      { num: '1', title: '하단의 공유 버튼 탭', desc: 'Safari 하단 가운데 \u2B06\uFE0F(↑) 모양 공유 아이콘을 눌러주세요' },
+      { num: '1', title: '하단의 공유 버튼 탭', desc: <>Safari 하단 가운데의 <Icon name="share" size={14} style={{ display: 'inline-block', verticalAlign: 'middle', filter: 'brightness(0) invert(1)', margin: '0 2px' }} /> 아이콘을 눌러주세요</> },
       { num: '2', title: '"홈 화면에 추가" 선택', desc: '공유 메뉴를 아래로 스크롤하면 찾을 수 있어요' },
       { num: '3', title: '오른쪽 상단 "추가" 탭', desc: '홈 화면에 Travelunu 앱 아이콘이 생겨요' },
     ],
