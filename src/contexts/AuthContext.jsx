@@ -96,6 +96,8 @@ export function AuthProvider({ children }) {
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'kakao',
       options: {
+        // TODO: 네이티브에서는 Capacitor 커스텀 스킴 사용 필요
+        // e.g. isNative() ? 'com.travelunu.app:///' : window.location.origin + '/'
         redirectTo: `${window.location.origin}/`,
       },
     });

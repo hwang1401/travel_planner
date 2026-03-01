@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Button from './Button';
 import BottomSheet from './BottomSheet';
 import { SPACING } from '../../styles/tokens';
+import { isNative } from '../../utils/platform';
 
 const STORAGE_KEY = 'pwa-install-dismissed';
 
@@ -147,6 +148,8 @@ const whiteGhostStyle = {
 
 /** PWA로 설치되지 않은 웹 진입 시 하단에 "앱 설치" 툴팁 표시. */
 export default function PwaInstallPrompt() {
+  // 네이티브 앱에서는 설치 프롬프트 불필요
+  if (isNative()) return null;
   const [visible, setVisible] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(true);
