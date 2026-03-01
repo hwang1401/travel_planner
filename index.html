@@ -1,17 +1,27 @@
 <!DOCTYPE html>
 <html lang="ko">
   <head>
+    <!-- Google Analytics (GA4) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-PWWMG9C0SD"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-PWWMG9C0SD', { send_page_view: false });
+    </script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <title>Travelunu — 함께 만드는 여행 일정</title>
     <meta name="description" content="친구, 가족과 함께 여행 일정을 만들고 공유하세요. AI가 맞춤 추천해주는 일본 여행 플래너." />
     <meta name="keywords" content="여행 일정, 일본 여행, 여행 플래너, 일정 공유, AI 여행 추천, 오사카, 도쿄, 교토" />
+    <link rel="canonical" href="https://travelunu.com/" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Travelunu — 함께 만드는 여행 일정" />
     <meta property="og:description" content="친구, 가족과 함께 여행 일정을 만들고 공유하세요. AI가 맞춤 추천해주는 일본 여행 플래너." />
-    <meta property="og:image" content="/images/og-image.png" />
+    <meta property="og:image" content="https://travelunu.com/images/og-image.png" />
     <meta property="og:url" content="https://travelunu.com" />
     <meta property="og:locale" content="ko_KR" />
 
@@ -19,7 +29,30 @@
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Travelunu — 함께 만드는 여행 일정" />
     <meta name="twitter:description" content="친구, 가족과 함께 여행 일정을 만들고 공유하세요. AI가 맞춤 추천해주는 일본 여행 플래너." />
-    <meta name="twitter:image" content="/images/og-image.png" />
+    <meta name="twitter:image" content="https://travelunu.com/images/og-image.png" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Travelunu",
+      "url": "https://travelunu.com",
+      "description": "친구, 가족과 함께 여행 일정을 만들고 공유하세요. AI가 맞춤 추천해주는 일본 여행 플래너.",
+      "applicationCategory": "TravelApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "KRW"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "Travelunu",
+        "url": "https://travelunu.com"
+      }
+    }
+    </script>
 
     <!-- Favicon: 흰색 로고 사용 (primary 배경 #8b7bff 위 흰 로고 권장) -->
     <link rel="icon" type="image/png" href="/favicon.png" />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import SplashScreen from './components/SplashScreen';
 import LoginPage from './components/LoginPage';
@@ -8,13 +8,29 @@ import TravelPlanner from './components/TravelPlanner';
 import InvitePage from './components/InvitePage';
 import SettingsPage from './components/SettingsPage';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
+import { trackPageView } from './utils/analytics';
+
+const PAGE_TITLES = {
+  '/': '홈',
+  '/settings': '설정',
+};
 
 const MIN_SPLASH_MS = 1500;
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  const location = useLocation();
   const startRef = useRef(Date.now());
   const [splashDone, setSplashDone] = useState(false);
+
+  // GA4 SPA 페이지뷰 추적
+  useEffect(() => {
+    const path = location.pathname;
+    let title = PAGE_TITLES[path] || 'Travelunu';
+    if (path.startsWith('/trip/')) title = '여행 일정';
+    else if (path.startsWith('/invite/')) title = '초대';
+    trackPageView(path, `Travelunu — ${title}`);
+  }, [location]);
 
   // 스플래시: 어떤 상황에서도 한 번만, 최소 1.5초 노출
   useEffect(() => {
