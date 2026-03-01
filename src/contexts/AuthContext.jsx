@@ -11,6 +11,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { isNative, getPlatform } from '../utils/platform';
 
 const AuthContext = createContext(null);
 
@@ -84,22 +85,89 @@ export function AuthProvider({ children }) {
         if (mounted) setLoading(false);
       });
 
+    /* 3. 네이티브: 딥링크 콜백으로 OAuth 세션 설정 (PKCE) */
+    let appUrlListener;
+    if (isNative()) {
+      import('@capacitor/app').then(({ App }) => {
+        appUrlListener = App.addListener('appUrlOpen', async ({ url }) => {
+          console.log('[Auth] appUrlOpen:', url);
+          // PKCE: com.travelunu.app://login-callback/?code=xxx
+          const urlObj = new URL(url);
+          const code = urlObj.searchParams.get('code');
+          if (code) {
+            console.log('[Auth] PKCE code received, exchanging...');
+            const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeErr) {
+              console.error('[Auth] Code exchange error:', exchangeErr);
+            }
+            // 브라우저 닫기
+            import('@capacitor/browser').then(({ Browser }) => Browser.close());
+          }
+        });
+      });
+    }
+
     return () => {
       mounted = false;
       subscription?.unsubscribe();
+      appUrlListener?.then?.(l => l.remove());
+      if (appUrlListener?.remove) appUrlListener.remove();
     };
   }, [loadProfile]);
 
   /* ── Sign in with Kakao ── */
   const signInWithKakao = useCallback(async () => {
     setError(null);
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: 'kakao',
-      options: {
-        redirectTo: `${window.location.origin}/`,
-      },
-    });
-    if (err) setError(err.message);
+
+    if (isNative()) {
+      const { data, error: err } = await supabase.auth.signInWithOAuth({
+        provider: 'kakao',
+        options: {
+          redirectTo: 'com.travelunu.app://login-callback/',
+          skipBrowserRedirect: true,
+        },
+      });
+      if (err) { setError(err.message); return; }
+      if (data?.url) {
+        const platform = getPlatform();
+        if (platform === 'ios') {
+          // iOS: ASWebAuthenticationSession (콜백 자동 처리)
+          try {
+            const { registerPlugin } = await import('@capacitor/core');
+            const AuthSession = registerPlugin('AuthSession');
+            const result = await AuthSession.start({
+              url: data.url,
+              callbackScheme: 'com.travelunu.app',
+            });
+            if (result?.url) {
+              const urlObj = new URL(result.url);
+              const code = urlObj.searchParams.get('code');
+              if (code) {
+                await supabase.auth.exchangeCodeForSession(code);
+              }
+            }
+          } catch (e) {
+            if (!e.message?.includes('cancelled')) {
+              console.error('[Auth] AuthSession error:', e);
+              setError(e.message);
+            }
+          }
+        } else {
+          // Android: Chrome Custom Tabs → appUrlOpen 리스너에서 처리
+          const { Browser } = await import('@capacitor/browser');
+          await Browser.open({ url: data.url });
+        }
+      }
+    } else {
+      // 웹: 기본 리다이렉트 방식
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: 'kakao',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+      if (err) setError(err.message);
+    }
   }, []);
 
   /* ── Sign out ── */

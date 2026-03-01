@@ -9,11 +9,24 @@ declare const Deno: {
 // @ts-ignore — ESM URL import; valid in Deno runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const ALLOWED_ORIGINS = [
+  "https://travelunu.com",
+  "https://www.travelunu.com",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "capacitor://localhost",
+  "http://localhost",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 const BUCKET = "images";
 
@@ -35,12 +48,12 @@ async function downloadPhoto(photoName: string, apiKey: string, maxWidth = 1600)
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: getCorsHeaders(req) });
   }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -50,7 +63,7 @@ Deno.serve(async (req) => {
   if (!apiKey || !supabaseUrl || !supabaseKey) {
     return new Response(JSON.stringify({ error: "Server configuration error" }), {
       status: 500,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -61,13 +74,13 @@ Deno.serve(async (req) => {
     if (!placeId || typeof placeId !== "string") {
       return new Response(JSON.stringify({ error: "placeId required" }), {
         status: 400,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), {
       status: 400,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -83,13 +96,13 @@ Deno.serve(async (req) => {
   if (!existing) {
     return new Response(JSON.stringify({ ok: true, skipped: true, reason: "no_rag_record" }), {
       status: 200,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
   if (existing.image_url) {
     return new Response(JSON.stringify({ ok: true, skipped: true, reason: "already_cached" }), {
       status: 200,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -104,7 +117,7 @@ Deno.serve(async (req) => {
     if (!detailRes.ok) {
       return new Response(JSON.stringify({ ok: true, skipped: true, reason: "places_api_error" }), {
         status: 200,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
     const detailData = (await detailRes.json()) as { photos?: Array<{ name: string; widthPx?: number; heightPx?: number }> };
@@ -112,7 +125,7 @@ Deno.serve(async (req) => {
     if (photoNames.length === 0) {
       return new Response(JSON.stringify({ ok: true, skipped: true, reason: "no_photo" }), {
         status: 200,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -139,7 +152,7 @@ Deno.serve(async (req) => {
     if (urls.length === 0) {
       return new Response(JSON.stringify({ ok: false, error: "all_uploads_failed" }), {
         status: 500,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -150,13 +163,13 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ ok: true, image_url: urls[0], image_urls: urls }), {
       status: 200,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (e) {
     console.warn("[cache-place-photo] error:", (e as Error).message);
     return new Response(JSON.stringify({ ok: false, error: (e as Error).message }), {
       status: 500,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

@@ -9,24 +9,37 @@ declare const Deno: {
   env: { get: (key: string) => string | undefined };
 };
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const ALLOWED_ORIGINS = [
+  "https://travelunu.com",
+  "https://www.travelunu.com",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "capacitor://localhost",
+  "http://localhost",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: getCorsHeaders(req) });
   }
 
   if (req.method !== "POST") {
     return new Response(
       JSON.stringify({ error: "Method not allowed" }),
-      { status: 405, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+      { status: 405, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } },
     );
   }
 
@@ -35,7 +48,7 @@ Deno.serve(async (req) => {
     console.error("Missing GEMINI_API_KEY secret");
     return new Response(
       JSON.stringify({ error: "Server configuration error" }),
-      { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } },
     );
   }
 
@@ -45,7 +58,7 @@ Deno.serve(async (req) => {
   } catch {
     return new Response(
       JSON.stringify({ error: "Invalid JSON body" }),
-      { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+      { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } },
     );
   }
 
@@ -63,7 +76,7 @@ Deno.serve(async (req) => {
     return new Response(resBody, {
       status: geminiRes.status,
       headers: {
-        ...CORS_HEADERS,
+        ...getCorsHeaders(req),
         "Content-Type": "application/json",
       },
     });
@@ -71,7 +84,7 @@ Deno.serve(async (req) => {
     console.error("Gemini proxy fetch error:", err);
     return new Response(
       JSON.stringify({ error: { message: "Proxy fetch failed", status: "UNAVAILABLE" } }),
-      { status: 502, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+      { status: 502, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } },
     );
   }
 });
