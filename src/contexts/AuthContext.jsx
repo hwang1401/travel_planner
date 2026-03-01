@@ -11,7 +11,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { isNative } from '../utils/platform';
+import { isNative, getPlatform } from '../utils/platform';
 
 const AuthContext = createContext(null);
 
@@ -85,19 +85,21 @@ export function AuthProvider({ children }) {
         if (mounted) setLoading(false);
       });
 
-    /* 3. 네이티브: 딥링크 콜백으로 OAuth 세션 설정 */
+    /* 3. 네이티브: 딥링크 콜백으로 OAuth 세션 설정 (PKCE) */
     let appUrlListener;
     if (isNative()) {
       import('@capacitor/app').then(({ App }) => {
         appUrlListener = App.addListener('appUrlOpen', async ({ url }) => {
-          // com.travelunu.app:///#access_token=...&refresh_token=...
-          const hash = url.split('#')[1];
-          if (!hash) return;
-          const params = new URLSearchParams(hash);
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
-          if (accessToken && refreshToken) {
-            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          console.log('[Auth] appUrlOpen:', url);
+          // PKCE: com.travelunu.app://login-callback/?code=xxx
+          const urlObj = new URL(url);
+          const code = urlObj.searchParams.get('code');
+          if (code) {
+            console.log('[Auth] PKCE code received, exchanging...');
+            const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeErr) {
+              console.error('[Auth] Code exchange error:', exchangeErr);
+            }
             // 브라우저 닫기
             import('@capacitor/browser').then(({ Browser }) => Browser.close());
           }
@@ -118,18 +120,43 @@ export function AuthProvider({ children }) {
     setError(null);
 
     if (isNative()) {
-      // 네이티브: 시스템 브라우저로 OAuth 열고 커스텀 스킴으로 콜백
       const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: 'kakao',
         options: {
-          redirectTo: 'com.travelunu.app:///',
+          redirectTo: 'com.travelunu.app://login-callback/',
           skipBrowserRedirect: true,
         },
       });
       if (err) { setError(err.message); return; }
       if (data?.url) {
-        const { Browser } = await import('@capacitor/browser');
-        await Browser.open({ url: data.url, windowName: '_system' });
+        const platform = getPlatform();
+        if (platform === 'ios') {
+          // iOS: ASWebAuthenticationSession (콜백 자동 처리)
+          try {
+            const { registerPlugin } = await import('@capacitor/core');
+            const AuthSession = registerPlugin('AuthSession');
+            const result = await AuthSession.start({
+              url: data.url,
+              callbackScheme: 'com.travelunu.app',
+            });
+            if (result?.url) {
+              const urlObj = new URL(result.url);
+              const code = urlObj.searchParams.get('code');
+              if (code) {
+                await supabase.auth.exchangeCodeForSession(code);
+              }
+            }
+          } catch (e) {
+            if (!e.message?.includes('cancelled')) {
+              console.error('[Auth] AuthSession error:', e);
+              setError(e.message);
+            }
+          }
+        } else {
+          // Android: Chrome Custom Tabs → appUrlOpen 리스너에서 처리
+          const { Browser } = await import('@capacitor/browser');
+          await Browser.open({ url: data.url });
+        }
       }
     } else {
       // 웹: 기본 리다이렉트 방식

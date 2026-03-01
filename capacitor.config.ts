@@ -12,10 +12,18 @@ const config: CapacitorConfig = {
     // url: 'http://localhost:3000',
     // cleartext: true,
   },
+  android: {
+    // edge-to-edge 비활성화: 시스템 바 영역에 콘텐츠가 들어가지 않도록
+    SystemBars: {
+      insetsHandling: 'disable',
+    },
+  },
   plugins: {
     App: {
-      // 커스텀 URL 스킴 (OAuth 딥링크)
       url: 'com.travelunu.app',
+    },
+    SystemBars: {
+      insetsHandling: 'disable',
     },
   },
 };
