@@ -11,6 +11,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { isNative } from '../utils/platform';
 
 const AuthContext = createContext(null);
 
@@ -84,24 +85,62 @@ export function AuthProvider({ children }) {
         if (mounted) setLoading(false);
       });
 
+    /* 3. 네이티브: 딥링크 콜백으로 OAuth 세션 설정 */
+    let appUrlListener;
+    if (isNative()) {
+      import('@capacitor/app').then(({ App }) => {
+        appUrlListener = App.addListener('appUrlOpen', async ({ url }) => {
+          // com.travelunu.app:///#access_token=...&refresh_token=...
+          const hash = url.split('#')[1];
+          if (!hash) return;
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+            // 브라우저 닫기
+            import('@capacitor/browser').then(({ Browser }) => Browser.close());
+          }
+        });
+      });
+    }
+
     return () => {
       mounted = false;
       subscription?.unsubscribe();
+      appUrlListener?.then?.(l => l.remove());
+      if (appUrlListener?.remove) appUrlListener.remove();
     };
   }, [loadProfile]);
 
   /* ── Sign in with Kakao ── */
   const signInWithKakao = useCallback(async () => {
     setError(null);
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: 'kakao',
-      options: {
-        // TODO: 네이티브에서는 Capacitor 커스텀 스킴 사용 필요
-        // e.g. isNative() ? 'com.travelunu.app:///' : window.location.origin + '/'
-        redirectTo: `${window.location.origin}/`,
-      },
-    });
-    if (err) setError(err.message);
+
+    if (isNative()) {
+      // 네이티브: 시스템 브라우저로 OAuth 열고 커스텀 스킴으로 콜백
+      const { data, error: err } = await supabase.auth.signInWithOAuth({
+        provider: 'kakao',
+        options: {
+          redirectTo: 'com.travelunu.app:///',
+          skipBrowserRedirect: true,
+        },
+      });
+      if (err) { setError(err.message); return; }
+      if (data?.url) {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: data.url, windowName: '_system' });
+      }
+    } else {
+      // 웹: 기본 리다이렉트 방식
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: 'kakao',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+      if (err) setError(err.message);
+    }
   }, []);
 
   /* ── Sign out ── */
