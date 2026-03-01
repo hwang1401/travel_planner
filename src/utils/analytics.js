@@ -1,4 +1,4 @@
-const GA_ID = 'G-PWWMG9C0SD';
+const GA_ID = 'G-LCB7EY6BFM';
 
 export function trackPageView(path, title) {
   if (typeof window.gtag !== 'function') return;
