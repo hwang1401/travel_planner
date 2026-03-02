@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TravelUNU Store Screenshots</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 40px;
+    padding: 40px;
+    justify-content: center;
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  .slide {
+    width: 1080px;
+    height: 1920px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* ── Backgrounds ── */
+  .slide-1 { background: linear-gradient(180deg, #7c5bf0 0%, #6941e2 50%, #5531c8 100%); }
+  .slide-2 { background: linear-gradient(180deg, #4f46e5 0%, #4338ca 50%, #3730a3 100%); }
+  .slide-3 { background: linear-gradient(180deg, #7e41d4 0%, #6d28d9 50%, #5b21b6 100%); }
+  .slide-4 { background: linear-gradient(180deg, #6941e2 0%, #5b31d4 50%, #4c1d95 100%); }
+  .slide-5 { background: linear-gradient(180deg, #7c5bf0 0%, #6941e2 50%, #5531c8 100%); }
+  .slide-6 { background: linear-gradient(180deg, #5b5bd6 0%, #4f46e5 50%, #3730a3 100%); }
+
+  /* ── Decorative blobs ── */
+  .slide::before {
+    content: '';
+    position: absolute;
+    width: 900px;
+    height: 900px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%);
+    top: -300px;
+    right: -300px;
+    pointer-events: none;
+  }
+
+  /* ── Caption — compact top area ── */
+  .caption {
+    text-align: center;
+    padding: 100px 60px 40px;
+    z-index: 2;
+    flex-shrink: 0;
+    width: 100%;
+  }
+  .caption .sub {
+    font-size: 32px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 16px;
+    letter-spacing: -0.5px;
+  }
+  .caption .main {
+    font-size: 88px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.15;
+    letter-spacing: -3px;
+  }
+
+  /* ── Phone — large, rising from bottom ── */
+  .phone-wrapper {
+    position: absolute;
+    bottom: -40px;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+  .phone {
+    position: relative;
+    width: 640px;
+    border-radius: 56px;
+    background: #1c1c1e;
+    padding: 14px;
+    box-shadow:
+      0 -10px 100px rgba(0,0,0,0.35),
+      0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .phone-screen {
+    width: 100%;
+    border-radius: 44px;
+    overflow: hidden;
+    background: #000;
+  }
+  .phone-screen img {
+    width: 100%;
+    display: block;
+  }
+
+  /* Dynamic island */
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 140px;
+    height: 36px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+
+<!-- Slide 1: Hero -->
+<div class="slide slide-1" id="slide1">
+  <div class="caption">
+    <div class="sub">함께 만드는 여행 일정</div>
+    <div class="main">여행 계획,<br>이제 쉽게.</div>
+  </div>
+  <div class="phone-wrapper">
+    <div class="phone">
+      <div class="phone-screen">
+        <img src="IMG_8168.PNG" alt="내 여행">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 2: AI 일정 -->
+<div class="slide slide-2" id="slide2">
+  <div class="caption">
+    <div class="sub">일정 짜기 어려울 땐?</div>
+    <div class="main">AI가 짜주는<br>맞춤 일정.</div>
+  </div>
+  <div class="phone-wrapper">
+    <div class="phone">
+      <div class="phone-screen">
+        <img src="IMG_8183.PNG" alt="AI 일정 결과">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 3: 스타일 선택 -->
+<div class="slide slide-3" id="slide3">
+  <div class="caption">
+    <div class="sub">취향대로 골라보세요</div>
+    <div class="main">내 스타일로<br>맞춤 여행.</div>
+  </div>
+  <div class="phone-wrapper">
+    <div class="phone">
+      <div class="phone-screen">
+        <img src="IMG_8181.PNG" alt="스타일 선택">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 4: 타임라인 -->
+<div class="slide slide-4" id="slide4">
+  <div class="caption">
+    <div class="sub">시간순 깔끔한 일정 관리</div>
+    <div class="main">하루 일정을<br>한눈에.</div>
+  </div>
+  <div class="phone-wrapper">
+    <div class="phone">
+      <div class="phone-screen">
+        <img src="IMG_8169.PNG" alt="타임라인">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 5: 장소 상세 -->
+<div class="slide slide-5" id="slide5">
+  <div class="caption">
+    <div class="sub">영업시간, 주소, 사진까지</div>
+    <div class="main">장소 정보<br>바로 확인.</div>
+  </div>
+  <div class="phone-wrapper">
+    <div class="phone">
+      <div class="phone-screen">
+        <img src="IMG_8170.PNG" alt="장소 상세">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 6: 지도 -->
+<div class="slide slide-6" id="slide6">
+  <div class="caption">
+    <div class="sub">이동 경로를 한눈에 파악</div>
+    <div class="main">지도로 보는<br>여행 동선.</div>
+  </div>
+  <div class="phone-wrapper">
+    <div class="phone">
+      <div class="phone-screen">
+        <img src="IMG_8172.PNG" alt="여행 지도">
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
