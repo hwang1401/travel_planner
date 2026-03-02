@@ -30,9 +30,10 @@ const rowBase = {
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, deleteAccount } = useAuth();
   const [themeValue, setThemeValue] = useState(getTheme());
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [legalType, setLegalType] = useState(null);
 
   useEffect(() => {
@@ -176,7 +177,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* 로그아웃 */}
+        {/* 로그아웃 & 계정 삭제 */}
         <section>
           <div style={{
             background: 'var(--color-surface-container-lowest)',
@@ -196,6 +197,20 @@ export default function SettingsPage() {
             >
               로그아웃
             </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              style={{
+                ...rowBase,
+                justifyContent: 'center',
+                borderTop: '1px solid var(--color-outline-variant)',
+                color: 'var(--color-error)',
+                fontWeight: 'var(--typo-label-2-bold-weight)',
+                opacity: 0.7,
+              }}
+            >
+              계정 삭제
+            </button>
           </div>
         </section>
       </div>
@@ -209,6 +224,19 @@ export default function SettingsPage() {
           confirmLabel={confirmLogout.confirmLabel}
           onConfirm={confirmLogout.onConfirm}
           onCancel={() => setConfirmLogout(null)}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="계정 삭제"
+          message="계정을 삭제하면 모든 여행 일정과 개인정보가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+          confirmLabel="삭제"
+          onConfirm={async () => {
+            await deleteAccount();
+            setConfirmDelete(false);
+          }}
+          onCancel={() => setConfirmDelete(false)}
         />
       )}
     </div>

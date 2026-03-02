@@ -179,6 +179,27 @@ export function AuthProvider({ children }) {
     setProfile(null);
   }, []);
 
+  /* ── Delete account ── */
+  const deleteAccount = useCallback(async () => {
+    if (!user) return;
+    setError(null);
+    try {
+      // 1. Delete user's trips (cascade deletes schedule_items, trip_members)
+      await supabase.from('trips').delete().eq('owner_id', user.id);
+      // 2. Remove from shared trips
+      await supabase.from('trip_members').delete().eq('user_id', user.id);
+      // 3. Delete profile
+      await supabase.from('profiles').delete().eq('id', user.id);
+      // 4. Sign out (auth.users row cleanup is handled by Supabase admin/trigger)
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+    } catch (e) {
+      console.error('[Auth] Delete account error:', e);
+      setError('계정 삭제 중 오류가 발생했습니다.');
+    }
+  }, [user]);
+
   /* ── Update profile ── */
   const updateProfile = useCallback(async (updates) => {
     if (!user) return;
@@ -202,6 +223,7 @@ export function AuthProvider({ children }) {
     error,
     signInWithKakao,
     signOut,
+    deleteAccount,
     updateProfile,
     isAuthenticated: !!user,
   };
