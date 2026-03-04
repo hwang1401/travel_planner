@@ -1,0 +1,404 @@
+openapi: 3.0.3
+info:
+  title: TravelUNU API
+  description: |
+    TravelUNU 여행 플래너 앱의 백엔드 API 명세입니다.
+    모든 Edge Function은 Supabase Edge Functions (Deno) 위에서 동작하며,
+    인증은 Supabase Anon Key를 Bearer 토큰으로 전달합니다.
+  version: 1.0.0
+  contact:
+    name: TravelUNU Dev
+    url: https://github.com/hwang1401/travelunu
+
+servers:
+  - url: https://rjjfcnstdzwiwpblrxtz.supabase.co/functions/v1
+    description: Production (Supabase Edge Functions)
+  - url: http://localhost:54321/functions/v1
+    description: Local Development (supabase start)
+
+tags:
+  - name: AI
+    description: Gemini AI 프록시
+  - name: Places
+    description: Google Places 연동 (장소 검증, 사진 캐시)
+
+components:
+  securitySchemes:
+    SupabaseAnon:
+      type: http
+      scheme: bearer
+      description: Supabase Anon Key (VITE_SUPABASE_ANON_KEY)
+
+  schemas:
+    # ── Gemini Proxy ──
+    GeminiRequest:
+      type: object
+      description: Gemini generateContent 요청 body (Google AI API 형식 그대로 전달)
+      properties:
+        contents:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [user, model]
+              parts:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    text:
+                      type: string
+        generationConfig:
+          type: object
+          properties:
+            temperature:
+              type: number
+              example: 0.7
+            maxOutputTokens:
+              type: integer
+              example: 65536
+            responseMimeType:
+              type: string
+              example: application/json
+      required:
+        - contents
+
+    GeminiResponse:
+      type: object
+      description: Gemini API 응답 (그대로 프록시)
+      properties:
+        candidates:
+          type: array
+          items:
+            type: object
+            properties:
+              content:
+                type: object
+                properties:
+                  parts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        text:
+                          type: string
+              finishReason:
+                type: string
+                enum: [STOP, MAX_TOKENS, SAFETY, RECITATION, OTHER]
+
+    # ── Cache Place Photo ──
+    CachePlacePhotoRequest:
+      type: object
+      properties:
+        placeId:
+          type: string
+          description: Google Place ID
+          example: ChIJ5_jgRuB1dDURNjifBpOvNDI
+      required:
+        - placeId
+
+    CachePlacePhotoResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        image_url:
+          type: string
+          nullable: true
+          description: 대표 이미지 URL (Supabase Storage)
+        image_urls:
+          type: array
+          items:
+            type: string
+          description: 최대 3장의 이미지 URL
+        skipped:
+          type: boolean
+          description: 이미 캐시되었거나 조건 미충족 시 true
+        reason:
+          type: string
+          nullable: true
+          enum: [no_rag_record, already_cached, places_api_error, no_photo]
+          description: skipped=true일 때 사유
+
+    # ── Verify and Register Places ──
+    VerifyPlacesRequest:
+      type: object
+      properties:
+        places:
+          type: array
+          description: 검증할 장소 목록
+          items:
+            type: object
+            properties:
+              desc:
+                type: string
+                description: 장소명 (한국어)
+                example: 이치란 라멘
+              type:
+                type: string
+                description: 장소 유형
+                enum: [food, stay, spot, activity, transport, shopping]
+                example: food
+              address:
+                type: string
+                nullable: true
+                description: 주소 (선택)
+              region:
+                type: string
+                nullable: true
+                description: 지역 힌트 (한국어)
+                example: 후쿠오카
+            required:
+              - desc
+              - type
+        regionHint:
+          type: string
+          description: 전체 여행 지역 힌트 (한국어)
+          example: 후쿠오카
+      required:
+        - places
+
+    VerifyPlacesResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        registered:
+          type: integer
+          description: 신규 등록/업데이트된 장소 수
+        daily_limit_reached:
+          type: boolean
+          description: 일일 한도(50건) 도달 여부
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              desc:
+                type: string
+              address:
+                type: string
+                nullable: true
+              short_address:
+                type: string
+                nullable: true
+              lat:
+                type: number
+                nullable: true
+              lon:
+                type: number
+                nullable: true
+              image_url:
+                type: string
+                nullable: true
+              image_urls:
+                type: array
+                items:
+                  type: string
+              placeId:
+                type: string
+                nullable: true
+              rating:
+                type: number
+                nullable: true
+              reviewCount:
+                type: integer
+                nullable: true
+              opening_hours:
+                type: string
+                nullable: true
+                description: "월요일: HH:MM – HH:MM; ..." 형식
+              business_status:
+                type: string
+                nullable: true
+                enum: [OPERATIONAL, CLOSED_TEMPORARILY, CLOSED_PERMANENTLY]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Server configuration error
+
+security:
+  - SupabaseAnon: []
+
+paths:
+  /gemini-proxy:
+    post:
+      tags: [AI]
+      summary: Gemini AI 프록시
+      description: |
+        클라이언트의 Gemini API 요청을 서버에서 프록시합니다.
+        API 키는 서버(Supabase Secrets)에서만 관리되며 클라이언트에 노출되지 않습니다.
+        요청 body는 Gemini generateContent API 형식을 그대로 전달합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeminiRequest'
+            example:
+              contents:
+                - role: user
+                  parts:
+                    - text: "후쿠오카 3일 여행 일정 추천해줘"
+              generationConfig:
+                temperature: 0.7
+                maxOutputTokens: 65536
+      responses:
+        '200':
+          description: Gemini API 응답 (프록시)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeminiResponse'
+        '400':
+          description: 잘못된 요청 (Invalid JSON)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 서버 설정 오류 (API 키 미설정)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Gemini API 연결 실패
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Proxy fetch failed
+                      status:
+                        type: string
+                        example: UNAVAILABLE
+
+  /cache-place-photo:
+    post:
+      tags: [Places]
+      summary: 장소 사진 캐시
+      description: |
+        Google Places에서 장소 사진(최대 3장)을 다운로드하여
+        Supabase Storage에 캐시하고, rag_places 테이블의
+        image_url/image_urls를 업데이트합니다.
+
+        PlaceInfoContent에서 이미지가 없는 장소를 표시할 때
+        fire-and-forget으로 호출됩니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CachePlacePhotoRequest'
+      responses:
+        '200':
+          description: 성공 (캐시 완료 또는 스킵)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CachePlacePhotoResponse'
+              examples:
+                cached:
+                  summary: 사진 캐시 완료
+                  value:
+                    ok: true
+                    image_url: https://rjjfcnstdzwiwpblrxtz.supabase.co/storage/v1/object/public/images/rag/fukuoka/ChIJ5_jgRuB1dDURNjifBpOvNDI.jpg
+                    image_urls:
+                      - https://rjjfcnstdzwiwpblrxtz.supabase.co/storage/v1/object/public/images/rag/fukuoka/ChIJ5_jgRuB1dDURNjifBpOvNDI.jpg
+                      - https://rjjfcnstdzwiwpblrxtz.supabase.co/storage/v1/object/public/images/rag/fukuoka/ChIJ5_jgRuB1dDURNjifBpOvNDI_2.jpg
+                skipped:
+                  summary: 이미 캐시됨
+                  value:
+                    ok: true
+                    skipped: true
+                    reason: already_cached
+        '400':
+          description: placeId 누락 또는 잘못된 JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 서버 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /verify-and-register-places:
+    post:
+      tags: [Places]
+      summary: 장소 검증 및 등록
+      description: |
+        AI 채팅에서 추천된 장소들을 Google Places Text Search로 검증하고
+        rag_places 테이블에 등록합니다. 이미 등록된 장소는 캐시 히트하여
+        API 호출 없이 바로 반환합니다.
+
+        **주요 동작:**
+        1. DB에서 name_ko+region으로 캐시 조회
+        2. 캐시 미스 시 Google Text Search (JA+KO 이중 검색)
+        3. nameSimilar 알고리즘으로 이름 매칭
+        4. Place Details로 상세 정보 수집 (평점, 영업시간, 주소, 사진)
+        5. rag_places에 upsert + Storage에 사진 업로드
+
+        **일일 한도:** 신규 등록 50건/일 (API 비용 제어)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPlacesRequest'
+            example:
+              places:
+                - desc: 이치란 라멘
+                  type: food
+                  region: 후쿠오카
+                - desc: 캐널시티 하카타
+                  type: spot
+                  region: 후쿠오카
+              regionHint: 후쿠오카
+      responses:
+        '202':
+          description: 처리 완료 (등록/캐시 결과)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyPlacesResponse'
+              example:
+                ok: true
+                registered: 2
+                results:
+                  - desc: 이치란 라멘
+                    address: "일본 〒810-0801 후쿠오카현 후쿠오카시 하카타구 나카스 5-3-2"
+                    short_address: "나카스 5-3-2, 하카타구"
+                    lat: 33.5906
+                    lon: 130.4017
+                    image_url: https://rjjfcnstdzwiwpblrxtz.supabase.co/storage/v1/object/public/images/rag/fukuoka/ChIJ5_jgRuB1dDURNjifBpOvNDI.jpg
+                    placeId: ChIJ5_jgRuB1dDURNjifBpOvNDI
+                    rating: 4.1
+                    reviewCount: 12345
+                    opening_hours: "월요일: 10:00 – 23:00; 화요일: 10:00 – 23:00"
+                    business_status: OPERATIONAL
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 서버 설정 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

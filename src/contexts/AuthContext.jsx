@@ -4,7 +4,7 @@
  *
  * Wraps Supabase Auth:
  *   - Tracks current user session
- *   - Provides signInWithKakao, signOut
+ *   - Provides signInWithKakao, signInWithApple, signOut
  *   - Auto-refreshes token and persists session
  *   - Loads user profile from profiles table
  */
@@ -12,6 +12,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { isNative, getPlatform } from '../utils/platform';
+
+
 
 const AuthContext = createContext(null);
 
@@ -170,6 +172,26 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  /* ── Sign in with Apple ── */
+  const signInWithApple = useCallback(async () => {
+    setError(null);
+
+    if (isNative()) {
+      // TODO: iOS native Apple sign-in (Capacitor plugin 설치 후 활성화)
+      setError('네이티브 Apple 로그인은 추후 지원 예정입니다.');
+    } else {
+      // Web: Supabase OAuth redirect (implicit flow for Apple compatibility)
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+          queryParams: { flowType: 'implicit' },
+        },
+      });
+      if (err) setError(err.message);
+    }
+  }, []);
+
   /* ── Sign out ── */
   const signOut = useCallback(async () => {
     setError(null);
@@ -222,6 +244,7 @@ export function AuthProvider({ children }) {
     loading,
     error,
     signInWithKakao,
+    signInWithApple,
     signOut,
     deleteAccount,
     updateProfile,
