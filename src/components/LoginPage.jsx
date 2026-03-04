@@ -10,7 +10,7 @@ import { SPACING } from '../styles/tokens';
 import LegalDialog from './common/LegalDialog';
 
 export default function LoginPage() {
-  const { signInWithKakao, error } = useAuth();
+  const { signInWithKakao, signInWithApple, error } = useAuth();
   const [legalType, setLegalType] = useState(null); // 'terms' | 'privacy' | null
 
   return (
@@ -86,6 +86,36 @@ export default function LoginPage() {
             {error}
           </div>
         )}
+
+        {/* Apple Login */}
+        <button
+          onClick={signInWithApple}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: SPACING.md,
+            width: '100%',
+            height: '48px',
+            borderRadius: 'var(--radius-md, 8px)',
+            border: 'none',
+            background: '#000000',
+            color: '#FFFFFF',
+            fontSize: 'var(--typo-label-1-n---bold-size, 15px)',
+            fontWeight: 'var(--typo-label-1-n---bold-weight, 700)',
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            transition: 'filter 0.15s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(1.2)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.filter = 'none'; }}
+        >
+          {/* Apple icon */}
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M14.94 10.56c-.02-2.19 1.79-3.24 1.87-3.29-1.02-1.49-2.6-1.69-3.16-1.72-1.35-.14-2.63.79-3.31.79-.68 0-1.74-.77-2.86-.75-1.47.02-2.83.86-3.59 2.17-1.53 2.65-.39 6.59 1.1 8.74.73 1.05 1.6 2.24 2.74 2.19 1.1-.04 1.52-.71 2.85-.71 1.33 0 1.71.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.4 1.2-2.46-.03-.01-2.3-.88-2.35-3.52zM12.77 4.04c.61-.74 1.02-1.76.91-2.79-.88.04-1.94.58-2.57 1.32-.56.65-1.06 1.69-.93 2.69.99.07 1.99-.5 2.59-1.22z" fill="#FFFFFF"/>
+          </svg>
+          Apple로 시작하기
+        </button>
 
         {/* Kakao Login */}
         <button
