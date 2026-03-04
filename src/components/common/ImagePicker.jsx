@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import Icon from './Icon';
 import Button from './Button';
 import { SPACING } from '../../styles/tokens';
+import { isNative } from '../../utils/platform';
 
 /*
  * ── ImagePicker ──
