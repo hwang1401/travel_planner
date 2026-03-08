@@ -49,3 +49,4 @@ ios/build/
 
 # Supabase temp
 supabase/.temp/
+.vercel
