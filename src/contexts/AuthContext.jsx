@@ -177,8 +177,42 @@ export function AuthProvider({ children }) {
     setError(null);
 
     if (isNative()) {
-      // TODO: iOS native Apple sign-in (Capacitor plugin 설치 후 활성화)
-      setError('네이티브 Apple 로그인은 추후 지원 예정입니다.');
+      const { data, error: err } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: 'com.travelunu.app://login-callback/',
+          skipBrowserRedirect: true,
+        },
+      });
+      if (err) { setError(err.message); return; }
+      if (data?.url) {
+        const platform = getPlatform();
+        if (platform === 'ios') {
+          try {
+            const { registerPlugin } = await import('@capacitor/core');
+            const AuthSession = registerPlugin('AuthSession');
+            const result = await AuthSession.start({
+              url: data.url,
+              callbackScheme: 'com.travelunu.app',
+            });
+            if (result?.url) {
+              const urlObj = new URL(result.url);
+              const code = urlObj.searchParams.get('code');
+              if (code) {
+                await supabase.auth.exchangeCodeForSession(code);
+              }
+            }
+          } catch (e) {
+            if (!e.message?.includes('cancelled')) {
+              console.error('[Auth] Apple AuthSession error:', e);
+              setError(e.message);
+            }
+          }
+        } else {
+          const { Browser } = await import('@capacitor/browser');
+          await Browser.open({ url: data.url });
+        }
+      }
     } else {
       // Web: Supabase OAuth redirect (implicit flow for Apple compatibility)
       const { error: err } = await supabase.auth.signInWithOAuth({
