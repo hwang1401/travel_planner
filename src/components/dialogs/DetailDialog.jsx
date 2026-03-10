@@ -340,9 +340,17 @@ export default function DetailDialog({
     setPhotosLoading(true);
     getPlacePhotos(pid, 3).then(async (urls) => {
       if (cancelled || !urls.length) return;
+      // Google Maps photo URI는 네이티브 WKWebView에서 <img src>로 로드 시 실패할 수 있음
+      // → 일단 표시하되, cachePhotoToRAG 완료 후 Supabase Storage URL로 교체
       if (!cancelled) setPlacePhotos(urls);
       try {
         await cachePhotoToRAG(pid);
+        // 캐싱 완료 후 RAG에서 Supabase Storage URL 가져와서 교체
+        if (!cancelled) {
+          const cached = await getPlaceByNameOrAddress({ name: '', address: '', placeId: pid });
+          const cachedUrls = cached?.image_urls?.length ? cached.image_urls : (cached?.image_url ? [cached.image_url] : []);
+          if (!cancelled && cachedUrls.length > 0) setRagImages(cachedUrls);
+        }
       } catch (e) {
         console.warn('[DetailDialog] cachePhotoToRAG failed:', e);
       }
