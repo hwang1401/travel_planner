@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import { useAppViewportRect } from '../../hooks/useAppViewportRect';
 import Button from '../common/Button';
 import Field from '../common/Field';
 import Icon from '../common/Icon';
@@ -308,7 +309,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
         setGenStatusMsg('일정 생성 중...');
         const styleTemplates = selectedStyles.map(s => STYLE_CHIPS.find(c => c.label === s)?.template).filter(Boolean);
         const fullPreferences = [...styleTemplates, aiPreferences.trim()].filter(Boolean).join('. ');
-        const { days, error } = await generateFullTripSchedule({
+        const { days, error, verifyPromise } = await generateFullTripSchedule({
           destinations,
           duration: duration || 1,
           startDate,
@@ -318,7 +319,11 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
         });
         if (error) { setGenError(error); setGenerating(false); return; }
         if (days.length === 0) { setGenError('AI가 일정을 생성하지 못했습니다.'); setGenerating(false); return; }
-        if (!abortedRef.current) setPreview({ days });
+        if (!abortedRef.current) {
+          setPreview({ days });
+          // 백그라운드 검증 완료 후 미리보기 갱신
+          verifyPromise?.then(() => { if (!abortedRef.current) setPreview({ days: [...days] }); });
+        }
       }
     } catch (err) { setGenError(err.message); }
     finally { setGenerating(false); setGenStatusMsg(''); }
@@ -346,16 +351,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
     }
   };
 
-  const [viewportRect, setViewportRect] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
+  const viewportRect = useAppViewportRect();
 
   return (
     <PageTransition open={open} onClose={onClose} viewportRect={viewportRect}>
@@ -869,7 +865,7 @@ export default function CreateTripWizard({ open, onClose, onCreate }) {
       {toast && <Toast message={toast.message} icon={toast.icon} onDone={() => setToast(null)} />}
 
       {selectedPlace && createPortal(
-        <BottomSheet maxHeight="70vh" zIndex={9600} onClose={() => setSelectedPlace(null)}>
+        <BottomSheet contentFill maxHeight="70vh" zIndex={9600} onClose={() => setSelectedPlace(null)}>
           <PlaceInfoContent
             view="info"
             place={{

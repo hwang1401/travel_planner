@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { useAppViewportRect } from '../../hooks/useAppViewportRect';
 import { createPortal } from 'react-dom';
 import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
@@ -37,16 +38,7 @@ export default function TimetableSearchDialog({ onClose, onSelect }) {
     onClose();
   };
 
-  const [viewportRect, setViewportRect] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
+  const viewportRect = useAppViewportRect();
 
   const modal = (
     <div style={{

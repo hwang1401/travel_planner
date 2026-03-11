@@ -9,6 +9,7 @@
  * variant: 'compact' | 'full'
  */
 import { useState, useEffect } from 'react';
+import { useAppViewportRect } from '../../hooks/useAppViewportRect';
 import { createPortal } from 'react-dom';
 import { useBackClose } from '../../hooks/useBackClose';
 import { COLOR, RADIUS, SPACING } from '../../styles/tokens';
@@ -249,16 +250,7 @@ export default function TimetablePreview({ timetable, variant = 'full', accentCo
 // ── 전체 시간표 팝업 다이얼로그 ──
 function TimetableDetailDialog({ timetable, accentColor, onClose, onTimeRowClick }) {
   useBackClose(true, onClose);
-  const [viewportRect, setViewportRect] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
+  const viewportRect = useAppViewportRect();
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose?.(); };

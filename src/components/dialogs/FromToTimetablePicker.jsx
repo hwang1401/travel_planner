@@ -8,7 +8,8 @@
  * onSelect({ from, to, routeId, route }) — route는 TIMETABLE_DB 항목
  * 노선 없으면 routeId/route 없이 호출
  */
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { useAppViewportRect } from '../../hooks/useAppViewportRect';
 import { createPortal } from 'react-dom';
 import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
@@ -140,16 +141,7 @@ export default function FromToTimetablePicker({ onClose, onSelect, initialFrom =
     [STEP_ROUTE]: '노선 선택',
   };
 
-  const [viewportRect, setViewportRect] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
+  const viewportRect = useAppViewportRect();
 
   const overlay = (
     <div style={{

@@ -125,10 +125,12 @@ export default function AddPlacePage({ open, onClose, onSave, dayIdx, tripId, al
     const update = () => {
       const vh = vv.height;
       const ih = window.innerHeight;
+      const root = document.getElementById('root');
+      const rootRect = root ? root.getBoundingClientRect() : null;
       setViewportRect({
         top: vv.offsetTop,
-        left: vv.offsetLeft,
-        width: vv.width,
+        left: rootRect ? rootRect.left : vv.offsetLeft,
+        width: rootRect ? rootRect.width : vv.width,
         height: vh,
       });
       if (isSearchFocusedRef.current && vh < ih - 100) {

@@ -248,7 +248,7 @@ export default function TimePickerDialog({ open, value, onConfirm, onClose, minu
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0, bottom: 0, left: 'var(--app-left, 0)', right: 'var(--app-right, 0)',
         zIndex,
         display: 'flex',
         alignItems: 'center',

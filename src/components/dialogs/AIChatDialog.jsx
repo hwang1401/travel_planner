@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { useAppViewportRect } from '../../hooks/useAppViewportRect';
 import { createPortal } from 'react-dom';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { useBackClose } from '../../hooks/useBackClose';
@@ -163,15 +164,19 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
 
   useScrollLock(true);
 
-  const [viewportRect, setViewportRect] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  const viewportRect = useAppViewportRect();
+
+  // 백그라운드 검증 완료 후 마지막 AI 메시지를 새 참조로 교체해 re-render 트리거
+  const applyVerifyUpdate = useCallback((placesRef, itemsRef, verifyPromise) => {
+    verifyPromise?.then(() => {
+      setChatMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === 'ai' && last.places === placesRef) {
+          return [...prev.slice(0, -1), { ...last, places: [...placesRef], items: [...itemsRef] }];
+        }
+        return prev;
+      });
+    });
   }, []);
 
   const handleSendChat = useCallback(async () => {
@@ -190,7 +195,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
     const currentItems = lastAi?.items ?? undefined;
     const dayContext = currentDay?.label || '';
     const tripScheduleSummary = buildTripScheduleSummary(allDays || []);
-    const { type: respType, message, places, items, error, choices } = await getAIRecommendation(raw, history, dayContext, {
+    const { type: respType, message, places, items, error, choices, verifyPromise } = await getAIRecommendation(raw, history, dayContext, {
       onStatus: (s) => setAiStatusMsg(s),
       destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean) : undefined,
       currentItems,
@@ -204,13 +209,9 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
     }
     const choicesArr = Array.isArray(choices) ? choices : [];
     const placesArr = Array.isArray(places) ? places : [];
-    setChatMessages((prev) => {
-      const next = [...prev, { role: 'ai', text: message, type: respType || 'chat', places: placesArr, items, choices: choicesArr }];
-      // TODO: choices 기능 개선 후 복원
-      // if (items.length === 0 && placesArr.length === 0 && choicesArr.length > 0) setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
-      return next;
-    });
+    setChatMessages((prev) => [...prev, { role: 'ai', text: message, type: respType || 'chat', places: placesArr, items, choices: choicesArr }]);
     setTimeout(() => chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
+    applyVerifyUpdate(placesArr, items, verifyPromise);
   }, [chatInput, chatLoading, chatMessages, currentDay, destinations, allDays]);
 
   const handleChoiceSelect = useCallback((choiceText) => {
@@ -227,7 +228,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
       destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean) : undefined,
       currentItems,
       tripScheduleSummary,
-    }).then(({ type: respType, message, places, items, error, choices }) => {
+    }).then(({ type: respType, message, places, items, error, choices, verifyPromise }) => {
       setChatLoading(false);
       setAiStatusMsg('');
       const choicesArr = Array.isArray(choices) ? choices : [];
@@ -236,13 +237,9 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
         setChatMessages((prev) => [...prev, { role: 'ai', text: '일시적인 오류가 발생했어요.', isError: true, lastUserText: choiceText }]);
         return;
       }
-      setChatMessages((prev) => {
-        const next = [...prev, { role: 'ai', text: message, type: respType || 'chat', places: placesArr, items, choices: choicesArr }];
-        // TODO: choices 기능 개선 후 복원
-        // if (items.length === 0 && placesArr.length === 0 && choicesArr.length > 0) setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
-        return next;
-      });
+      setChatMessages((prev) => [...prev, { role: 'ai', text: message, type: respType || 'chat', places: placesArr, items, choices: choicesArr }]);
       setTimeout(() => chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
+      applyVerifyUpdate(placesArr, items, verifyPromise);
     }).catch(() => { setChatLoading(false); setAiStatusMsg(''); });
   }, [chatMessages, currentDay, destinations, allDays]);
 
@@ -260,7 +257,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
         destinations: Array.isArray(destinations) ? destinations.map((d) => (typeof d === 'string' ? d : d?.name ?? '')).filter(Boolean) : undefined,
         currentItems,
         tripScheduleSummary,
-      }).then(({ type: respType, message, places, items, error, choices }) => {
+      }).then(({ type: respType, message, places, items, error, choices, verifyPromise }) => {
         setChatLoading(false);
         setAiStatusMsg('');
         const choicesArr = Array.isArray(choices) ? choices : [];
@@ -268,12 +265,8 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
         if (error) {
           setChatMessages((prev2) => [...prev2, { role: 'ai', text: '일시적인 오류가 발생했어요.', isError: true, lastUserText }]);
         } else {
-          setChatMessages((prev2) => {
-            const next = [...prev2, { role: 'ai', text: message, type: respType || 'chat', places: placesArr, items, choices: choicesArr }];
-            // TODO: choices 기능 개선 후 복원
-            // if (items.length === 0 && placesArr.length === 0 && choicesArr.length > 0) setTimeout(() => setChoicesSheet({ question: message, choices: choicesArr }), 0);
-            return next;
-          });
+          setChatMessages((prev2) => [...prev2, { role: 'ai', text: message, type: respType || 'chat', places: placesArr, items, choices: choicesArr }]);
+          applyVerifyUpdate(placesArr, items, verifyPromise);
         }
         setTimeout(() => chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
       }).catch(() => {
@@ -521,7 +514,7 @@ export default function AIChatDialog({ onClose, onBulkImport, currentDay, destin
         </BottomSheet>
       )}
       {selectedAIPlace && (
-        <BottomSheet maxHeight={placeView === 'form' ? '85vh' : '70vh'} zIndex={9600} onClose={() => { setSelectedAIPlace(null); setPlaceView('info'); }}>
+        <BottomSheet contentFill maxHeight={placeView === 'form' ? '85vh' : '70vh'} zIndex={9600} onClose={() => { setSelectedAIPlace(null); setPlaceView('info'); }}>
           <PlaceInfoContent
             view={placeView}
             onGoToForm={() => setPlaceView('form')}

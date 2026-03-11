@@ -210,7 +210,7 @@ export default function PwaInstallPrompt() {
 
   // 하단 바 공통 스타일
   const barStyle = {
-    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 10000,
+    position: 'fixed', bottom: 0, left: 'var(--app-left, 0)', right: 'var(--app-right, 0)', zIndex: 10000,
     padding: `${SPACING.lg} ${SPACING.xxl}`,
     paddingBottom: 'calc(var(--spacing-sp120, 12px) + var(--safe-area-bottom, 0px))',
     background: 'var(--color-primary)', color: 'var(--color-on-primary)',

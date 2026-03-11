@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useAppViewportRect } from '../../hooks/useAppViewportRect';
 import { createPortal } from 'react-dom';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { useBackClose } from '../../hooks/useBackClose';
@@ -169,17 +170,7 @@ export default function DetailDialog({
   const [loadedImageIndices, setLoadedImageIndices] = useState(() => new Set());
   const [ragShortAddress, setRagShortAddress] = useState(null);
 
-  // visualViewport
-  const [viewportRect, setViewportRect] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
+  const viewportRect = useAppViewportRect();
 
   // 배경 스크롤 차단: useScrollLock이 overflow + touchmove 처리 (iOS overscroll 방지)
   useEffect(() => {
@@ -246,7 +237,22 @@ export default function DetailDialog({
   // 다른 아이템으로 전환 시에만 로드 상태 리셋 (RAG 이미지 추가 시 기존 로드 상태 유지)
   useEffect(() => {
     setLoadedImageIndices(new Set());
+    // 캐러셀 스크롤 위치도 초기화
+    if (carouselScrollRef.current) carouselScrollRef.current.scrollLeft = 0;
   }, [curIdx]);
+
+  // WKWebView에서 onLoad/onError가 발생하지 않는 경우를 위한 5초 timeout 폴백
+  useEffect(() => {
+    if (!displayImages.length) return;
+    const timer = setTimeout(() => {
+      setLoadedImageIndices(prev => {
+        const next = new Set(prev);
+        for (let i = 0; i < displayImages.length; i++) next.add(i);
+        return next;
+      });
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [displayImages]);
 
   const directionsUrl = effectiveDetail.placeId
     ? `https://www.google.com/maps/dir/?api=1&destination=place_id:${effectiveDetail.placeId}&destination_place_id=${effectiveDetail.placeId}`
@@ -331,28 +337,31 @@ export default function DetailDialog({
     const pid = effectiveDetail?.placeId;
     if (!pid) { setPlacePhotos([]); return; }
     if (effectiveDetail._imageRemovedByUser) return;
-    const hasImage = mainImage || (imagesArray && imagesArray.length > 0);
-    if (hasImage) return;
-    if (ragImages.length > 0) return;
+    // 이미 3장 이상이면 추가 불필요
+    const totalImages = new Set([
+      ...(mainImage ? [mainImage] : []),
+      ...(imagesArray || []),
+      ...ragImages,
+    ].filter(Boolean)).size;
+    if (totalImages >= 3) return;
 
     setPlacePhotos([]); // 비동기 fetch 전 리셋 — 스와이프 시 이전 사진 잔류 방지
     let cancelled = false;
     setPhotosLoading(true);
     getPlacePhotos(pid, 3).then(async (urls) => {
       if (cancelled || !urls.length) return;
-      // Google Maps photo URI는 네이티브 WKWebView에서 <img src>로 로드 시 실패할 수 있음
-      // → 일단 표시하되, cachePhotoToRAG 완료 후 Supabase Storage URL로 교체
-      if (!cancelled) setPlacePhotos(urls);
       try {
         await cachePhotoToRAG(pid);
-        // 캐싱 완료 후 RAG에서 Supabase Storage URL 가져와서 교체
+        // 캐싱 완료 후 Supabase Storage URL로만 교체 (Google URL 중간 노출 없이)
         if (!cancelled) {
           const cached = await getPlaceByNameOrAddress({ name: '', address: '', placeId: pid });
           const cachedUrls = cached?.image_urls?.length ? cached.image_urls : (cached?.image_url ? [cached.image_url] : []);
           if (!cancelled && cachedUrls.length > 0) setRagImages(cachedUrls);
+          else if (!cancelled) setPlacePhotos(urls); // 캐싱 실패 시 Google URL 폴백
         }
       } catch (e) {
-        console.warn('[DetailDialog] cachePhotoToRAG failed:', e);
+        // 캐싱 실패 시 Google URL 폴백
+        if (!cancelled) setPlacePhotos(urls);
       }
     }).catch(() => {
       if (!cancelled) setPlacePhotos([]);
@@ -897,7 +906,7 @@ export default function DetailDialog({
   );
 
   const renderNearbyTab = () => (
-    <div ref={nearbyScrollRef}>
+    <div>
       {nearbyLoading && (
         <div style={{ display: 'flex', gap: SPACING.lg, overflowX: 'hidden', paddingBottom: SPACING.sm, paddingTop: SPACING.lg }}>
           {[1, 2, 3, 4].map((i) => (
@@ -1326,6 +1335,7 @@ export default function DetailDialog({
         <div style={{
           flexShrink: 0,
           padding: `${SPACING.md} ${px} 0 ${px}`,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           display: 'flex', gap: SPACING.md,
           borderTop: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)',
         }}>
@@ -1641,7 +1651,7 @@ export default function DetailDialog({
       <div
         style={{
           position: 'fixed',
-          inset: 0,
+          top: 0, bottom: 0, left: 'var(--app-left, 0)', right: 'var(--app-right, 0)',
           zIndex: 1999,
           background: 'transparent',
           pointerEvents: 'auto',

@@ -197,7 +197,7 @@ export default function ImportPreviewDialog({
     <div
       onClick={onCancel}
       style={{
-        position: "fixed", inset: 0, zIndex: 9000,
+        position: "fixed", top: 0, bottom: 0, left: "var(--app-left, 0)", right: "var(--app-right, 0)", zIndex: 9000,
         background: "rgba(0,0,0,0.5)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: SPACING.xxl,

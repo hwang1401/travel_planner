@@ -21,14 +21,23 @@ const MIN_SPLASH_MS = 400;
 /* ── Trip Card Component ── */
 function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge, members, onClick, onMore }) {
   const [coverLoaded, setCoverLoaded] = useState(false);
-  useEffect(() => { setCoverLoaded(false); }, [coverImage]);
+  const [coverError, setCoverError] = useState(false);
+  const imgRef = useRef(null);
+  useEffect(() => { setCoverLoaded(false); setCoverError(false); }, [coverImage]);
+  // 캐시된 이미지는 onLoad가 이미 발생했을 수 있어 complete 상태 직접 확인
+  useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalHeight > 0) {
+      setCoverLoaded(true);
+    }
+  });
   const destSummary = destinations?.length > 0
     ? destinations.length === 1
       ? destinations[0]
       : `${destinations[0]} 외 ${destinations.length - 1}곳`
     : null;
 
-  const hasCover = coverImage || coverColor;
+  const showCoverImage = coverImage && !coverError;
+  const hasCover = showCoverImage || coverColor;
 
   return (
     <div style={{ position: 'relative', marginBottom: SPACING.lg }}>
@@ -43,18 +52,19 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
       >
         {/* Cover: image > coverColor gradient > none */}
         <div style={{
-          height: coverImage ? '100px' : coverColor ? '60px' : '0',
+          height: showCoverImage ? '100px' : coverColor ? '60px' : '0',
           position: 'relative', overflow: 'hidden',
-          background: !coverImage && coverColor ? coverColor : undefined,
+          background: !showCoverImage && coverColor ? coverColor : undefined,
         }}>
-          {coverImage && (
+          {showCoverImage && (
             <>
               {!coverLoaded && <Skeleton style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />}
               <img
+                ref={imgRef}
                 src={coverImage}
                 alt=""
-                loading="lazy"
                 onLoad={() => setCoverLoaded(true)}
+                onError={() => { setCoverLoaded(true); setCoverError(true); }}
                 style={{
                   position: 'absolute', inset: 0, width: '100%', height: '100%',
                   objectFit: 'cover',
@@ -594,7 +604,7 @@ export default function HomePage() {
             bottom: pwaPromptVisible
               ? 'calc(80px + var(--safe-area-bottom, 0px))'
               : 'calc(20px + var(--safe-area-bottom, 0px))',
-            right: 16,
+            right: 'calc(var(--app-right, 0px) + 16px)',
             transition: 'bottom 0.3s ease',
             zIndex: 9999,
             width: 48,

@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
+import { useAppViewportRect } from '../../hooks/useAppViewportRect';
 import Button from '../common/Button';
 import Icon from '../common/Icon';
 import PageTransition from '../common/PageTransition';
@@ -87,16 +88,7 @@ export default function PasteInfoPage({ open, onClose, onImport, context = '' })
     onClose();
   };
 
-  const [viewportRect, setViewportRect] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
+  const viewportRect = useAppViewportRect();
 
   return (
     <PageTransition open={open} onClose={onClose} viewportRect={viewportRect}>

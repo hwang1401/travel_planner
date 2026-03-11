@@ -3,7 +3,7 @@ import { useScrollLock } from '../../hooks/useScrollLock';
 import Button from './Button';
 
 /* ── Bottom Sheet (reusable wrapper for mobile-style modals) ── */
-export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zIndex = 1000, title, children }) {
+export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zIndex = 1000, title, children, contentFill = false }) {
   const sheetRef = useRef(null);
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -67,13 +67,18 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
     return () => el.removeEventListener('touchmove', handler);
   }, []);
 
+  // 키보드 높이 = 전체 화면 - 비주얼 뷰포트 (항상 0 이상)
+  const keyboardHeight = vv ? Math.max(0, window.innerHeight - vv.top - vv.height) : 0;
+
   return (
     <div
       ref={backdropRef}
       onClick={onClose}
       style={{
-        position: "fixed", left: 0, right: 0,
-        ...(vv ? { top: vv.top, height: vv.height } : { top: 0, bottom: 0 }),
+        // backdrop은 항상 전체화면 — 키보드 올라와도 홈화면 노출 방지
+        position: "fixed", left: "var(--app-left, 0)", right: "var(--app-right, 0)", top: 0, bottom: 0,
+        // sheet를 keyboard 위로 밀기 위해 paddingBottom 사용
+        paddingBottom: keyboardHeight,
         zIndex,
         background: "color-mix(in srgb, var(--color-scrim) 35%, transparent)", backdropFilter: "blur(4px)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
@@ -140,7 +145,13 @@ export default function BottomSheet({ onClose, maxHeight = "85vh", minHeight, zI
             <Button variant="ghost-neutral" size="sm" iconOnly="close" onClick={onClose} />
           </div>
         )}
-        <div style={{
+        <div style={contentFill ? {
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        } : {
           flex: 1,
           minHeight: 0,
           overflowY: "auto",

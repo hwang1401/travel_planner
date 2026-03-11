@@ -6,7 +6,8 @@
  *
  * onSelect(station) — 선택된 역명 반환
  */
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { useAppViewportRect } from '../../hooks/useAppViewportRect';
 import { createPortal } from 'react-dom';
 import { useBackClose } from '../../hooks/useBackClose';
 import Icon from '../common/Icon';
@@ -45,16 +46,7 @@ export default function SingleStationPicker({ onClose, onSelect, mode, fixedStat
 
   const title = mode === 'from' ? `출발지 선택 (→ ${fixedStation})` : `도착지 선택 (${fixedStation} →)`;
 
-  const [viewportRect, setViewportRect] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setViewportRect({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
+  const viewportRect = useAppViewportRect();
 
   const overlay = (
     <div style={{

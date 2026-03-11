@@ -17,7 +17,7 @@ export default function ConfirmDialog({ title, message, confirmLabel, onConfirm,
       onClick={onCancel}
       onTouchMove={handleBackdropTouch}
       style={{
-        position: "fixed", inset: 0, zIndex: "var(--z-confirm)",
+        position: "fixed", top: 0, bottom: 0, left: "var(--app-left, 0)", right: "var(--app-right, 0)", zIndex: "var(--z-confirm)",
         background: "color-mix(in srgb, var(--color-scrim) 40%, transparent)", backdropFilter: "blur(4px)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: SPACING.xxxl, animation: "fadeIn 0.15s ease",

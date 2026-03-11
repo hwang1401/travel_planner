@@ -253,7 +253,7 @@ export default function FullMapDialog({ days, onClose, onAddItem, initialDay = 0
 
   return (
     <div style={{
-      position: "fixed", inset: 0, zIndex: "var(--z-dialog)",
+      position: "fixed", top: 0, bottom: 0, left: "var(--app-left, 0)", right: "var(--app-right, 0)", zIndex: "var(--z-dialog)",
       background: "var(--color-surface-container-lowest)", display: "flex", flexDirection: "column",
       animation: "fadeIn 0.2s ease",
       paddingTop: "env(safe-area-inset-top, 0px)",

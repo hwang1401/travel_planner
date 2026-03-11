@@ -2160,7 +2160,7 @@ export default function TravelPlanner() {
         onClick={() => setShowMap(true)}
         title="여행 지도"
         style={{
-          position: "fixed", bottom: "calc(24px + var(--safe-area-bottom, 0px))", right: "24px", zIndex: "var(--z-fab)",
+          position: "fixed", bottom: "calc(24px + var(--safe-area-bottom, 0px))", right: "calc(var(--app-right, 0px) + 24px)", zIndex: "var(--z-fab)",
           width: "52px", height: "52px",
           boxShadow: "var(--shadow-strong)",
         }} />
@@ -2183,7 +2183,7 @@ export default function TravelPlanner() {
       {longPressMode && (
         <div style={{
           position: "fixed",
-          bottom: 0, left: 0, right: 0,
+          bottom: 0, left: "var(--app-left, 0)", right: "var(--app-right, 0)",
           zIndex: 1500,
           padding: `${SPACING.xl} ${SPACING.xxl}`,
           paddingBottom: `var(--safe-area-bottom, 0px)`,

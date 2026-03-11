@@ -15,7 +15,7 @@ export default function ImageViewer({ src, alt, onClose }) {
     <div
       onClick={onClose}
       style={{
-        position: "fixed", inset: 0, zIndex: "var(--z-viewer, 10000)",
+        position: "fixed", top: 0, bottom: 0, left: "var(--app-left, 0)", right: "var(--app-right, 0)", zIndex: "var(--z-viewer, 10000)",
         background: "rgba(0,0,0,0.92)",
         display: "flex", alignItems: "center", justifyContent: "center",
         animation: "fadeIn 0.15s ease",

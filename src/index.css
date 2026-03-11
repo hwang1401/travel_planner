@@ -78,6 +78,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── 웹 데스크탑: 모바일 앱 너비로 중앙 정렬 ── */
+@media (min-width: 520px) {
+  :root {
+    --app-width: 480px;
+    --app-left: calc((100vw - 480px) / 2);
+    --app-right: calc((100vw - 480px) / 2);
+  }
+  body {
+    background: var(--color-surface-dim, #ebebeb);
+  }
+  #root {
+    max-width: var(--app-width);
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--color-surface);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.15);
+  }
+}
+
 /* Hide scrollbar for tab areas */
 *::-webkit-scrollbar {
   height: 0;
