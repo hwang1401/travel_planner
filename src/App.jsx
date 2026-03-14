@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import SplashScreen from './components/SplashScreen';
 import LoginPage from './components/LoginPage';
+import OnboardingSlides from './components/OnboardingSlides';
 import HomePage from './components/HomePage';
 import TravelPlanner from './components/TravelPlanner';
 import InvitePage from './components/InvitePage';
@@ -18,10 +19,13 @@ const PAGE_TITLES = {
 const MIN_SPLASH_MS = 1500;
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { user, loading, isGuest, enterGuestMode } = useAuth();
   const location = useLocation();
   const startRef = useRef(Date.now());
   const [splashDone, setSplashDone] = useState(false);
+  const [onboardingDone, setOnboardingDone] = useState(
+    () => localStorage.getItem('travelunu_onboarding_done') === '1'
+  );
 
   // GA4 SPA 페이지뷰 추적
   useEffect(() => {
@@ -46,15 +50,23 @@ function AppRoutes() {
 
   if (!splashDone) return <SplashScreen />;
 
-  // Not authenticated → login
-  if (!user) return (
+  // First launch: onboarding slides → auto-enter guest mode
+  if (!onboardingDone) {
+    return <OnboardingSlides onComplete={() => {
+      setOnboardingDone(true);
+      if (!user) enterGuestMode();
+    }} />;
+  }
+
+  // Not authenticated and not guest → login
+  if (!user && !isGuest) return (
     <>
       <LoginPage />
       <PwaInstallPrompt />
     </>
   );
 
-  // Authenticated → app routes + PWA 설치 툴팁 (웹 진입 시만)
+  // Authenticated or guest → app routes
   return (
     <>
       <Routes>

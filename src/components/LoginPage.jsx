@@ -10,7 +10,7 @@ import { SPACING } from '../styles/tokens';
 import LegalDialog from './common/LegalDialog';
 
 export default function LoginPage() {
-  const { signInWithKakao, signInWithApple, error } = useAuth();
+  const { signInWithKakao, signInWithApple, error, enterGuestMode } = useAuth();
   const [legalType, setLegalType] = useState(null); // 'terms' | 'privacy' | null
 
   return (
@@ -145,6 +145,22 @@ export default function LoginPage() {
             <path d="M10 2C5.029 2 1 5.143 1 9.036c0 2.458 1.614 4.618 4.054 5.89l-1.03 3.78a.3.3 0 00.457.336l4.382-2.907c.373.034.752.052 1.137.052 4.971 0 9-3.143 9-7.036C19 5.143 14.971 2 10 2z" fill="#191919"/>
           </svg>
           카카오로 시작하기
+        </button>
+
+        {/* Guest mode */}
+        <button
+          onClick={enterGuestMode}
+          style={{
+            background: 'none', border: 'none',
+            padding: `${SPACING.md} 0`,
+            fontSize: 'var(--typo-label-2-medium-size)',
+            fontWeight: 'var(--typo-label-2-medium-weight)',
+            color: 'var(--color-on-surface-variant2)',
+            cursor: 'pointer', textAlign: 'center',
+            width: '100%', fontFamily: 'inherit',
+          }}
+        >
+          로그인 없이 둘러보기
         </button>
 
         {/* Terms notice */}

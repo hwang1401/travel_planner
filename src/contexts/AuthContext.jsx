@@ -22,6 +22,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);  // profiles table row
   const [loading, setLoading] = useState(true);  // initial session check
   const [error, setError] = useState(null);
+  const [isGuest, setIsGuest] = useState(false); // guest browsing mode
 
   /* ── Load profile from profiles table ── */
   const loadProfile = useCallback(async (userId) => {
@@ -60,6 +61,7 @@ export function AuthProvider({ children }) {
 
         if (session?.user) {
           setUser(session.user);
+          setIsGuest(false);
           setLoading(false);
           // Load profile in background (don't block)
           loadProfile(session.user.id);
@@ -226,6 +228,16 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  /* ── Guest mode ── */
+  const enterGuestMode = useCallback(() => {
+    setIsGuest(true);
+    setLoading(false);
+  }, []);
+
+  const exitGuestMode = useCallback(() => {
+    setIsGuest(false);
+  }, []);
+
   /* ── Sign out ── */
   const signOut = useCallback(async () => {
     setError(null);
@@ -233,6 +245,7 @@ export function AuthProvider({ children }) {
     if (err) setError(err.message);
     setUser(null);
     setProfile(null);
+    setIsGuest(false);
   }, []);
 
   /* ── Delete account ── */
@@ -277,6 +290,9 @@ export function AuthProvider({ children }) {
     profile,
     loading,
     error,
+    isGuest,
+    enterGuestMode,
+    exitGuestMode,
     signInWithKakao,
     signInWithApple,
     signOut,

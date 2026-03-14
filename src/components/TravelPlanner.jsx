@@ -8,7 +8,7 @@ import { mergeData, generateDaySummary } from "../utils/scheduleUtils";
 import { TYPE_CONFIG } from "../data/guides";
 import { COLOR, SPACING, RADIUS, TYPE_LABELS, getTypeConfig } from "../styles/tokens";
 /* Service imports */
-import { getTrip, updateTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
+import { getTrip, updateTrip, createTrip, getShareCode, formatDateRange, getTripDuration } from "../services/tripService";
 import { loadSchedule, saveSchedule, subscribeToSchedule, createDebouncedSave } from "../services/scheduleService";
 import { getMyRole, getShareLink } from "../services/memberService";
 import { getRegionsFromItems, getRegionCodesFromDestinations, getRegionDisplayName, upsertPlaceToRAG } from "../services/ragService";
@@ -41,6 +41,10 @@ import DuplicateReviewDialog from "./dialogs/DuplicateReviewDialog";
 import FullMapDialog from "./map/FullMapDialog";
 import MapButton from "./map/MapButton";
 import { getItemCoords } from "../data/locations";
+
+/* Guest mode */
+import { SAMPLE_TRIP, SAMPLE_SCHEDULE } from "../data/sampleTrip";
+import LoginPrompt from "./common/LoginPrompt";
 
 /* Schedule components */
 import PlaceCard from "./schedule/PlaceCard";
@@ -314,7 +318,9 @@ function mergeDayLevel(local, remote, dirtyDays, dirtyMeta) {
 export default function TravelPlanner() {
   const navigate = useNavigate();
   const { tripId } = useParams();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
+  const isSampleTrip = isGuest && tripId === SAMPLE_TRIP.id;
+  const isSampleTripPendingSave = !isGuest && user && tripId === SAMPLE_TRIP.id;
 
   /* ── Trip metadata (Supabase trips only) ── */
   const [tripMeta, setTripMeta] = useState(null);
@@ -359,6 +365,7 @@ export default function TravelPlanner() {
   const [addDestinationSheet, setAddDestinationSheet] = useState(null);
   const [addDestinationSelected, setAddDestinationSelected] = useState(() => new Set());
   const [duplicateReview, setDuplicateReview] = useState(null);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const todayInitDone = useRef(false);
 
   /* ── Debounced save ref ── */
@@ -392,9 +399,68 @@ export default function TravelPlanner() {
   /* ── Permissions ── */
   const canEdit = myRole === "owner" || myRole === "editor";
 
+  /* ── Sample → Real trip: show confirm dialog after guest logs in ── */
+  const [showSaveSampleConfirm, setShowSaveSampleConfirm] = useState(false);
+  const convertingRef = useRef(false);
+  useEffect(() => {
+    if (tripId !== SAMPLE_TRIP.id || !user || isGuest) return;
+    sessionStorage.removeItem('login_context');
+    setShowSaveSampleConfirm(true);
+  }, [tripId, user, isGuest]);
+
+  const handleSaveSampleTrip = useCallback(async () => {
+    if (convertingRef.current) return;
+    convertingRef.current = true;
+    setShowSaveSampleConfirm(false);
+    try {
+      const newTrip = await createTrip({
+        name: SAMPLE_TRIP.name,
+        destinations: SAMPLE_TRIP.destinations,
+        startDate: SAMPLE_TRIP.startDate,
+        endDate: SAMPLE_TRIP.endDate,
+        scheduleData: SAMPLE_SCHEDULE,
+      });
+      navigate(`/trip/${newTrip.id}`, { replace: true });
+    } catch (err) {
+      console.error('[TravelPlanner] Sample→Real trip conversion failed:', err);
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
+
+  const handleSkipSampleTrip = useCallback(() => {
+    setShowSaveSampleConfirm(false);
+    navigate('/', { replace: true });
+  }, [navigate]);
+
   /* ── Load trip metadata + schedule from Supabase ── */
   useEffect(() => {
     if (!tripId) return;
+
+    // 로그인 직후 샘플 trip: Supabase 로드 스킵, 저장 확인 다이얼로그 대기
+    if (isSampleTripPendingSave) {
+      setTripLoading(false);
+      setScheduleLoading(false);
+      return;
+    }
+
+    // Guest sample trip: load hardcoded data
+    if (isSampleTrip) {
+      setTripMeta({
+        id: SAMPLE_TRIP.id,
+        name: SAMPLE_TRIP.name,
+        destinations: SAMPLE_TRIP.destinations,
+        start_date: SAMPLE_TRIP.startDate,
+        end_date: SAMPLE_TRIP.endDate,
+        cover_image: '',
+        cover_color: SAMPLE_TRIP.coverColor,
+      });
+      setMyRole('editor');
+      setShareCode(null);
+      setCustomData(ensureItemIds(SAMPLE_SCHEDULE));
+      setTripLoading(false);
+      setScheduleLoading(false);
+      return;
+    }
 
     let cancelled = false;
 
@@ -432,7 +498,7 @@ export default function TravelPlanner() {
 
     load();
     return () => { cancelled = true; };
-  }, [tripId]);
+  }, [tripId, isSampleTrip, isSampleTripPendingSave]);
 
   /* ── Pull-to-refresh: 일정 다시 불러오기 ── */
   const refreshSchedule = useCallback(async () => {
@@ -469,7 +535,7 @@ export default function TravelPlanner() {
 
   /* ── Setup debounced save for Supabase trips ── */
   useEffect(() => {
-    if (!tripId) return;
+    if (!tripId || isSampleTrip) return;
     const ds = createDebouncedSave(tripId, 800, (version) => {
       lastSavedVersionRef.current = version;
       // 저장 완료 시점의 dirtyGen을 캡처하여 지연 해제 예약
@@ -481,7 +547,7 @@ export default function TravelPlanner() {
 
   /* ── Realtime subscription for Supabase trips ── */
   useEffect(() => {
-    if (!tripId) return;
+    if (!tripId || isSampleTrip) return;
 
     const unsubscribe = subscribeToSchedule(tripId, (payload) => {
       // 절대 본인 저장분을 realtime으로 덮어쓰지 않음
@@ -802,8 +868,15 @@ export default function TravelPlanner() {
     });
   }, [DAYS, tripMeta?.startDate]);
 
+  /* ── Guest gate: show LoginPrompt instead of mutating ── */
+  const guestGate = useCallback(() => {
+    if (isSampleTrip) { setShowLoginPrompt(true); return true; }
+    return false;
+  }, [isSampleTrip]);
+
   /* ── Handlers ── */
   const handleAddDay = useCallback((labelOrEmpty) => {
+    if (guestGate()) return;
     const labelTrimmed = (labelOrEmpty || "").trim();
     const nextDayNum = DAYS.length === 0 ? 1 : Math.max(...DAYS.map((d) => d.day), 0) + 1;
     const displayLabel = labelTrimmed || `Day ${nextDayNum}`;
@@ -865,6 +938,7 @@ export default function TravelPlanner() {
   }, [updateCustomData, baseLen]);
 
   const handleDeleteDay = useCallback((dayIdx) => {
+    if (guestGate()) return;
     if (dayIdx < baseLen) return;
     if (DAYS.length <= 1) {
       setToast({ message: "마지막 날짜는 삭제할 수 없어요. 최소 1일 이상 유지해 주세요.", icon: "info" });
@@ -947,6 +1021,7 @@ export default function TravelPlanner() {
 
   /* ── Day Reorder ── */
   const handleOpenReorder = useCallback(() => {
+    if (guestGate()) return;
     // Each item tracks its original pre-reorder index in the merged array
     const currentOrder = customData._dayOrder || DAYS.map((_, i) => i);
     setReorderList(DAYS.map((d, i) => ({
@@ -992,6 +1067,7 @@ export default function TravelPlanner() {
   }, [reorderList, updateCustomData, baseLen, immediateSave]);
 
   const handleSaveItem = useCallback((newItem, dayIdx, sectionIdx, itemIdx, opts = {}) => {
+    if (guestGate()) return;
     // Check for duplicate timestamp
     if (!opts.skipDuplicateCheck && sectionIdx === -1 && itemIdx === null) {
       // New item — check all sections for same time
@@ -1152,6 +1228,7 @@ export default function TravelPlanner() {
   }, [updateCustomData, baseLen, immediateSave, handleDeleteUndo]);
 
   const handleDeleteItem = useCallback((dayIdx, sectionIdx, itemIdx, itemRef) => {
+    if (guestGate()) return;
     setConfirmDialog({
       title: "일정 삭제",
       message: "이 일정을 삭제하시겠습니까?",
@@ -1183,6 +1260,7 @@ export default function TravelPlanner() {
 
   /* 정보 다이얼로그에서 삭제 시: 확인 다이얼로그를 DetailDialog 위에 표시 → 확인 후 삭제+닫기 */
   const handleDeleteFromDetail = useCallback((d) => {
+    if (guestGate()) return;
     if (!d?._item?._custom) return;
     setConfirmDialog({
       title: "일정 삭제",
@@ -1198,6 +1276,7 @@ export default function TravelPlanner() {
 
   /* 일정을 다른 Day로 이동: 현재 Day에서 제거 → 선택한 Day 마지막(extraItems)에 추가 */
   const handleMoveToDay = useCallback((detailPayload, targetDisplayIdx) => {
+    if (guestGate()) return;
     const item = detailPayload?._item;
     if (!item) return;
     const sourceDayIdx = toOrigIdx(detailPayload._di ?? selectedDay);
@@ -1241,6 +1320,7 @@ export default function TravelPlanner() {
   const longPressMode = longPressSelection.size > 0;
 
   const handleLongPressToggle = useCallback((item) => {
+    if (guestGate()) return;
     if (bulkDeleteMode) return; // 기존 bulk 모드와 동시 비활성
     setLongPressSelection((prev) => {
       const next = new Set(prev);
@@ -1539,6 +1619,28 @@ export default function TravelPlanner() {
     return <ScheduleSkeleton />;
   }
 
+  /* ── Sample trip pending save: show confirm dialog over blank screen ── */
+  if (isSampleTripPendingSave) {
+    return (
+      <div style={{
+        width: "100%", height: "100vh", display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        background: "var(--color-surface)",
+      }}>
+        {showSaveSampleConfirm && (
+          <ConfirmDialog
+            title="샘플 여행 저장"
+            message="샘플 여행 계획을 내 여행으로 저장할까요?"
+            confirmLabel="저장하기"
+            cancelLabel="괜찮아요"
+            onConfirm={handleSaveSampleTrip}
+            onCancel={handleSkipSampleTrip}
+          />
+        )}
+      </div>
+    );
+  }
+
   /* ── No access ── */
   if (!myRole) {
     return (
@@ -1643,7 +1745,7 @@ export default function TravelPlanner() {
         })()}
         {/* Share button */}
         <Button variant="ghost-neutral" size="md" iconOnly="share"
-          onClick={() => setShowShareSheet(true)}
+          onClick={() => { if (guestGate()) return; setShowShareSheet(true); }}
           title="공유 및 초대" />
         {/* More menu button */}
         <Button variant="ghost-neutral" size="md" iconOnly="moreHorizontal"
@@ -1687,7 +1789,7 @@ export default function TravelPlanner() {
                   className="day-reorder-btn" />
               )}
               <Button variant="neutral" size="sm" iconOnly="plus"
-                onClick={() => setShowAddDay(true)}
+                onClick={() => { if (guestGate()) return; setShowAddDay(true); }}
                 title="날짜 추가" />
             </div>
           )}
@@ -1750,7 +1852,7 @@ export default function TravelPlanner() {
                         textAlign: "left", fontFamily: "inherit",
                         color: "var(--color-on-surface)",
                       }}
-                      onClick={canEdit ? () => setShowDayMoreMenu(true) : undefined}
+                      onClick={canEdit ? () => { if (guestGate()) return; setShowDayMoreMenu(true); } : undefined}
                       title={canEdit ? "날짜 이름 수정 또는 삭제" : undefined}
                     >
                       <h2 style={{
@@ -1785,12 +1887,12 @@ export default function TravelPlanner() {
                       {!bulkDeleteMode ? (
                         <>
                           <Button variant="neutral" size="sm" iconOnly="trash"
-                            onClick={() => { setBulkDeleteMode(true); setSelectedBulkKeys(new Set()); }}
+                            onClick={() => { if (guestGate()) return; setBulkDeleteMode(true); setSelectedBulkKeys(new Set()); }}
                             style={{ borderRadius: "16px" }}
                             title="일괄 삭제"
                             aria-label="일괄 삭제" />
                           <Button variant="primary" size="sm" iconLeft="plus"
-                            onClick={() => setShowAddSheet(true)}
+                            onClick={() => { if (guestGate()) return; setShowAddSheet(true); }}
                             style={{ borderRadius: "16px" }}>
                             일정 추가
                           </Button>
@@ -1857,7 +1959,7 @@ export default function TravelPlanner() {
             icon="calendar"
             title="아직 일정이 없습니다"
             description="날짜를 추가하고 일정을 계획해 보세요"
-            actions={canEdit ? { label: "날짜 추가", variant: "primary", iconLeft: "plus", onClick: () => setShowAddDay(true) } : undefined}
+            actions={canEdit ? { label: "날짜 추가", variant: "primary", iconLeft: "plus", onClick: () => { if (guestGate()) return; setShowAddDay(true); } } : undefined}
           />
         )}
 
@@ -1873,7 +1975,7 @@ export default function TravelPlanner() {
                 ? "일정 추가 버튼을 눌러\n새로운 일정을 추가해보세요"
                 : "아직 추가된 일정이 없습니다"}
               actions={canEdit ? [
-                { label: "추가하기", variant: "primary", iconLeft: "plus", onClick: () => setShowAddSheet(true) },
+                { label: "추가하기", variant: "primary", iconLeft: "plus", onClick: () => { if (guestGate()) return; setShowAddSheet(true); } },
               ] : undefined}
             />
           );
@@ -2003,7 +2105,7 @@ export default function TravelPlanner() {
                           isClickable={!bulkDeleteMode && !longPressMode && isClickable}
                           onClick={handleClick}
                           isLast={isLastItem}
-                          onTimeClick={canEdit ? (itm) => handleTimeClickFromCard(itm, effectiveSi, ii) : undefined}
+                          onTimeClick={canEdit && !isSampleTrip ? (itm) => handleTimeClickFromCard(itm, effectiveSi, ii) : undefined}
                           onLongPress={canEdit ? handleLongPressToggle : undefined}
                           isSelected={isLongPressSelected(enrichedItem)}
                           selectionMode={longPressMode}
@@ -2056,15 +2158,15 @@ export default function TravelPlanner() {
         onClose={() => setActiveDetail(null)}
         dayColor="var(--color-primary)"
         tripId={tripId}
-        onDelete={canEdit && activeDetail?._item?._custom ? handleDeleteFromDetail : undefined}
-        onMoveToDay={canEdit && activeDetail?._item?._custom ? handleMoveToDay : undefined}
-        onSaveField={canEdit ? handleSaveFieldFromDetail : undefined}
+        onDelete={canEdit && !isSampleTrip && activeDetail?._item?._custom ? handleDeleteFromDetail : undefined}
+        onMoveToDay={canEdit && !isSampleTrip && activeDetail?._item?._custom ? handleMoveToDay : undefined}
+        onSaveField={canEdit && !isSampleTrip ? handleSaveFieldFromDetail : undefined}
         moveDayOptions={DAYS.map((d, i) => ({ label: d.label || `Day ${d.day}`, displayIdx: i }))}
         currentDayDisplayIdx={selectedDay}
         allDetailPayloads={allDetailPayloads}
         currentDetailIndex={currentDetailIndex}
         onNavigateToIndex={allDetailPayloads.length > 1 ? onDetailNavigateToIndex : undefined}
-        onAddToSchedule={canEdit ? (place) => setAddNearbyPlace(place) : undefined}
+        onAddToSchedule={canEdit && !isSampleTrip ? (place) => setAddNearbyPlace(place) : undefined}
       />
       )}
 
@@ -2659,7 +2761,7 @@ export default function TravelPlanner() {
             {[
               { icon: "compass", label: "여행 가이드", onClick: () => { setShowMoreMenu(false); setShowGuide(true); } },
               { icon: "file", label: "여행 서류", onClick: () => { setShowMoreMenu(false); setShowDocs(true); } },
-              { icon: "persons", label: `멤버 (${tripMeta?.members?.length || 0}명)`, onClick: () => { setShowMoreMenu(false); setShowShareSheet(true); } },
+              { icon: "persons", label: `멤버 (${tripMeta?.members?.length || 0}명)`, onClick: () => { setShowMoreMenu(false); if (guestGate()) return; setShowShareSheet(true); } },
             ].map((menuItem, idx) => (
               <button
                 key={idx}
@@ -2680,6 +2782,21 @@ export default function TravelPlanner() {
             ))}
           </div>
         </BottomSheet>
+      )}
+
+      {/* Login Prompt (guest mode) */}
+      {showLoginPrompt && <LoginPrompt context="sample-edit" onClose={() => setShowLoginPrompt(false)} />}
+
+      {/* Sample trip save confirmation */}
+      {showSaveSampleConfirm && (
+        <ConfirmDialog
+          title="샘플 여행 저장"
+          message="샘플 여행 계획을 내 여행으로 저장할까요?"
+          confirmLabel="저장하기"
+          cancelLabel="괜찮아요"
+          onConfirm={handleSaveSampleTrip}
+          onCancel={handleSkipSampleTrip}
+        />
       )}
 
       {/* Toast */}

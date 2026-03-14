@@ -14,6 +14,8 @@ import { loadTrips, createTrip, updateTrip, deleteTrip, duplicateTrip, getShareC
 import { getShareLink } from '../services/memberService';
 import BottomSheet from './common/BottomSheet';
 import PullToRefresh from './common/PullToRefresh';
+import LoginPrompt from './common/LoginPrompt';
+import { SAMPLE_TRIP } from '../data/sampleTrip';
 import { COLOR, SPACING, RADIUS } from '../styles/tokens';
 
 const MIN_SPLASH_MS = 400;
@@ -172,26 +174,28 @@ function TripCard({ title, subtitle, destinations, coverColor, coverImage, badge
         </div>
       </div>
 
-      {/* More button (top-right) */}
-      <div
-        style={{
-          position: 'absolute', top: hasCover ? '8px' : '10px', right: '8px',
-        }}
-        {...(hasCover && { 'data-cover': 'true' })}
-      >
-        <Button
-          variant="ghost-neutral"
-          size="lg"
-          iconOnly="moreHorizontal"
-          title="더보기"
-          onClick={(e) => { e.stopPropagation(); onMore(); }}
-          style={
-            hasCover
-              ? { background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)' }
-              : undefined
-          }
-        />
-      </div>
+      {/* More button (top-right) — hidden for guest sample trips */}
+      {onMore && (
+        <div
+          style={{
+            position: 'absolute', top: hasCover ? '8px' : '10px', right: '8px',
+          }}
+          {...(hasCover && { 'data-cover': 'true' })}
+        >
+          <Button
+            variant="ghost-neutral"
+            size="lg"
+            iconOnly="moreHorizontal"
+            title="더보기"
+            onClick={(e) => { e.stopPropagation(); onMore(); }}
+            style={
+              hasCover
+                ? { background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)' }
+                : undefined
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -253,11 +257,26 @@ function useChannelTalk(user, profile) {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isGuest } = useAuth();
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editTrip, setEditTrip] = useState(null); // trip object for edit mode
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginContext, setLoginContext] = useState(null); // 'home' | 'add-trip'
+
+  /* ── Post-login action: close prompt + check sessionStorage for pending context ── */
+  const postLoginHandled = useRef(false);
+  useEffect(() => {
+    if (!user || isGuest || postLoginHandled.current) return;
+    setShowLoginPrompt(false);
+    const ctx = sessionStorage.getItem('login_context');
+    if (!ctx) return;
+    sessionStorage.removeItem('login_context');
+    postLoginHandled.current = true;
+    if (ctx === 'add-trip') setShowCreate(true);
+  }, [user, isGuest]);
+
   const { ready: chatReady, openChat } = useChannelTalk(user, profile);
   const showChatBtn = chatReady && !showCreate && !editTrip;
   const [pwaPromptVisible, setPwaPromptVisible] = useState(
@@ -279,6 +298,11 @@ export default function HomePage() {
 
   /* ── Load trips from Supabase (최소 스플래시 시간 적용으로 깜빡임 방지) ── */
   const fetchTrips = useCallback(async () => {
+    if (isGuest) {
+      setTrips([SAMPLE_TRIP]);
+      setLoading(false);
+      return;
+    }
     splashStartRef.current = Date.now();
     try {
       const data = await loadTrips();
@@ -291,7 +315,7 @@ export default function HomePage() {
       const delay = Math.max(0, MIN_SPLASH_MS - elapsed);
       setTimeout(() => setLoading(false), delay);
     }
-  }, []);
+  }, [isGuest]);
 
   useEffect(() => { fetchTrips(); }, [fetchTrips]);
 
@@ -477,6 +501,21 @@ export default function HomePage() {
                   </span>
                 </div>
               )}
+              {isGuest && (
+                <button
+                  onClick={() => { setLoginContext('home'); setShowLoginPrompt(true); }}
+                  style={{
+                    padding: `${SPACING.sm} ${SPACING.lg}`, borderRadius: '20px',
+                    background: 'var(--color-primary)', color: 'var(--color-on-primary)',
+                    border: 'none',
+                    fontSize: 'var(--typo-caption-1-bold-size)',
+                    fontWeight: 'var(--typo-caption-1-bold-weight)',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  로그인
+                </button>
+              )}
             </div>
             <p style={{
               margin: `0 0 ${SPACING.xxl}`, fontSize: 'var(--typo-caption-1-regular-size)',
@@ -505,7 +544,7 @@ export default function HomePage() {
                   coverImage={trip.coverImage}
                   members={trip.members || []}
                   onClick={() => handleOpenTrip(trip)}
-                  onMore={() => setMoreMenu({ trip })}
+                  onMore={isGuest ? undefined : () => setMoreMenu({ trip })}
                 />
               ))}
 
@@ -537,7 +576,7 @@ export default function HomePage() {
           transition: 'bottom 0.3s ease',
         }}>
           <Button variant="primary" size="xlg" iconLeft="plus"
-            onClick={() => setShowCreate(true)}
+            onClick={() => { if (isGuest) { setLoginContext('add-trip'); setShowLoginPrompt(true); } else { setShowCreate(true); } }}
             style={{
               borderRadius: '24px', padding: `0 ${SPACING.xxxl}`, height: '48px',
               boxShadow: 'var(--shadow-strong)',
@@ -587,6 +626,9 @@ export default function HomePage() {
           </div>
         </BottomSheet>
       )}
+
+      {/* Login Prompt (guest mode) */}
+      {showLoginPrompt && <LoginPrompt context={loginContext} onClose={() => setShowLoginPrompt(false)} />}
 
       {/* Toast */}
       {toast && (
