@@ -17,6 +17,7 @@ const SIZES = [
   { name: 'iphone69',    width: 1320, height: 2868, dir: 'output_iphone69' },
   { name: 'iphone65',    width: 1284, height: 2778, dir: 'output_iphone65' },
   { name: 'ipad129',     width: 2048, height: 2732, dir: 'output_ipad129' },
+  { name: 'ipad13',      width: 2064, height: 2752, dir: 'output_ipad13' },
 ];
 
 async function main() {
@@ -33,33 +34,28 @@ async function main() {
     await page.addStyleTag({
       content: `
         .slide { width: ${size.width}px !important; height: ${size.height}px !important; }
-        ${size.name === 'ipad129' ? `
+        ${size.name === 'ipad129' || size.name === 'ipad13' ? `
           .caption { padding: 160px 100px 40px !important; }
           .caption .main { font-size: 140px !important; letter-spacing: -4px !important; }
           .caption .sub { font-size: 48px !important; }
-          .phone { width: 1000px !important; border-radius: 70px !important; }
-          .phone-screen { border-radius: 56px !important; }
-          .phone::before { width: 200px !important; height: 48px !important; top: 28px !important; }
-          .phone-wrapper { bottom: -60px !important; }
+          .phone { width: 880px !important; border-radius: 70px !important; margin-bottom: -100px !important; }
+          .phone-screen { border-radius: 70px !important; }
         ` : size.name === 'iphone69' || size.name === 'iphone65' ? `
           .caption { padding: 120px 80px 30px !important; }
           .caption .main { font-size: 110px !important; letter-spacing: -3px !important; }
           .caption .sub { font-size: 38px !important; }
-          .phone { width: 900px !important; border-radius: 64px !important; }
-          .phone-screen { border-radius: 52px !important; }
-          .phone::before { width: 180px !important; height: 44px !important; top: 26px !important; }
-          .phone-wrapper { bottom: -80px !important; }
+          .phone { width: 980px !important; border-radius: 64px !important; margin-bottom: -100px !important; }
+          .phone-screen { border-radius: 64px !important; }
         ` : size.width >= 1400 ? `
           .caption { padding: 140px 80px 40px !important; }
           .caption .main { font-size: 110px !important; letter-spacing: -3px !important; }
           .caption .sub { font-size: 38px !important; }
-          .phone { width: 760px !important; border-radius: 60px !important; }
-          .phone-screen { border-radius: 48px !important; }
-          .phone::before { width: 160px !important; height: 40px !important; }
+          .phone { width: 800px !important; border-radius: 60px !important; margin-bottom: -80px !important; }
+          .phone-screen { border-radius: 60px !important; }
         ` : size.width >= 1100 ? `
           .caption .main { font-size: 90px !important; }
           .caption .sub { font-size: 34px !important; }
-          .phone { width: 660px !important; }
+          .phone { width: 700px !important; margin-bottom: -80px !important; }
         ` : ''}
       `
     });

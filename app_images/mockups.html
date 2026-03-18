@@ -29,137 +29,171 @@
     flex-shrink: 0;
   }
 
-  /* ── Backgrounds ── */
-  .slide-1 { background: linear-gradient(180deg, #7c5bf0 0%, #6941e2 50%, #5531c8 100%); }
-  .slide-2 { background: linear-gradient(180deg, #4f46e5 0%, #4338ca 50%, #3730a3 100%); }
-  .slide-3 { background: linear-gradient(180deg, #7e41d4 0%, #6d28d9 50%, #5b21b6 100%); }
-  .slide-4 { background: linear-gradient(180deg, #6941e2 0%, #5b31d4 50%, #4c1d95 100%); }
-  .slide-5 { background: linear-gradient(180deg, #7c5bf0 0%, #6941e2 50%, #5531c8 100%); }
-  .slide-6 { background: linear-gradient(180deg, #5b5bd6 0%, #4f46e5 50%, #3730a3 100%); }
+  /* ── Backgrounds (디자인 시스템 hsl 팔레트 기반) ── */
+  .slide-1 { background: #5a348e; } /* hsl-purple-750 */
+  .slide-2 { background: #0db37c; } /* hsl-green-700 */
+  .slide-3 { background: #ec9708; } /* hsl-orange-700 */
+  .slide-4 { background: #11b2a0; } /* hsl-teal-700 */
+  .slide-5 { background: #5457f2; } /* hsl-indigo-700 */
+  .slide-6 { background: #be0e65; } /* hsl-pink-850 */
 
   /* ── Decorative blobs ── */
   .slide::before {
     content: '';
     position: absolute;
-    width: 900px;
-    height: 900px;
+    width: 800px;
+    height: 800px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%);
-    top: -300px;
-    right: -300px;
+    background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%);
+    top: -260px;
+    right: -240px;
+    pointer-events: none;
+  }
+  .slide::after {
+    content: '';
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 65%);
+    bottom: 200px;
+    left: -200px;
     pointer-events: none;
   }
 
-  /* ── Caption — compact top area ── */
+  /* ── Feature tag ── */
+  .feature-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 100px;
+    padding: 8px 22px;
+    font-size: 22px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: -0.3px;
+    margin-bottom: 20px;
+  }
+
+  /* ── Caption ── */
   .caption {
     text-align: center;
-    padding: 100px 60px 40px;
+    padding: 80px 60px 32px;
     z-index: 2;
     flex-shrink: 0;
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
   .caption .sub {
-    font-size: 32px;
-    font-weight: 700;
+    font-size: 26px;
+    font-weight: 600;
     color: rgba(255,255,255,0.6);
-    margin-bottom: 16px;
-    letter-spacing: -0.5px;
+    margin-bottom: 14px;
+    letter-spacing: -0.3px;
   }
   .caption .main {
-    font-size: 88px;
+    font-size: 68px;
     font-weight: 900;
     color: #fff;
     line-height: 1.15;
-    letter-spacing: -3px;
+    letter-spacing: -2px;
   }
 
-  /* ── Phone — large, rising from bottom ── */
+  /* ── Phone ── */
   .phone-wrapper {
-    position: absolute;
-    bottom: -40px;
-    z-index: 2;
+    flex: 1;
     display: flex;
+    align-items: flex-end;
     justify-content: center;
     width: 100%;
+    overflow: hidden;
+    z-index: 2;
+  }
+  /* Glow behind phone */
+  .phone-wrapper::before {
+    content: '';
+    position: absolute;
+    bottom: 60px;
+    width: 500px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(150,100,255,0.35) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
   }
   .phone {
     position: relative;
-    width: 640px;
+    width: 720px;
     border-radius: 56px;
-    background: #1c1c1e;
-    padding: 14px;
-    box-shadow:
-      0 -10px 100px rgba(0,0,0,0.35),
-      0 0 0 1px rgba(255,255,255,0.06);
+    background: transparent;
+    padding: 0;
+    box-shadow: 0 -20px 120px rgba(0,0,0,0.3);
+    z-index: 1;
+    margin-bottom: -80px;
   }
   .phone-screen {
     width: 100%;
-    border-radius: 44px;
+    border-radius: 56px;
     overflow: hidden;
-    background: #000;
+    background: #f5f5f7;
   }
   .phone-screen img {
     width: 100%;
     display: block;
   }
 
-  /* Dynamic island */
-  .phone::before {
-    content: '';
-    position: absolute;
-    top: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 140px;
-    height: 36px;
-    background: #000;
-    border-radius: 20px;
-    z-index: 10;
-  }
+  /* Dynamic island 제거 */
+  .phone::before { display: none; }
 </style>
 </head>
 <body>
 
-<!-- Slide 1: Hero -->
+<!-- Slide 1: 홈 화면 -->
 <div class="slide slide-1" id="slide1">
   <div class="caption">
-    <div class="sub">함께 만드는 여행 일정</div>
-    <div class="main">여행 계획,<br>이제 쉽게.</div>
+
+    <div class="sub">나만의 여행 리스트</div>
+    <div class="main">여행 계획<br>이제 쉽게</div>
   </div>
   <div class="phone-wrapper">
     <div class="phone">
       <div class="phone-screen">
-        <img src="raw/IMG_8168.PNG" alt="내 여행">
+        <img src="raw/new_01_home.png" alt="내 여행">
       </div>
     </div>
   </div>
 </div>
 
-<!-- Slide 2: AI 일정 -->
+<!-- Slide 2: AI 일정 생성 -->
 <div class="slide slide-2" id="slide2">
   <div class="caption">
-    <div class="sub">일정 짜기 어려울 땐?</div>
-    <div class="main">AI가 짜주는<br>맞춤 일정.</div>
+
+    <div class="sub">AI가 짜주는 맞춤 코스</div>
+    <div class="main">목적지만<br>말해보세요</div>
   </div>
   <div class="phone-wrapper">
     <div class="phone">
       <div class="phone-screen">
-        <img src="raw/IMG_8183.PNG" alt="AI 일정 결과">
+        <img src="raw/new_02_wizard.png" alt="AI 일정 결과">
       </div>
     </div>
   </div>
 </div>
 
-<!-- Slide 3: 스타일 선택 -->
+<!-- Slide 3: AI 채팅 -->
 <div class="slide slide-3" id="slide3">
   <div class="caption">
-    <div class="sub">취향대로 골라보세요</div>
-    <div class="main">내 스타일로<br>맞춤 여행.</div>
+
+    <div class="sub">대화로 완성하는 일정</div>
+    <div class="main">맛집도 코스도<br>AI가 찾아요</div>
   </div>
   <div class="phone-wrapper">
     <div class="phone">
       <div class="phone-screen">
-        <img src="raw/IMG_8181.PNG" alt="스타일 선택">
+        <img src="raw/new_03_chat.png" alt="AI 채팅">
       </div>
     </div>
   </div>
@@ -168,13 +202,14 @@
 <!-- Slide 4: 타임라인 -->
 <div class="slide slide-4" id="slide4">
   <div class="caption">
-    <div class="sub">시간순 깔끔한 일정 관리</div>
-    <div class="main">하루 일정을<br>한눈에.</div>
+
+    <div class="sub">시간순 깔끔한 정리</div>
+    <div class="main">하루 일정을<br>한눈에</div>
   </div>
   <div class="phone-wrapper">
     <div class="phone">
       <div class="phone-screen">
-        <img src="raw/IMG_8169.PNG" alt="타임라인">
+        <img src="raw/new_04_timeline.png" alt="타임라인">
       </div>
     </div>
   </div>
@@ -183,13 +218,14 @@
 <!-- Slide 5: 장소 상세 -->
 <div class="slide slide-5" id="slide5">
   <div class="caption">
+
     <div class="sub">영업시간, 주소, 사진까지</div>
-    <div class="main">장소 정보<br>바로 확인.</div>
+    <div class="main">장소 정보<br>바로 확인</div>
   </div>
   <div class="phone-wrapper">
     <div class="phone">
       <div class="phone-screen">
-        <img src="raw/IMG_8170.PNG" alt="장소 상세">
+        <img src="raw/new_05_place.png" alt="장소 상세">
       </div>
     </div>
   </div>
@@ -198,13 +234,14 @@
 <!-- Slide 6: 지도 -->
 <div class="slide slide-6" id="slide6">
   <div class="caption">
-    <div class="sub">이동 경로를 한눈에 파악</div>
-    <div class="main">지도로 보는<br>여행 동선.</div>
+
+    <div class="sub">이동 동선을 한눈에</div>
+    <div class="main">지도로 보는<br>여행 동선</div>
   </div>
   <div class="phone-wrapper">
     <div class="phone">
       <div class="phone-screen">
-        <img src="raw/IMG_8172.PNG" alt="여행 지도">
+        <img src="raw/new_06_map.png" alt="여행 지도">
       </div>
     </div>
   </div>

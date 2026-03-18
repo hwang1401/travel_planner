@@ -94,14 +94,13 @@
     </style>
   </head>
   <body>
-    <!-- 정적 스플래시: primary 배경 → 흰색 로고 규칙 -->
     <div id="root">
-      <div id="app-splash" style="position:fixed;inset:0;background:#8b7bff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);">
-        <img src="/icons/logo-splash.png" alt="" style="width:80px;height:auto;margin-bottom:20px;object-fit:contain;filter:brightness(0) invert(1);">
-        <h1 style="margin:0;font-size:28px;font-weight:700;color:#fff;letter-spacing:-0.5px;">Travelunu</h1>
-        <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.7);">함께 만드는 여행 일정</p>
+      <div id="app-splash" style="position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);">
+        <img src="/images/logo-transparent.png" alt="" style="width:220px;height:auto;object-fit:contain;">
+        <p style="margin:16px 0 0;font-size:14px;color:rgba(0,0,0,0.5);">함께 만드는 여행 일정</p>
       </div>
     </div>
+    <style>@media(prefers-color-scheme:dark){#app-splash{background:#1c1c1e !important}#app-splash p{color:rgba(255,255,255,0.5) !important}}</style>
     <script type="module" src="/src/main.jsx"></script>
 
   </body>

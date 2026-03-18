@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { isNative } from '../utils/platform';
 
 /**
  * Get all members of a trip.
@@ -125,7 +126,8 @@ export async function joinByShareCode(shareCode) {
  * Get the share link for a trip.
  */
 export function getShareLink(shareCode) {
-  return `${window.location.origin}/invite/${shareCode}`;
+  const base = isNative() ? 'https://travelunu.com' : window.location.origin;
+  return `${base}/invite/${shareCode}`;
 }
 
 /**

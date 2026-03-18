@@ -12,6 +12,8 @@ import { getTrip, updateTrip, createTrip, getShareCode, formatDateRange, getTrip
 import { loadSchedule, saveSchedule, subscribeToSchedule, createDebouncedSave } from "../services/scheduleService";
 import { getMyRole, getShareLink } from "../services/memberService";
 import { getRegionsFromItems, getRegionCodesFromDestinations, getRegionDisplayName, upsertPlaceToRAG } from "../services/ragService";
+import { isNative } from "../utils/platform";
+import { Share } from "@capacitor/share";
 
 /* Common component imports */
 import Icon from "./common/Icon";
@@ -2557,18 +2559,23 @@ export default function TravelPlanner() {
               </p>
 
               {/* Native share button for mobile */}
-              {typeof navigator.share === "function" && shareCode && (
+              {(isNative() || typeof navigator.share === "function") && shareCode && (
                 <Button
                   variant="neutral"
                   size="lg"
                   iconLeft="share"
                   onClick={async () => {
                     try {
-                      await navigator.share({
+                      const shareData = {
                         title: tripMeta?.name || "여행 초대",
                         text: `"${tripMeta?.name || "여행"}"에 참여해보세요!`,
                         url: getShareLink(shareCode),
-                      });
+                      };
+                      if (isNative()) {
+                        await Share.share({ ...shareData, dialogTitle: "여행 공유" });
+                      } else {
+                        await navigator.share(shareData);
+                      }
                     } catch { /* user cancelled */ }
                   }}
                   style={{ marginTop: SPACING.ml, width: "100%" }}

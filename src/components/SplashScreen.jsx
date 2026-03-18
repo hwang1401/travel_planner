@@ -1,9 +1,8 @@
 /*
- * ── Splash Screen ──
+ * -- Splash Screen --
  * 앱 초기 세션 체크 시 표시. AuthContext loading 중에만 노출.
- * 규칙: primary(푸른/보라) 배경일 때는 흰색 로고 사용.
+ * 라이트/다크 모드 대응: 배경색 자동 전환, og-image 로고 사용.
  */
-import { SPACING } from '../styles/tokens';
 
 export default function SplashScreen() {
   return (
@@ -15,38 +14,25 @@ export default function SplashScreen() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--color-primary, #8b7bff)',
+        background: 'var(--color-surface, #fff)',
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingBottom: 'var(--safe-area-bottom, 0px)',
       }}
     >
       <img
-        src="/icons/logo-splash.png"
-        alt="Travelunu"
+        src="/images/logo-transparent.png"
+        alt="travelunu"
         style={{
-          width: '80px',
+          width: '220px',
           height: 'auto',
-            marginBottom: SPACING.xxl,
           objectFit: 'contain',
-          filter: 'brightness(0) invert(1)',
         }}
       />
-      <h1
-        style={{
-          margin: `0 0 ${SPACING.md}`,
-          fontSize: '28px',
-          fontWeight: 700,
-          color: 'var(--color-on-primary)',
-          letterSpacing: '-0.5px',
-        }}
-      >
-        Travelunu
-      </h1>
       <p
         style={{
-          margin: 0,
+          margin: '16px 0 0',
           fontSize: '14px',
-          color: 'rgba(255,255,255,0.7)',
+          color: 'var(--color-on-surface-variant2, rgba(0,0,0,0.5))',
         }}
       >
         함께 만드는 여행 일정
@@ -56,8 +42,8 @@ export default function SplashScreen() {
           marginTop: '40px',
           width: '28px',
           height: '28px',
-          border: '2.5px solid rgba(255,255,255,0.3)',
-          borderTopColor: 'rgba(255,255,255,0.95)',
+          border: '2.5px solid var(--color-outline-variant, rgba(0,0,0,0.1))',
+          borderTopColor: 'var(--color-primary, #4a90d9)',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
         }}

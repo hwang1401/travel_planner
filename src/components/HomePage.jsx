@@ -17,6 +17,8 @@ import PullToRefresh from './common/PullToRefresh';
 import LoginPrompt from './common/LoginPrompt';
 import { SAMPLE_TRIP } from '../data/sampleTrip';
 import { COLOR, SPACING, RADIUS } from '../styles/tokens';
+import { isNative } from '../utils/platform';
+import { Share } from '@capacitor/share';
 
 const MIN_SPLASH_MS = 400;
 
@@ -405,15 +407,27 @@ export default function HomePage() {
       if (!code) { setToast({ message: '공유 코드를 찾을 수 없습니다', icon: 'info' }); return; }
       const link = getShareLink(code);
 
-      // Use native share API if available (mobile)
-      if (typeof navigator.share === 'function') {
+      // Use Capacitor Share on native, navigator.share on web
+      if (isNative()) {
+        try {
+          await Share.share({
+            title: trip.name,
+            text: `"${trip.name}" 여행에 참여해보세요!`,
+            url: link,
+            dialogTitle: '여행 공유',
+          });
+          return;
+        } catch {
+          // User cancelled or share failed — fall through to clipboard
+        }
+      } else if (typeof navigator.share === 'function') {
         try {
           await navigator.share({
             title: trip.name,
             text: `"${trip.name}" 여행에 참여해보세요!`,
             url: link,
           });
-          return; // User shared or cancelled — no toast needed
+          return;
         } catch {
           // User cancelled or share failed — fall through to clipboard
         }
