@@ -3,16 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [
-    react({
-      jsxRuntime: 'automatic',
-      jsxImportSource: 'react',
-      babel: {
-        plugins: [],
-      },
-    }),
-    tailwindcss(),
-  ],
+  plugins: [react(), tailwindcss()],
   server: {
     port: 3000,
     open: true,
@@ -20,7 +11,12 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: undefined, // Vite 자동 청크 분리 사용
+        manualChunks: {
+          // 큰 라이브러리 분리
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          supabase: ['@supabase/supabase-js'],
+          map: ['leaflet', 'react-leaflet'],
+        },
       },
     },
   },
